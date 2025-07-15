@@ -40,6 +40,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -56,6 +57,7 @@ public class RunModelTest {
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
+    private static final String STRUCT_INPUT_PATH = "examples/models/python/data/inputs/structured_run_config.json";
 
     // Only test E2E run model using the local repo
     // E2E model loading with different repo types is tested in ImportModelTest
@@ -90,6 +92,11 @@ public class RunModelTest {
     static TagHeader fileIoModelId;
     static TagHeader outputFileId;
     static TagHeader outputFileIdStream;
+
+    static TagHeader structModelId;
+    static SchemaDefinition structModelInputSchema;
+    static TagHeader structInputDataId;
+    static TagHeader structOutputDataId;
 
     @Test @Order(1)
     void loadInputData() throws Exception {
@@ -737,4 +744,167 @@ public class RunModelTest {
         Assertions.assertEquals(expectedContent, fileContents);
     }
 
+    @Test @Order(15)
+    void struct_importModel() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for struct...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.structured_objects.StructModel")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_model:struct"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_model:struct_import_model"))
+                .build());
+
+        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_model:struct", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.structured_objects.StructModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("run_config"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("modified_config"));
+
+        structModelId = modelTag.getHeader();
+        structModelInputSchema = modelDef.getInputsOrThrow("run_config").getSchema();
+    }
+
+    @Test @Order(16)
+    void struct_loadInputData() throws Exception {
+
+        log.info("Loading struct input data...");
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var inputPath = platform.tracRepoDir().resolve(STRUCT_INPUT_PATH);
+        var inputBytes = Files.readAllBytes(inputPath);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(structModelInputSchema)
+                .setFormat("text/json")
+                .setContent(ByteString.copyFrom(inputBytes))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_dataset")
+                        .setValue(MetadataCodec.encodeValue("run_model:run_config")))
+                .build();
+
+        structInputDataId = dataClient.createSmallDataset(writeRequest);
+
+        var dataSelector = MetadataUtil.selectorFor(structInputDataId);
+        var dataRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(dataSelector)
+                .build();
+
+        var dataTag = metaClient.readObject(dataRequest);
+
+        var datasetAttr = dataTag.getAttrsOrThrow("e2e_test_dataset");
+        var datasetSchema = dataTag.getDefinition().getData().getSchema();
+
+        Assertions.assertEquals("run_model:run_config", MetadataCodec.decodeStringValue(datasetAttr));
+        Assertions.assertEquals(SchemaType.STRUCT_SCHEMA, datasetSchema.getSchemaType());
+        Assertions.assertEquals(4, datasetSchema.getFieldsCount());
+
+        log.info("Struct input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
+    }
+
+    @Test @Order(17)
+    void struct_runModel() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(MetadataUtil.selectorFor(structModelId))
+                .putParameters("t0_date", MetadataCodec.encodeValue(LocalDate.now()))
+                .putParameters("projection_period", MetadataCodec.encodeValue(365))
+                .putInputs("run_config", MetadataUtil.selectorFor(structInputDataId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_model:modified_config")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setRunModel(runModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:structured_objects")))
+                .build();
+
+        var jobStatus = runJob(orchClient, jobRequest);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var searchResult = dataSearchResult.getSearchResult(0);
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_model:modified_config", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        structOutputDataId = dataTag.getHeader();
+    }
+
+    @Test @Order(18)
+    void struct_checkOutputData() {
+
+        log.info("Checking struct output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(structOutputDataId))
+                .setFormat("text/json")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+        var jsonText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+
+        System.out.println(jsonText);
+
+        // Model should have added this scenario, just look for its name
+        Assertions.assertTrue(jsonText.contains("hpi_shock"));
+    }
 }
