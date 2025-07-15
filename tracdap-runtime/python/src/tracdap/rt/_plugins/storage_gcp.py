@@ -48,6 +48,7 @@ def _gcp_fsspec_available():
 
 class GcpStorageProvider(IStorageProvider):
 
+    PROJECT_PROPERTY = "project"
     BUCKET_PROPERTY = "bucket"
     PREFIX_PROPERTY = "prefix"
     REGION_PROPERTY = "region"
@@ -68,11 +69,13 @@ class GcpStorageProvider(IStorageProvider):
     RUNTIME_FS_DEFAULT = RUNTIME_FS_AUTO
 
     ARROW_CLIENT_ARGS = {
+        PROJECT_PROPERTY: "project_id",
         REGION_PROPERTY: "default_bucket_location",
-        ENDPOINT_PROPERTY: "endpoint_override"
+        ENDPOINT_PROPERTY: "endpoint_override",
     }
 
     FSSPEC_CLIENT_ARGS = {
+        PROJECT_PROPERTY: "project",
         REGION_PROPERTY: "default_location",
         ENDPOINT_PROPERTY: "endpoint_url"
     }
@@ -139,8 +142,13 @@ class GcpStorageProvider(IStorageProvider):
 
         client_args = dict()
 
+        project = _helpers.get_plugin_property(self._properties, self.PROJECT_PROPERTY)
         region = _helpers.get_plugin_property(self._properties, self.REGION_PROPERTY)
         endpoint = _helpers.get_plugin_property(self._properties, self.ENDPOINT_PROPERTY)
+
+        if project is not None:
+            project_key = arg_mapping[self.PROJECT_PROPERTY]
+            client_args[project_key] = project
 
         if region is not None:
             region_key = arg_mapping[self.REGION_PROPERTY]
