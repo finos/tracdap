@@ -42,6 +42,7 @@ dependencies {
 
     // Google Guava - common lib includes helpers to translate to/from equivalent JDK types
     api group: 'com.google.guava', name: 'guava', version: "$guava_version"
+    api group: 'com.google.code.gson', name: 'gson', version: "$gson_version"
 
     // Netty common package - for building Netty helpers, package has limited dependencies
     api group: 'io.netty', name: 'netty-common', version: "$netty_version"

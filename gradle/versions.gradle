@@ -27,8 +27,9 @@ ext {
 
     // Core platform technologies
     netty_version = '4.1.118.Final'
-    guava_version = '33.4.0-jre'
-    proto_version = '4.29.3'
+    guava_version = '33.4.8-jre'
+    gson_version = '2.13.1'
+    proto_version = '4.31.1'
     grpc_version = '1.70.0'
     gapi_version = '2.51.0'
 
