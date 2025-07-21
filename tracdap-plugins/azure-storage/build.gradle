@@ -39,6 +39,7 @@ dependencies {
 
     // July 2025: Force version for compliance (can be removed once Azure updates)
     implementation group: 'com.nimbusds', name: 'nimbus-jose-jwt', version: '10.3.1'
+    implementation group: 'io.projectreactor.netty', name: 'reactor-netty-http', version: '1.2.8'
 
     testImplementation project(path: ":tracdap-lib-data", configuration: "testSuite")
 }
