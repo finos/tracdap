@@ -685,13 +685,13 @@ public class JobConsistencyValidator {
             var requiredValueField = requiredField.getChildren(1);
 
             ctx = checkFieldSchema(
-                    suppliedKeyField, requiredRootSchema,
-                    requiredKeyField, suppliedRootSchema,
+                    suppliedKeyField, suppliedRootSchema,
+                    requiredKeyField, requiredRootSchema,
                     childFieldPath, ctx);
 
             ctx = checkFieldSchema(
-                    suppliedValueField, requiredRootSchema,
-                    requiredValueField, suppliedRootSchema,
+                    suppliedValueField, suppliedRootSchema,
+                    requiredValueField, requiredRootSchema,
                     childFieldPath, ctx);
 
             return ctx;
