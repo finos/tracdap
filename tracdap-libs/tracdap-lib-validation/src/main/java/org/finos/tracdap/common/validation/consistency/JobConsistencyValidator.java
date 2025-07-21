@@ -19,6 +19,7 @@ package org.finos.tracdap.common.validation.consistency;
 
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.common.graph.*;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -698,6 +699,14 @@ public class JobConsistencyValidator {
         }
 
         if (requiredField.getFieldType() == BasicType.STRUCT) {
+
+            // Internal consistency of all schemas is already checked during static object validation
+
+            if (suppliedField.hasNamedType() && !suppliedRootSchema.containsNamedTypes(suppliedField.getNamedType()))
+                throw new EValidationGap(String.format("Job contains an invalid schema: Missing named type [%s]", suppliedField.getNamedType()));
+
+            if (requiredField.hasNamedType() && !requiredRootSchema.containsNamedTypes(requiredField.getNamedType()))
+                throw new EValidationGap(String.format("Job contains an invalid schema: Missing named type [%s]", requiredField.getNamedType()));
 
             var suppliedChildren = suppliedField.hasNamedType()
                     ? suppliedRootSchema.getNamedTypesOrThrow(suppliedField.getNamedType()).getFieldsList()
