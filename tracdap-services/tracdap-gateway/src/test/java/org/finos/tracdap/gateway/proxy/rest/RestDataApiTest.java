@@ -224,7 +224,7 @@ public class RestDataApiTest {
         var createFileBase64 = Base64.getEncoder().encodeToString(createFileBytes);
         var createRequestJson = "{\n" +
                 "    \"name\": \"create_flow.json\",\n" +
-                "    \"mimeType\": \"text/json\",\n" +
+                "    \"mimeType\": \"application/json\",\n" +
                 "    \"size\": " + createFileBytes.length + ",\n" +
                 "    \"content\": \"" + createFileBase64+ "\"\n" +
                 "}";
@@ -272,7 +272,7 @@ public class RestDataApiTest {
         var updateRequestJson = "{\n" +
                 "    \"name\": \"create_flow.json\",\n" +
                 "    \"priorVersion\": " + fileSelectorJson + ",\n" +
-                "    \"mimeType\": \"text/json\",\n" +
+                "    \"mimeType\": \"application/json\",\n" +
                 "    \"size\": " + updateFileBytes.length + ",\n" +
                 "    \"content\": \"" + updateFileBase64+ "\"\n" +
                 "}";

@@ -59,7 +59,7 @@ export function loadDataFromTrac(dataId) {
         tenant: "ACME_CORP",
 
         selector: dataId,
-        format: "text/json"
+        format: "application/json"
     });
 
     return dataApi.readSmallDataset(request).then(response => {
@@ -148,7 +148,7 @@ function saveDataFromMemory(schemaId, originalDataId, newData) {
 
         // Schema, format and content are provided as normal
         schemaId: schemaId,
-        format: "text/json",
+        format: "application/json",
         content: bytes,
 
         // Existing tags are retained during updates

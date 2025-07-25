@@ -49,7 +49,7 @@ public class CoreDataPlugin extends TracPlugin {
             new PluginServiceInfo(ICodec.class, ARROW_STREAM_CODEC_NAME, List.of("ARROW_STREAM", "application/vnd.apache.arrow.stream", "application/x-apache-arrow-stream")),
             new PluginServiceInfo(ICodec.class, ARROW_FILE_CODEC_NAME, List.of("ARROW_FILE", "application/vnd.apache.arrow.file", "application/x-apache-arrow-file")),
             new PluginServiceInfo(ICodec.class, CSV_CODEC_NAME, List.of("CSV", "text/csv")),
-            new PluginServiceInfo(ICodec.class, JSON_CODEC_NAME, List.of("JSON", "text/json")));
+            new PluginServiceInfo(ICodec.class, JSON_CODEC_NAME, List.of("JSON", "application/json", "text/json")));
 
 
     @Override

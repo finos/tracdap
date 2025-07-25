@@ -288,7 +288,7 @@ abstract class DataRoundTripTest {
             var testDataBytes = testDataStream.readAllBytes();
             var testData = List.of(ByteString.copyFrom(testDataBytes));
 
-            var mimeType = "text/json";
+            var mimeType = "application/json";
             roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, true);
             roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, false);
         }
@@ -321,7 +321,7 @@ abstract class DataRoundTripTest {
                 }
             };
 
-            var mimeType = "text/json";
+            var mimeType = "application/json";
             roundTripComparison(testData, mimeType, mimeType, jsonComparison, true);
             roundTripComparison(testData, mimeType, mimeType, jsonComparison, false);
         }

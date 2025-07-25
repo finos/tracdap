@@ -37,10 +37,10 @@ import tracdap.rt._impl.core.type_system as _meta_types
 
 class StructProcessor:
 
-    JSON_FORMAT = "text/json"
+    JSON_FORMAT = "application/json"
     JSON_ALT_FORMATS = ["json", ".json"]
 
-    YAML_FORMAT = "text/yaml"
+    YAML_FORMAT = "application/yaml"
     YAML_ALT_FORMATS = ["yaml", ".yaml", "yml"]
 
     __primitive_types: dict[type, _meta.BasicType] = {
