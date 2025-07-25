@@ -87,7 +87,6 @@ packaging >= 23.0
 safety != 3.3.0
 marshmallow < 4.0
 
-# Series 3.x does not work with Python 3.11
-# Series 4.x does not work with Python 3.7
-# So, let PIP pick a version that works with the version of Python being used
-pip-licenses >= 5.0, < 6.0
+# Thsi project is the successor of the original pip-licenses tool
+# https://github.com/raimon49/pip-licenses/issues/227#issuecomment-3050082147
+pip-licenses-cli >= 1.4, < 2.0
