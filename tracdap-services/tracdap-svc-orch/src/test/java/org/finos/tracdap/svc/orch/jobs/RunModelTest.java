@@ -795,7 +795,7 @@ public class RunModelTest {
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSchema(structModelInputSchema)
-                .setFormat("text/json")
+                .setFormat("application/json")
                 .setContent(ByteString.copyFrom(inputBytes))
                 .addTagUpdates(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_dataset")
@@ -895,7 +895,7 @@ public class RunModelTest {
         var readRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSelector(MetadataUtil.selectorFor(structOutputDataId))
-                .setFormat("text/json")
+                .setFormat("application/json")
                 .build();
 
 

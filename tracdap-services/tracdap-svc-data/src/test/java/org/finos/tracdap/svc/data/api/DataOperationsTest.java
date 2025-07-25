@@ -669,7 +669,7 @@ abstract class DataOperationsTest {
         // Format code does not match the supplied data (but is a supported format)
         // This should be detected as data corruption, and reported back as DATA_LOSS
 
-        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().setFormat("text/json").build();
+        var request = BASIC_CREATE_DATASET_REQUEST.toBuilder().setFormat("application/json").build();
         var response = DataApiTestHelpers.clientStreaming(dataClient::createDataset, request);
         waitFor(TEST_TIMEOUT, response);
         var error = assertThrows(StatusRuntimeException.class, () -> resultOf(response));
