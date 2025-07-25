@@ -77,7 +77,7 @@ service TracDataApi {
    * The "format" parameter describes the format used to upload data. For example,
    * to upload a CSV file the format would be set to "text/csv" and the file content
    * can be uploaded directly, or to upload the output of an editor grid in a web
-   * client the format can be set to "text/json" to upload a JSON representation of
+   * client the format can be set to "application/json" to upload a JSON representation of
    * the editor contents. TRAC will apply format conversion before the data is
    * processed and stored.
    *
@@ -120,7 +120,7 @@ service TracDataApi {
    * The "format" parameter describes the format used to upload data. For example,
    * to upload a CSV file the format would be set to "text/csv" and the file content
    * can be uploaded directly, or to upload the output of an editor grid in a web
-   * client the format can be set to "text/json" to upload a JSON representation of
+   * client the format can be set to "application/json" to upload a JSON representation of
    * the editor contents. TRAC will apply format conversion before the data is
    * processed and stored.
    *
@@ -176,7 +176,7 @@ service TracDataApi {
    * The "format" parameter describes the format used to upload data. For example,
    * to upload a CSV file the format would be set to "text/csv" and the file content
    * can be uploaded directly, or to upload the output of an editor grid in a web
-   * client the format can be set to "text/json" to upload a JSON representation of
+   * client the format can be set to "application/json" to upload a JSON representation of
    * the editor contents. It is not necessary for different versions of the same dataset
    * to be uploaded using the same format. TRAC will apply format conversion before the
    * data is processed and stored.
@@ -228,7 +228,7 @@ service TracDataApi {
    * The "format" parameter describes the format used to upload data. For example,
    * to upload a CSV file the format would be set to "text/csv" and the file content
    * can be uploaded directly, or to upload the output of an editor grid in a web
-   * client the format can be set to "text/json" to upload a JSON representation of
+   * client the format can be set to "application/json" to upload a JSON representation of
    * the editor contents. It is not necessary for different versions of the same dataset
    * to be uploaded using the same format. TRAC will apply format conversion before the
    * data is processed and stored.
