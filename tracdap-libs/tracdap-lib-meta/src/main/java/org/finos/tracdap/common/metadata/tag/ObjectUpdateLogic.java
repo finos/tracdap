@@ -21,11 +21,9 @@ import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
-import org.finos.tracdap.metadata.ObjectDefinition;
-import org.finos.tracdap.metadata.Tag;
-import org.finos.tracdap.metadata.TagHeader;
-import org.finos.tracdap.metadata.TagUpdate;
+import org.finos.tracdap.metadata.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -56,9 +54,11 @@ public class ObjectUpdateLogic {
 
         // Apply the common controlled trac_ tags for newly created objects
 
+        var structuredAttrs = structuredAttrs(definition);
         var createAttrs = commonCreateAttrs(requestMetadata, userMetadata);
         var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, structuredAttrs);
         newTag = TagUpdateLogic.applyTagUpdates(newTag, createAttrs);
         newTag = TagUpdateLogic.applyTagUpdates(newTag, updateAttrs);
 
@@ -85,12 +85,15 @@ public class ObjectUpdateLogic {
                 .setDefinition(definition)
                 .build();
 
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
+
         // Apply the common controlled trac_ tags for updated objects
 
-        var commonAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
+        var structuredAttrs = structuredAttrs(definition);
+        var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
-        newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
-        newTag = TagUpdateLogic.applyTagUpdates(newTag, commonAttrs);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, structuredAttrs);
+        newTag = TagUpdateLogic.applyTagUpdates(newTag, updateAttrs);
 
         return newTag;
     }
@@ -158,5 +161,136 @@ public class ObjectUpdateLogic {
                 .build();
 
         return List.of(updateTimeAttr, updateUserIdAttr, updateUserNameAttr);
+    }
+
+    public static List<TagUpdate> structuredAttrs(ObjectDefinition tracObject) {
+
+        // Set structured attrs that are available directly in the object definition
+        // This does not cover everything - e.g. job status is not part of the job definition
+        // Other controlled attrs must be passed in by the relevant TRAC services
+
+        switch (tracObject.getObjectType()) {
+
+            case SCHEMA: return structuredSchemaAttrs(tracObject.getSchema());
+            case FILE: return structuredFileAttrs(tracObject.getFile());
+            case MODEL: return structuredModelAttrs(tracObject.getModel());
+            case JOB: return structuredJobAttrs(tracObject.getJob());
+
+            default:
+                return List.of();
+        }
+    }
+
+    public static List<TagUpdate> structuredSchemaAttrs(SchemaDefinition tracSchema) {
+
+        var schemaAttrs = new ArrayList<TagUpdate>();
+
+        schemaAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_SCHEMA_TYPE_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracSchema.getSchemaType().name()))
+                .build());
+
+        if (tracSchema.getSchemaType() == SchemaType.TABLE_SCHEMA &&
+            tracSchema.getTable().getFieldsCount() > 0) {
+
+            schemaAttrs.add(TagUpdate.newBuilder()
+                    .setAttrName(MetadataConstants.TRAC_SCHEMA_FIELD_COUNT_ATTR)
+                    .setValue(MetadataCodec.encodeValue(tracSchema.getTable().getFieldsCount()))
+                    .build());
+        }
+        else {
+
+            schemaAttrs.add(TagUpdate.newBuilder()
+                    .setAttrName(MetadataConstants.TRAC_SCHEMA_FIELD_COUNT_ATTR)
+                    .setValue(MetadataCodec.encodeValue(tracSchema.getFieldsCount()))
+                    .build());
+        }
+
+        return schemaAttrs;
+    }
+
+    public static List<TagUpdate> structuredFileAttrs(FileDefinition tracFile) {
+
+        var fileAttrs = new ArrayList<TagUpdate>();
+
+        fileAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_FILE_NAME_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracFile.getName()))
+                .build());
+
+        fileAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_FILE_EXTENSION_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracFile.getExtension()))
+                .build());
+
+        fileAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_FILE_MIME_TYPE_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracFile.getMimeType()))
+                .build());
+
+        fileAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_FILE_SIZE_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracFile.getSize()))
+                .build());
+
+        return fileAttrs;
+    }
+
+    public static List<TagUpdate> structuredModelAttrs(ModelDefinition tracModel) {
+
+        var modelAttrs = new ArrayList<TagUpdate>();
+
+        modelAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_MODEL_LANGUAGE)
+                .setValue(MetadataCodec.encodeValue(tracModel.getLanguage()))
+                .build());
+
+        modelAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_MODEL_REPOSITORY)
+                .setValue(MetadataCodec.encodeValue(tracModel.getRepository()))
+                .build());
+
+        if (tracModel.hasPackageGroup()) {
+            modelAttrs.add(TagUpdate.newBuilder()
+                    .setAttrName(MetadataConstants.TRAC_MODEL_PACKAGE_GROUP)
+                    .setValue(MetadataCodec.encodeValue(tracModel.getPackageGroup()))
+                    .build());
+        }
+
+        modelAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_MODEL_PACKAGE)
+                .setValue(MetadataCodec.encodeValue(tracModel.getPackage()))
+                .build());
+
+        modelAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_MODEL_VERSION)
+                .setValue(MetadataCodec.encodeValue(tracModel.getVersion()))
+                .build());
+
+        modelAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_MODEL_ENTRY_POINT)
+                .setValue(MetadataCodec.encodeValue(tracModel.getEntryPoint()))
+                .build());
+
+        if (tracModel.hasPath()) {
+            modelAttrs.add(TagUpdate.newBuilder()
+                    .setAttrName(MetadataConstants.TRAC_MODEL_PATH)
+                    .setValue(MetadataCodec.encodeValue(tracModel.getPath()))
+                    .build());
+        }
+
+        return modelAttrs;
+    }
+
+    public static List<TagUpdate> structuredJobAttrs(JobDefinition tracJob) {
+
+        var jobAttrs = new ArrayList<TagUpdate>();
+
+        jobAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_JOB_TYPE_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracJob.getJobType().name()))
+                .build());
+
+        return jobAttrs;
     }
 }
