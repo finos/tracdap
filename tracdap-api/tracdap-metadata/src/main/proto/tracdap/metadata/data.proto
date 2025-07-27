@@ -39,8 +39,8 @@ enum SchemaType {
     SCHEMA_TYPE_NOT_SET = 0;
 
     /// Tabular data
-    TABLE = 1;
     TABLE_SCHEMA = 1;
+    TABLE = 1;
 
     /// Structured objects
     STRUCT_SCHEMA = 2;
