@@ -169,6 +169,8 @@ message DataDefinition {
 
         uint32 deltaIndex = 1;
         string dataItem = 2;
+
+        uint64 rowCount = 3;
     }
 
     /// Snapshot of a partition
@@ -188,4 +190,6 @@ message DataDefinition {
     map<string, Part> parts = 3;
 
     TagSelector storageId = 4;
+
+    uint64 rowCount = 5;
 }
