@@ -172,6 +172,7 @@ public class ObjectUpdateLogic {
         switch (tracObject.getObjectType()) {
 
             case SCHEMA: return structuredSchemaAttrs(tracObject.getSchema());
+            case DATA: return structuredDataAttrs(tracObject.getData());
             case FILE: return structuredFileAttrs(tracObject.getFile());
             case MODEL: return structuredModelAttrs(tracObject.getModel());
             case JOB: return structuredJobAttrs(tracObject.getJob());
