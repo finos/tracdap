@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
+import org.finos.tracdap.common.data.pipeline.CounterStage;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -173,7 +174,7 @@ public class DataService {
                 // Update metadata objects with results from data processing
                 // (currently just size, but could also include other basic stats)
                 // Metadata tags are also built here
-                .thenApply(state -> finalizeUpdateMetadata(request, state))
+                .thenApply(state -> finalizeMetadata(request, state))
 
                 // Save metadata to the metadata store
                 // This effectively "commits" the dataset by making it visible
@@ -642,35 +643,53 @@ public class DataService {
 
     private RequestState finalizeMetadata(DataWriteRequest request, RequestState state) {
 
+        // Update row count for the delta being processed
+
+        var part = state.data.getPartsOrThrow(state.part.getOpaqueKey());
+        var delta = part.getSnap().getDeltas(part.getSnap().getDeltasCount() - 1);
+
+        var augmentedDelta = delta.toBuilder()
+                .setRowCount(state.dataRowCount)
+                .build();
+
+        var augmentedPart = part.toBuilder()
+                .setSnap(part.getSnap().toBuilder()
+                .setDeltas(part.getSnap().getDeltasCount() - 1, augmentedDelta))
+                .build();
+
+        var augmentedData = state.data.toBuilder()
+                .putParts(state.part.getOpaqueKey(), augmentedPart);
+
+        // Update top level row count by aggregating across live deltas
+        // Superseded snapshots are not included
+
+        long totalRowCount = augmentedData.getPartsMap().values().stream()
+                .map(DataDefinition.Part::getSnap)
+                .map(DataDefinition.Snap::getDeltasList)
+                .flatMap(List::stream)
+                .mapToLong(DataDefinition.Delta::getRowCount)
+                .sum();
+
+        state.data = augmentedData
+                .setRowCount(totalRowCount)
+                .build();
+
         // Client can set uncontrolled tags on the dataset, but not the storage object
         // Controlled tags are added to the storage object
         state.dataTags = request.getTagUpdatesList();
         state.storageTags = controlledStorageAttrs(state.dataId);
-
-        // TODO: Add controlled tags to DATA objects, e.g. trac_data_rows, trac_data_size
-
-        return state;
-    }
-
-    private RequestState finalizeUpdateMetadata(DataWriteRequest request, RequestState state) {
-
-        // Client can update uncontrolled tags on the dataset
-        // Controlled tags for storage do not change on update
-        state.dataTags = request.getTagUpdatesList();
-        state.storageTags = List.of();
 
         return state;
     }
 
     private static List<TagUpdate> controlledStorageAttrs(TagHeader dataId) {
 
-        // TODO: Special metadata Value type for handling tag selectors
+        // TODO: Metadata svc should have a common way to record object references
         var selector = MetadataUtil.selectorForLatest(dataId);
         var storageObjectAttr = MetadataUtil.objectKey(selector);
 
         var storageForAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_STORAGE_OBJECT_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
                 .setValue(MetadataCodec.encodeValue(storageObjectAttr))
                 .build();
 
@@ -706,17 +725,23 @@ public class DataService {
 
         var pipeline = DataPipeline.forSource(contentStream, dataCtx);
         var decoder = codec.getDecoder(state.schema, dataCtx.arrowAllocator(), codecOptions);
+        var counter = new CounterStage();
         var signal = new CompletableFuture<Long>();
 
         pipeline.addStage(decoder);
+        pipeline.addStage(counter);
         pipeline = storage.pipelineWriter(state.copy, dataCtx, pipeline, signal);
 
         pipeline.execute();
 
-        return signal.thenApply(rowsSaved -> recordSaveResult(rowsSaved, state));
+        return signal.thenApply(fileSize -> recordSaveResult(fileSize, counter, state));
     }
 
-    private RequestState recordSaveResult(long rowsSaved, RequestState state) {
+    private RequestState recordSaveResult(long fileSize, CounterStage counter, RequestState state) {
+
+        state.fileSize = fileSize;
+        state.dataRowCount = counter.getRowCount();
+        state.dataBatchCount = counter.getBatchCount();
 
         return state;
     }

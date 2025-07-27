@@ -53,4 +53,6 @@ class RequestState {
     StorageCopy copy;
 
     long fileSize;
+    long dataRowCount;
+    long dataBatchCount;
 }

@@ -135,7 +135,7 @@ public class FileService {
                 .thenCompose(state -> writeFileContent(request, state, contentStream, dataCtx))
 
                 // Build updated tag attrs (must be done after file size is known)
-                .thenApply(state -> finalizeUpdateMetadata(request, state))
+                .thenApply(state -> finalizeMetadata(request, state))
 
                 // Save all metadata
                 .thenCompose(state -> saveMetadata(request, state, priorState));
@@ -505,35 +505,17 @@ public class FileService {
         state.fileTags = request.getTagUpdatesList();
         state.storageTags = controlledStorageAttrs(state.fileId);
 
-        // TODO: Add controlled tags to DATA objects, e.g. trac_data_rows, trac_data_size
-
-        return state;
-    }
-
-    private RequestState finalizeUpdateMetadata(FileWriteRequest request, RequestState state) {
-
-        // Record actual size in the file def
-        state.file = state.file.toBuilder()
-                .setSize(state.fileSize)
-                .build();
-
-        // Client can update uncontrolled tags on the file
-        // Controlled tags for storage do not change on update
-        state.fileTags = request.getTagUpdatesList();
-        state.storageTags = List.of();
-
         return state;
     }
 
     private static List<TagUpdate> controlledStorageAttrs(TagHeader fileId) {
 
-        // TODO: Special metadata Value type for handling tag selectors
+        // TODO: Metadata svc should have a common way to record object references
         var selector = MetadataUtil.selectorForLatest(fileId);
         var storageObjectAttr = MetadataUtil.objectKey(selector);
 
         var storageForAttr = TagUpdate.newBuilder()
                 .setAttrName(TRAC_STORAGE_OBJECT_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
                 .setValue(MetadataCodec.encodeValue(storageObjectAttr))
                 .build();
 
