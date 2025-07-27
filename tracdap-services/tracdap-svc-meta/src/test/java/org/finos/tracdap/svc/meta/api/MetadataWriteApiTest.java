@@ -763,13 +763,19 @@ abstract class MetadataWriteApiTest {
         assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
         assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
 
+        // Attrs that will have different values for the update versions of the metadata samples
+        var CHANGING_ATTRS = List.of(
+                "trac_schema_field_count",
+                "trac_file_name",
+                "trac_file_size");
+
         for (var attr : expectedTag.getAttrsMap().keySet()) {
 
             // trac_update_  attrs are set on the original tag and changed by the update operation
-            if (attr.startsWith("trac_update_"))
-                continue;
-
-            assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+            if (attr.startsWith("trac_update_") || CHANGING_ATTRS.contains(attr))
+                assertEquals(expectedTag.getAttrsOrThrow(attr).getType(), tagFromStore.getAttrsOrThrow(attr).getType());
+            else
+                assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr), attr);
         }
 
         assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
@@ -1253,13 +1259,19 @@ abstract class MetadataWriteApiTest {
             assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
             assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
 
+            // Attrs that will have different values for the update versions of the metadata samples
+            var CHANGING_ATTRS = List.of(
+                    "trac_schema_field_count",
+                    "trac_file_name",
+                    "trac_file_size");
+
             for (var attr : expectedTag.getAttrsMap().keySet()) {
 
                 // trac_update_  attrs are set on the original tag and changed by the update operation
-                if (attr.startsWith("trac_update_"))
-                    continue;
-
-                assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+                if (attr.startsWith("trac_update_") || CHANGING_ATTRS.contains(attr))
+                    assertEquals(expectedTag.getAttrsOrThrow(attr).getType(), tagFromStore.getAttrsOrThrow(attr).getType());
+                else
+                    assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr), attr);
             }
 
             assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
