@@ -51,4 +51,6 @@ class RequestState {
     long limit;
 
     StorageCopy copy;
+
+    long fileSize;
 }

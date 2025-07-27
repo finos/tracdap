@@ -44,8 +44,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
@@ -101,7 +99,7 @@ public class FileService {
                 .thenCompose(state -> writeFileContent(request, state, contentStream, dataCtx))
 
                 // Build new tag attrs (must be done after file size is known)
-                .thenApply(state -> buildCreateAttrs(request, state))
+                .thenApply(state -> finalizeMetadata(request, state))
 
                 // Save all metadata
                 .thenCompose(state -> saveMetadata(request, state));
@@ -137,7 +135,7 @@ public class FileService {
                 .thenCompose(state -> writeFileContent(request, state, contentStream, dataCtx))
 
                 // Build updated tag attrs (must be done after file size is known)
-                .thenApply(state -> buildUpdateAttrs(request, state))
+                .thenApply(state -> finalizeUpdateMetadata(request, state))
 
                 // Save all metadata
                 .thenCompose(state -> saveMetadata(request, state, priorState));
@@ -331,10 +329,7 @@ public class FileService {
             throw new EDataSize(err);
         }
 
-        // Record actual size in the file def
-        state.file = state.file.toBuilder()
-                .setSize(actualSize)
-                .build();
+        state.fileSize = actualSize;
 
         return state;
     }
@@ -498,72 +493,42 @@ public class FileService {
                 .build();
     }
 
-    private RequestState buildCreateAttrs(FileWriteRequest request, RequestState state) {
+    private RequestState finalizeMetadata(FileWriteRequest request, RequestState state) {
 
-        var controlledFileAttrs = createFileAttrs(state.file);
-        var controlledStorageAttrs = createStorageAttrs(state.fileId);
+        // Record actual size in the file def
+        state.file = state.file.toBuilder()
+                .setSize(state.fileSize)
+                .build();
 
-        // File object has user-supplied attrs + controlled attrs
-        state.fileTags = Stream.concat(
-                request.getTagUpdatesList().stream(),
-                controlledFileAttrs.stream())
-                .collect(Collectors.toList());
+        // Client can set uncontrolled tags on the file, but not the storage object
+        // Controlled tags are added to the storage object
+        state.fileTags = request.getTagUpdatesList();
+        state.storageTags = controlledStorageAttrs(state.fileId);
 
-        // Storage object just has controlled attrs
-        state.storageTags = controlledStorageAttrs;
+        // TODO: Add controlled tags to DATA objects, e.g. trac_data_rows, trac_data_size
 
         return state;
     }
 
-    private RequestState buildUpdateAttrs(FileWriteRequest request, RequestState state) {
+    private RequestState finalizeUpdateMetadata(FileWriteRequest request, RequestState state) {
 
-        var controlledFileAttrs = updateFileAttrs(state.file);
+        // Record actual size in the file def
+        state.file = state.file.toBuilder()
+                .setSize(state.fileSize)
+                .build();
 
-        // File object has user-supplied attrs + controlled attrs
-        state.fileTags = Stream.concat(
-                request.getTagUpdatesList().stream(),
-                controlledFileAttrs.stream())
-                .collect(Collectors.toList());
-
-        // Storage attrs do not change across versions
+        // Client can update uncontrolled tags on the file
+        // Controlled tags for storage do not change on update
+        state.fileTags = request.getTagUpdatesList();
         state.storageTags = List.of();
 
         return state;
     }
 
-    private List<TagUpdate> createFileAttrs(FileDefinition fileDef) {
-
-        var nameAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_NAME_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getName()))
-                .build();
-
-        var extensionAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_EXTENSION_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getExtension()))
-                .build();
-
-        var mimeTypeAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_MIME_TYPE_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getMimeType()))
-                .build();
-
-        var sizeAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_SIZE_ATTR)
-                .setOperation(TagOperation.CREATE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
-                .build();
-
-        return List.of(nameAttr, extensionAttr, mimeTypeAttr, sizeAttr);
-    }
-
-    private List<TagUpdate> createStorageAttrs(TagHeader fileId) {
+    private static List<TagUpdate> controlledStorageAttrs(TagHeader fileId) {
 
         // TODO: Special metadata Value type for handling tag selectors
-        var selector = selectorForLatest(fileId);
+        var selector = MetadataUtil.selectorForLatest(fileId);
         var storageObjectAttr = MetadataUtil.objectKey(selector);
 
         var storageForAttr = TagUpdate.newBuilder()
@@ -573,24 +538,5 @@ public class FileService {
                 .build();
 
         return List.of(storageForAttr);
-    }
-
-    private List<TagUpdate> updateFileAttrs(FileDefinition fileDef) {
-
-        // Extension and mime type are not allowed to change between file versions
-
-        var nameAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_NAME_ATTR)
-                .setOperation(TagOperation.REPLACE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getName()))
-                .build();
-
-        var sizeAttr = TagUpdate.newBuilder()
-                .setAttrName(TRAC_FILE_SIZE_ATTR)
-                .setOperation(TagOperation.REPLACE_ATTR)
-                .setValue(MetadataCodec.encodeValue(fileDef.getSize()))
-                .build();
-
-        return List.of(nameAttr, sizeAttr);
     }
 }
