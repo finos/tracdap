@@ -209,6 +209,18 @@ public class ObjectUpdateLogic {
         return schemaAttrs;
     }
 
+    public static List<TagUpdate> structuredDataAttrs(DataDefinition tracData) {
+
+        var dataAttrs = new ArrayList<TagUpdate>();
+
+        dataAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_DATA_ROW_COUNT_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracData.getRowCount()))
+                .build());
+
+        return dataAttrs;
+    }
+
     public static List<TagUpdate> structuredFileAttrs(FileDefinition tracFile) {
 
         var fileAttrs = new ArrayList<TagUpdate>();
