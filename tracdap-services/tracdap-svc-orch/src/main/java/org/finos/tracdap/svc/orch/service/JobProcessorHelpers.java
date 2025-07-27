@@ -223,24 +223,19 @@ public class JobProcessorHelpers {
                 .setJob(jobState.definition)
                 .build();
 
-        var ctrlJobAttrs = List.of(
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_TYPE_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.jobType.toString()))
-                        .build(),
-                TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.tracStatus.toString()))
-                        .build());
+        var userJobAttrs = jobState.jobRequest.getJobAttrsList();
 
-        var freeJobAttrs = jobState.jobRequest.getJobAttrsList();
+        var initialStatusAttr = TagUpdate.newBuilder()
+                .setAttrName(TRAC_JOB_STATUS_ATTR)
+                .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name()))
+                .build();
 
         var jobWriteReq = MetadataWriteRequest.newBuilder()
                 .setTenant(jobState.tenant)
                 .setObjectType(ObjectType.JOB)
                 .setDefinition(jobObj)
-                .addAllTagUpdates(ctrlJobAttrs)
-                .addAllTagUpdates(freeJobAttrs)
+                .addAllTagUpdates(userJobAttrs)
+                .addTagUpdates(initialStatusAttr)
                 .build();
 
         jobState.jobId = client.createObject(jobWriteReq);
