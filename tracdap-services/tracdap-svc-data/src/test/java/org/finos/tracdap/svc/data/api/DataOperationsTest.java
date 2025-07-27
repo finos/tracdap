@@ -233,6 +233,12 @@ abstract class DataOperationsTest {
         waitFor(TEST_TIMEOUT, metaResponse);
         var tag = resultOf(metaResponse);
 
+        // Structured attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_data_row_count"));
+        var rowCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_data_row_count"));
+        Assertions.assertEquals(10, rowCount);
+
         // Explicitly set attrs
 
         Assertions.assertTrue(tag.containsAttrs("dataset_name"));
@@ -762,6 +768,12 @@ abstract class DataOperationsTest {
         var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
         waitFor(TEST_TIMEOUT, metaResponse);
         var tag = resultOf(metaResponse);
+
+        // Structured attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_data_row_count"));
+        var rowCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_data_row_count"));
+        Assertions.assertEquals(10, rowCount);
 
         // Explicitly set attrs
 
