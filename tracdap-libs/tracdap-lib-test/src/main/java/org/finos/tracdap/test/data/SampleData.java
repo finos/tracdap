@@ -535,19 +535,17 @@ public class SampleData {
 
             if (dictionary != null) {
 
-                var staging = new ArrowVsrStaging(stagingVector, (BaseIntVector) vector, dictionary);
+                var staging = new ArrowVsrStaging<>(stagingVector, (BaseIntVector) vector, dictionary);
                 stagedFields.add(staging);
             }
             else {
 
-                var staging = new ArrowVsrStaging(stagingVector, (BaseIntVector) vector);
+                var staging = new ArrowVsrStaging<>(stagingVector, (BaseIntVector) vector);
                 stagedFields.add(staging);
                 dictionaries.put(staging.getDictionary());
             }
 
-            var stagingConsumer = buildConsumer((FieldVector) stagingVector, null, null, null, allocator);
-
-            return stagingConsumer;
+            return buildConsumer((FieldVector) stagingVector, null, null, null, allocator);
         }
 
         switch (field.getType().getTypeID()) {
