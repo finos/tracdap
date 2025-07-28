@@ -19,6 +19,7 @@ package org.finos.tracdap.common.metadata.tag;
 
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.metadata.*;
@@ -32,7 +33,7 @@ public class ObjectUpdateLogic {
 
     public static Tag buildNewObject(
             UUID objectId, ObjectDefinition definition, List<TagUpdate> tagUpdates,
-            RequestMetadata requestMetadata, UserMetadata userMetadata) {
+            MetadataBundle references, RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var newHeader = TagHeader.newBuilder()
                 .setObjectType(definition.getObjectType())
@@ -54,7 +55,7 @@ public class ObjectUpdateLogic {
 
         // Apply the common controlled trac_ tags for newly created objects
 
-        var structuredAttrs = structuredAttrs(definition);
+        var structuredAttrs = structuredAttrs(definition, references);
         var createAttrs = commonCreateAttrs(requestMetadata, userMetadata);
         var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
@@ -67,7 +68,7 @@ public class ObjectUpdateLogic {
 
     public static Tag buildNewVersion(
             Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates,
-            RequestMetadata requestMetadata, UserMetadata userMetadata) {
+            MetadataBundle references, RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var oldHeader = priorTag.getHeader();
 
@@ -89,7 +90,7 @@ public class ObjectUpdateLogic {
 
         // Apply the common controlled trac_ tags for updated objects
 
-        var structuredAttrs = structuredAttrs(definition);
+        var structuredAttrs = structuredAttrs(definition, references);
         var updateAttrs = commonUpdateAttrs(requestMetadata, userMetadata);
 
         newTag = TagUpdateLogic.applyTagUpdates(newTag, structuredAttrs);
@@ -163,7 +164,7 @@ public class ObjectUpdateLogic {
         return List.of(updateTimeAttr, updateUserIdAttr, updateUserNameAttr);
     }
 
-    public static List<TagUpdate> structuredAttrs(ObjectDefinition tracObject) {
+    public static List<TagUpdate> structuredAttrs(ObjectDefinition tracObject, MetadataBundle references) {
 
         // Set structured attrs that are available directly in the object definition
         // This does not cover everything - e.g. job status is not part of the job definition
@@ -172,7 +173,7 @@ public class ObjectUpdateLogic {
         switch (tracObject.getObjectType()) {
 
             case SCHEMA: return structuredSchemaAttrs(tracObject.getSchema());
-            case DATA: return structuredDataAttrs(tracObject.getData());
+            case DATA: return structuredDataAttrs(tracObject.getData(), references);
             case FILE: return structuredFileAttrs(tracObject.getFile());
             case MODEL: return structuredModelAttrs(tracObject.getModel());
             case JOB: return structuredJobAttrs(tracObject.getJob());
@@ -210,9 +211,19 @@ public class ObjectUpdateLogic {
         return schemaAttrs;
     }
 
-    public static List<TagUpdate> structuredDataAttrs(DataDefinition tracData) {
+    public static List<TagUpdate> structuredDataAttrs(DataDefinition tracData, MetadataBundle references) {
 
-        var dataAttrs = new ArrayList<TagUpdate>();
+        var externalSchema = tracData.hasSchemaId() && references != null
+                ? references.getObject(tracData.getSchemaId(), /* required = */ false).getSchema()
+                : null;
+
+        var schema = tracData.hasSchema()
+                ? tracData.getSchema()
+                : externalSchema;
+
+        var dataAttrs = schema != null
+                ? structuredSchemaAttrs(schema)
+                : new ArrayList<TagUpdate>();
 
         dataAttrs.add(TagUpdate.newBuilder()
                 .setAttrName(MetadataConstants.TRAC_DATA_ROW_COUNT_ATTR)
