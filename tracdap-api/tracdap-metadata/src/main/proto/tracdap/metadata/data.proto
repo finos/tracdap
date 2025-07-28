@@ -170,7 +170,8 @@ message DataDefinition {
         uint32 deltaIndex = 1;
         string dataItem = 2;
 
-        uint64 rowCount = 3;
+        uint64 physicalRowCount = 3;
+        uint64 deltaRowCount = 4;
     }
 
     /// Snapshot of a partition

@@ -648,8 +648,11 @@ public class DataService {
         var part = state.data.getPartsOrThrow(state.part.getOpaqueKey());
         var delta = part.getSnap().getDeltas(part.getSnap().getDeltasCount() - 1);
 
+        // Delta row count is to allow for updates in deltas which update rather than append a dataset
+        // Currently all rows are physical so the two values are the same
         var augmentedDelta = delta.toBuilder()
-                .setRowCount(state.dataRowCount)
+                .setPhysicalRowCount(state.dataRowCount)
+                .setDeltaRowCount(state.dataRowCount)
                 .build();
 
         var augmentedPart = part.toBuilder()
@@ -667,7 +670,7 @@ public class DataService {
                 .map(DataDefinition.Part::getSnap)
                 .map(DataDefinition.Snap::getDeltasList)
                 .flatMap(List::stream)
-                .mapToLong(DataDefinition.Delta::getRowCount)
+                .mapToLong(DataDefinition.Delta::getDeltaRowCount)
                 .sum();
 
         state.data = augmentedData
