@@ -23,6 +23,7 @@ import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
@@ -39,9 +40,11 @@ public class MetadataWriteService {
 
     private final Validator validator = new Validator();
     private final IMetadataStore metadataStore;
+    private final BundleLoader bundleLoader;
 
     public MetadataWriteService(IMetadataStore metadataStore) {
         this.metadataStore = metadataStore;
+        this.bundleLoader = new BundleLoader(metadataStore);
     }
 
     public TagHeader preallocateId(String tenant, MetadataWriteRequest request) {
@@ -58,8 +61,9 @@ public class MetadataWriteService {
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
         var userMetadata = UserMetadata.get(Context.current());
+        var references = bundleLoader.loadReferenceBundle(tenant, request);
 
-        var preallocatedObjects = processPreallocatedObjects(List.of(request), requestMetadata, userMetadata);
+        var preallocatedObjects = processPreallocatedObjects(List.of(request), references, requestMetadata, userMetadata);
 
         metadataStore.savePreallocatedObjects(tenant, preallocatedObjects);
 
@@ -71,8 +75,9 @@ public class MetadataWriteService {
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
         var userMetadata = UserMetadata.get(Context.current());
+        var references = bundleLoader.loadReferenceBundle(tenant, request);
 
-        var newObjects = processNewObjects(List.of(request), requestMetadata, userMetadata);
+        var newObjects = processNewObjects(List.of(request), references, requestMetadata, userMetadata);
 
         metadataStore.saveNewObjects(tenant, newObjects);
 
@@ -84,8 +89,9 @@ public class MetadataWriteService {
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
         var userMetadata = UserMetadata.get(Context.current());
+        var references = bundleLoader.loadReferenceBundle(tenant, request);
 
-        var newVersions = processNewVersions(tenant, List.of(request), requestMetadata, userMetadata);
+        var newVersions = processNewVersions(tenant, List.of(request), references, requestMetadata, userMetadata);
 
         metadataStore.saveNewVersions(tenant, newVersions);
 
@@ -112,11 +118,12 @@ public class MetadataWriteService {
         var userMetadata = UserMetadata.get(Context.current());
 
         var tenant = request.getTenant();
+        var references = bundleLoader.loadReferenceBundle(tenant, request, requestMetadata);
 
         var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
-        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedObjectsList(), requestMetadata, userMetadata);
-        var newObjects = processNewObjects(request.getCreateObjectsList(), requestMetadata, userMetadata);
-        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), requestMetadata, userMetadata);
+        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedObjectsList(), references, requestMetadata, userMetadata);
+        var newObjects = processNewObjects(request.getCreateObjectsList(), references, requestMetadata, userMetadata);
+        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), references, requestMetadata, userMetadata);
         var newTags = processNewTags(tenant, request.getUpdateTagsList(), requestMetadata, userMetadata);
 
         var batchUpdate = new MetadataBatchUpdate(
@@ -161,7 +168,7 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processPreallocatedObjects(
-            List<MetadataWriteRequest> requests,
+            List<MetadataWriteRequest> requests, MetadataBundle references,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var preallocatedObjects = new ArrayList<Tag>(requests.size());
@@ -172,7 +179,7 @@ public class MetadataWriteService {
 
             var preallocatedObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), request.getTagUpdatesList(),
-                    requestMetadata, userMetadata);
+                    references, requestMetadata, userMetadata);
 
             preallocatedObjects.add(preallocatedObject);
         }
@@ -181,7 +188,7 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processNewObjects(
-            List<MetadataWriteRequest> requests,
+            List<MetadataWriteRequest> requests, MetadataBundle references,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var newObjects = new ArrayList<Tag>(requests.size());
@@ -194,7 +201,7 @@ public class MetadataWriteService {
 
             var newObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), request.getTagUpdatesList(),
-                    requestMetadata, userMetadata);
+                    references, requestMetadata, userMetadata);
 
             newObjects.add(newObject);
         }
@@ -203,7 +210,7 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processNewVersions(
-            String tenant, List<MetadataWriteRequest> requests,
+            String tenant, List<MetadataWriteRequest> requests, MetadataBundle references,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         // Do not query the DAL if there are no requests
@@ -229,7 +236,7 @@ public class MetadataWriteService {
 
             var newObject = ObjectUpdateLogic.buildNewVersion(
                     priorVersion, request.getDefinition(), request.getTagUpdatesList(),
-                    requestMetadata, userMetadata);
+                    references, requestMetadata, userMetadata);
 
             newVersions.add(newObject);
         }

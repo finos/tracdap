@@ -57,6 +57,10 @@ public class MetadataBundle {
     }
 
     public ObjectDefinition getObject(TagSelector selector) {
+        return getObject(selector, true);
+    }
+
+    public ObjectDefinition getObject(TagSelector selector, boolean required) {
 
         var selectorKey = MetadataUtil.objectKey(selector);
 
@@ -68,8 +72,12 @@ public class MetadataBundle {
 
         var object = objects.get(objectKey);
 
-        if (object.getObjectType() != selector.getObjectType())
-            throw new EUnexpected();
+        if (object.getObjectType() != selector.getObjectType()) {
+            if (required)
+                throw new EUnexpected();
+            else
+                return null;
+        }
 
         return object;
     }
