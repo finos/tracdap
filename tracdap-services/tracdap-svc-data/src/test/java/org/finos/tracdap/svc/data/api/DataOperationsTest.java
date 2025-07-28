@@ -233,6 +233,15 @@ abstract class DataOperationsTest {
         waitFor(TEST_TIMEOUT, metaResponse);
         var tag = resultOf(metaResponse);
 
+        // Structured attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_schema_field_count"));
+        Assertions.assertTrue(tag.containsAttrs("trac_data_row_count"));
+        var fieldCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_schema_field_count"));
+        var rowCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_data_row_count"));
+        Assertions.assertEquals(8, fieldCount);
+        Assertions.assertEquals(10, rowCount);
+
         // Explicitly set attrs
 
         Assertions.assertTrue(tag.containsAttrs("dataset_name"));
@@ -311,6 +320,15 @@ abstract class DataOperationsTest {
         var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
         waitFor(TEST_TIMEOUT, metaResponse);
         var tag = resultOf(metaResponse);
+
+        // Structured attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_schema_field_count"));
+        Assertions.assertTrue(tag.containsAttrs("trac_data_row_count"));
+        var fieldCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_schema_field_count"));
+        var rowCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_data_row_count"));
+        Assertions.assertEquals(8, fieldCount);
+        Assertions.assertEquals(10, rowCount);
 
         // Explicitly set attrs
 
@@ -763,6 +781,15 @@ abstract class DataOperationsTest {
         waitFor(TEST_TIMEOUT, metaResponse);
         var tag = resultOf(metaResponse);
 
+        // Structured attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_schema_field_count"));
+        Assertions.assertTrue(tag.containsAttrs("trac_data_row_count"));
+        var fieldCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_schema_field_count"));
+        var rowCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_data_row_count"));
+        Assertions.assertEquals(9, fieldCount);
+        Assertions.assertEquals(10, rowCount);
+
         // Explicitly set attrs
 
         Assertions.assertTrue(tag.containsAttrs("dataset_name"));
@@ -872,6 +899,15 @@ abstract class DataOperationsTest {
         var metaResponse = Futures.javaFuture(metaClient.readObject(metaRequest));
         waitFor(TEST_TIMEOUT, metaResponse);
         var tag = resultOf(metaResponse);
+
+        // Structured attrs
+
+        Assertions.assertTrue(tag.containsAttrs("trac_schema_field_count"));
+        Assertions.assertTrue(tag.containsAttrs("trac_data_row_count"));
+        var fieldCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_schema_field_count"));
+        var rowCount = MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow("trac_data_row_count"));
+        Assertions.assertEquals(9, fieldCount);
+        Assertions.assertEquals(10, rowCount);
 
         // Explicitly set attrs
 

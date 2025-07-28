@@ -33,10 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.common.metadata.MetadataCodec.encodeValue;
-import static org.finos.tracdap.common.metadata.MetadataConstants.*;
-
-
 public class ImportModelJob implements IJobLogic {
 
     @Override
@@ -141,50 +137,6 @@ public class ImportModelJob implements IJobLogic {
         // Add attrs defined in the job
         var suppliedAttrs = jobConfig.getJob().getImportModel().getModelAttrsList();
         modelAttrs.addAllAttrs(suppliedAttrs);
-
-        // Add controlled attrs for models
-        var modelDef = modelObj.getModel();
-
-        modelAttrs.addAttrs(TagUpdate.newBuilder()
-                .setAttrName(TRAC_MODEL_LANGUAGE)
-                .setValue(encodeValue(modelDef.getLanguage()))
-                .build());
-
-        modelAttrs.addAttrs(TagUpdate.newBuilder()
-                .setAttrName(TRAC_MODEL_REPOSITORY)
-                .setValue(encodeValue(modelDef.getRepository()))
-                .build());
-
-        if (modelDef.hasPackageGroup()) {
-
-            modelAttrs.addAttrs(TagUpdate.newBuilder()
-                    .setAttrName(TRAC_MODEL_PACKAGE_GROUP)
-                    .setValue(encodeValue(modelDef.getPackageGroup()))
-                    .build());
-        }
-
-        modelAttrs.addAttrs(TagUpdate.newBuilder()
-                .setAttrName(TRAC_MODEL_PACKAGE)
-                .setValue(encodeValue(modelDef.getPackage()))
-                .build());
-
-        modelAttrs.addAttrs(TagUpdate.newBuilder()
-                .setAttrName(TRAC_MODEL_VERSION)
-                .setValue(encodeValue(modelDef.getVersion()))
-                .build());
-
-        modelAttrs.addAttrs(TagUpdate.newBuilder()
-                .setAttrName(TRAC_MODEL_ENTRY_POINT)
-                .setValue(encodeValue(modelDef.getEntryPoint()))
-                .build());
-
-        if (modelDef.hasPath()) {
-
-            modelAttrs.addAttrs(TagUpdate.newBuilder()
-                    .setAttrName(TRAC_MODEL_PATH)
-                    .setValue(encodeValue(modelDef.getPath()))
-                    .build());
-        }
 
         return JobResult.newBuilder()
                 .addObjectIds(modelId)

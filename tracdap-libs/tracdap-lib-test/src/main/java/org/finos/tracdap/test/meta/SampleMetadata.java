@@ -46,6 +46,20 @@ public class SampleMetadata {
 
     private static final Random random = new Random(Instant.now().getEpochSecond());
 
+    private static TagSelector storageSelector = TagSelector.newBuilder()
+            .setObjectType(ObjectType.STORAGE)
+            .setObjectId(UUID.randomUUID().toString())
+            .setLatestObject(true)
+            .setLatestTag(true)
+            .build();
+
+    public static void storageForPartialTests(TagSelector storageSelector) {
+
+        SampleMetadata.storageSelector = storageSelector.toBuilder()
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+    }
 
     public static ObjectDefinition dummyDefinitionForType(ObjectType objectType) {
 
@@ -165,13 +179,8 @@ public class SampleMetadata {
             .setObjectType(ObjectType.DATA)
             .setData(DataDefinition.newBuilder()
 
-            // There is no attempt here to link this to a storage definition
-            // Not needed yet to test metadata semantics in isolation
-            .setStorageId(TagSelector.newBuilder()
-                    .setObjectType(ObjectType.STORAGE)
-                    .setObjectId(UUID.randomUUID().toString())
-                    .setLatestObject(true)
-                    .setLatestTag(true))
+            // This storage selector can be set by test cases to handle consistency requirements in the meta svc
+            .setStorageId(storageSelector)
 
             .setSchema(SchemaDefinition.newBuilder()
                 .setSchemaType(SchemaType.TABLE)
@@ -557,11 +566,7 @@ public class SampleMetadata {
                 .setExtension("docx")
                 .setMimeType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 .setSize(45285)
-                .setStorageId(TagSelector.newBuilder()
-                    .setObjectType(ObjectType.STORAGE)
-                    .setObjectId(UUID.randomUUID().toString())
-                    .setLatestObject(true)
-                    .setLatestTag(true))
+                .setStorageId(storageSelector)
                 .setDataItem("file/FILE_ID/version-1"))
                 .build();
     }

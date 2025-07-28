@@ -19,8 +19,10 @@ package org.finos.tracdap.svc.meta.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.SampleMetadata;
@@ -28,10 +30,7 @@ import org.finos.tracdap.test.meta.SampleMetadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -95,6 +94,22 @@ abstract class MetadataSearchApiTest {
             searchApi = platform.metaClientBlocking();
             writeApi = platform.metaClientInternalBlocking();
         }
+    }
+
+    @Test
+    @Order(0)
+    void handleStorageConsistency() {
+
+        var storageDef = SampleMetadata.dummyStorageDef();
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.STORAGE)
+                .setDefinition(storageDef)
+                .build();
+
+        var storageId = writeApi.createObject(request);
+
+        SampleMetadata.storageForPartialTests(MetadataUtil.selectorForLatest(storageId));
     }
 
     @Test

@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.meta.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.svc.meta.TracMetadataService;
@@ -29,6 +30,7 @@ import org.finos.tracdap.test.meta.SampleMetadata;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
+import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -88,6 +90,22 @@ abstract class MetadataWriteApiTest {
             publicApi = platform.metaClientBlocking();
             internalApi = platform.metaClientInternalBlocking();
         }
+    }
+
+    @Test
+    @Order(0)
+    void handleStorageConsistency() {
+
+        var storageDef = SampleMetadata.dummyStorageDef();
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.STORAGE)
+                .setDefinition(storageDef)
+                .build();
+
+        var storageId = internalApi.createObject(request);
+
+        SampleMetadata.storageForPartialTests(MetadataUtil.selectorForLatest(storageId));
     }
 
     // -----------------------------------------------------------------------------------------------------------------
@@ -763,13 +781,19 @@ abstract class MetadataWriteApiTest {
         assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
         assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
 
+        // Attrs that will have different values for the update versions of the metadata samples
+        var CHANGING_ATTRS = List.of(
+                "trac_schema_field_count",
+                "trac_file_name",
+                "trac_file_size");
+
         for (var attr : expectedTag.getAttrsMap().keySet()) {
 
             // trac_update_  attrs are set on the original tag and changed by the update operation
-            if (attr.startsWith("trac_update_"))
-                continue;
-
-            assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+            if (attr.startsWith("trac_update_") || CHANGING_ATTRS.contains(attr))
+                assertEquals(expectedTag.getAttrsOrThrow(attr).getType(), tagFromStore.getAttrsOrThrow(attr).getType());
+            else
+                assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr), attr);
         }
 
         assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));
@@ -1253,13 +1277,19 @@ abstract class MetadataWriteApiTest {
             assertEquals(expectedTag.getHeader(), tagFromStore.getHeader());
             assertEquals(expectedTag.getDefinition(), tagFromStore.getDefinition());
 
+            // Attrs that will have different values for the update versions of the metadata samples
+            var CHANGING_ATTRS = List.of(
+                    "trac_schema_field_count",
+                    "trac_file_name",
+                    "trac_file_size");
+
             for (var attr : expectedTag.getAttrsMap().keySet()) {
 
                 // trac_update_  attrs are set on the original tag and changed by the update operation
-                if (attr.startsWith("trac_update_"))
-                    continue;
-
-                assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr));
+                if (attr.startsWith("trac_update_") || CHANGING_ATTRS.contains(attr))
+                    assertEquals(expectedTag.getAttrsOrThrow(attr).getType(), tagFromStore.getAttrsOrThrow(attr).getType());
+                else
+                    assertEquals(expectedTag.getAttrsOrThrow(attr), tagFromStore.getAttrsOrThrow(attr), attr);
             }
 
             assertTrue(tagFromStore.containsAttrs(MetadataConstants.TRAC_CREATE_TIME));

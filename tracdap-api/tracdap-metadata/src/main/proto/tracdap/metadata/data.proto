@@ -39,8 +39,8 @@ enum SchemaType {
     SCHEMA_TYPE_NOT_SET = 0;
 
     /// Tabular data
-    TABLE = 1;
     TABLE_SCHEMA = 1;
+    TABLE = 1;
 
     /// Structured objects
     STRUCT_SCHEMA = 2;
@@ -169,6 +169,9 @@ message DataDefinition {
 
         uint32 deltaIndex = 1;
         string dataItem = 2;
+
+        uint64 physicalRowCount = 3;
+        uint64 deltaRowCount = 4;
     }
 
     /// Snapshot of a partition
@@ -188,4 +191,6 @@ message DataDefinition {
     map<string, Part> parts = 3;
 
     TagSelector storageId = 4;
+
+    uint64 rowCount = 5;
 }

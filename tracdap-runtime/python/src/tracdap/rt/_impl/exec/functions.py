@@ -36,6 +36,8 @@ import tracdap.rt._impl.core.util as _util
 from tracdap.rt._impl.exec.graph import *
 from tracdap.rt._impl.exec.graph import _T
 
+import pyarrow as pa
+
 
 class NodeContext:
 
@@ -455,7 +457,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         return data_spec
 
-    def _save_table(self, data_item, data_spec, data_copy):
+    def _save_table(self, data_item: _data.DataItem, data_spec: _data.DataSpec, data_copy: _meta.StorageCopy):
 
         # Current implementation will always put an Arrow table in the data item
         # Empty tables are allowed, so explicitly check if table is None
@@ -481,6 +483,18 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         if data_spec.definition.schema is None and data_spec.definition.schemaId is None:
             data_spec.definition.schema = _data.DataMapping.arrow_to_trac_schema(data_item.table.schema)
 
+        # Update metadata row counts
+        part_key = _data.DataPartKey.for_root()
+        snap = data_spec.definition.parts[part_key.opaque_key].snap
+        delta = snap.deltas[-1]  # Latest delta is the one being written
+
+        delta.physicalRowCount = data_item.content.num_rows
+        delta.deltaRowCount = data_item.content.num_rows
+
+        data_spec.definition.rowCount = sum(map(
+            lambda part: sum(map(lambda d: d.deltaRowCount, part.snap.deltas)),
+            data_spec.definition.parts.values()))
+
         return data_spec
 
     def _save_struct(self, data_item, data_spec, data_copy):
@@ -503,6 +517,14 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
         if data_spec.definition.schema is None and data_spec.definition.schemaId is None:
             data_spec.definition.schema = data_item.trac_schema
+
+        # Update row count for STRUCT, which is always 1
+        part_key = _data.DataPartKey.for_root()
+        snap = data_spec.definition.parts[part_key.opaque_key].snap
+        delta = snap.deltas[-1]  # Latest delta is the one being written
+        delta.physicalRowCount = 1
+        delta.deltaRowCount = 1
+        data_spec.definition.rowCount = 1
 
         return data_spec
 
