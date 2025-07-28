@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.codec.text;
 
+import org.apache.arrow.vector.ValueVector;
 import org.finos.tracdap.common.codec.text.consumers.DictionaryStagingConsumer;
 import org.finos.tracdap.common.codec.text.consumers.IBatchConsumer;
 
@@ -34,6 +35,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -48,6 +50,7 @@ public class TextFileReader implements DictionaryProvider {
     private final IBatchConsumer consumer;
 
     private final DictionaryProvider dictionaries;
+    private final List<ValueVector> stagingVectors;
 
     public TextFileReader(
             Schema schema,
@@ -98,6 +101,7 @@ public class TextFileReader implements DictionaryProvider {
                 stagingFields, config);
 
         var dictionaries = new DictionaryProvider.MapDictionaryProvider();
+        var stagingVectors = new ArrayList<ValueVector>(stagingFields.size());
 
         if (prebuiltDictionaries != null) {
             for (var dictionaryId : prebuiltDictionaries.getDictionaryIds()) {
@@ -107,9 +111,11 @@ public class TextFileReader implements DictionaryProvider {
 
         for (var stagingField : stagingFields) {
             dictionaries.put(stagingField.getDictionary());
+            stagingVectors.add(stagingField.getStagingVector());
         }
 
         this.dictionaries = dictionaries;
+        this.stagingVectors = stagingVectors;
     }
 
     private VectorSchemaRoot buildRoot(Schema schema, BufferAllocator allocator,  TextFileConfig config) {
@@ -188,5 +194,14 @@ public class TextFileReader implements DictionaryProvider {
     public void close() throws IOException {
 
         parser.close();
+
+        root.close();
+
+        for (var dictionaryId : dictionaries.getDictionaryIds()) {
+            var dictionary = dictionaries.lookup(dictionaryId);
+            dictionary.getVector().close();
+        }
+
+        stagingVectors.forEach(ValueVector::close);
     }
 }
