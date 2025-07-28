@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.meta.services;
 
+import org.finos.tracdap.api.ConfigWriteRequest;
 import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
@@ -37,6 +38,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 public class BundleLoader {
@@ -48,17 +50,22 @@ public class BundleLoader {
         this.metadataStore = metadataStore;
     }
 
-    public MetadataBundle loadReferenceBundle(String tenant, MetadataWriteRequest request) {
+    public MetadataBundle loadReferenceBundle(String tenant, List<ObjectDefinition> objects) {
 
         var references = new ArrayList<TagSelector>();
-        findReferences(request, references);
+        findReferences(objects, references);
 
-        var mapping = new HashMap<String, TagHeader>();
-        var objects = new HashMap<String, ObjectDefinition>();
+        var bundleMapping = new HashMap<String, TagHeader>();
+        var bundleObjects = new HashMap<String, ObjectDefinition>();
 
-        loadReferences(tenant, references, mapping, objects);
+        loadReferences(tenant, references, bundleMapping, bundleObjects);
 
-        return new MetadataBundle(mapping, objects, Map.of());
+        return new MetadataBundle(bundleMapping, bundleObjects, Map.of());
+    }
+
+    public MetadataBundle loadReferenceBundle(String tenant, MetadataWriteRequest request) {
+
+        return loadReferenceBundle(tenant, List.of(request.getDefinition()));
     }
 
     public MetadataBundle loadReferenceBundle(
@@ -67,47 +74,61 @@ public class BundleLoader {
             RequestMetadata requestMetadata) {
 
         var references = new ArrayList<TagSelector>();
-        findReferences(batchWriteRequest.getCreatePreallocatedObjectsList(), references);
-        findReferences(batchWriteRequest.getCreateObjectsList(), references);
-        findReferences(batchWriteRequest.getUpdateObjectsList(), references);
+        findWriteBatchReferences(batchWriteRequest.getCreatePreallocatedObjectsList(), references);
+        findWriteBatchReferences(batchWriteRequest.getCreateObjectsList(), references);
+        findWriteBatchReferences(batchWriteRequest.getUpdateObjectsList(), references);
 
-        var mapping = new HashMap<String, TagHeader>();
-        var objects = new HashMap<String, ObjectDefinition>();
+        var bundleMapping = new HashMap<String, TagHeader>();
+        var bundleObjects = new HashMap<String, ObjectDefinition>();
 
-        resolveInternalBatchReferences(references, batchWriteRequest, requestMetadata, mapping, objects);
-        loadReferences(tenant, references, mapping, objects);
+        resolveInternalBatchReferences(references, batchWriteRequest, requestMetadata, bundleMapping, bundleObjects);
+        loadReferences(tenant, references, bundleMapping, bundleObjects);
 
-        return new MetadataBundle(mapping, objects, Map.of());
+        return new MetadataBundle(bundleMapping, bundleObjects, Map.of());
     }
 
-    private void findReferences(List<MetadataWriteRequest> requests, List<TagSelector> references) {
+    public MetadataBundle loadConfigReferenceBundle(String tenant, List<ConfigWriteRequest> requests) {
 
-        requests.forEach(request -> findReferences(request, references));
+        var objects = requests.stream()
+                .map(ConfigWriteRequest::getDefinition)
+                .collect(Collectors.toList());
+
+        return loadReferenceBundle(tenant, objects);
     }
 
-    private void findReferences(MetadataWriteRequest request, List<TagSelector> references) {
+    private void findReferences(ObjectDefinition object, List<TagSelector> references) {
 
         // TODO: Record references explicitly on object definition to avoid logic per object type
         // In particular references should be held for JobDefinition, which vary by job type
 
-        if (request.getObjectType() == ObjectType.DATA) {
+        if (object.getObjectType() == ObjectType.DATA) {
 
-            if (request.getDefinition().getData().hasSchemaId())
-                references.add(request.getDefinition().getData().getSchemaId());
+            if (object.getData().hasSchemaId())
+                references.add(object.getData().getSchemaId());
 
-            references.add(request.getDefinition().getData().getStorageId());
+            references.add(object.getData().getStorageId());
         }
 
-        else if (request.getObjectType() == ObjectType.FILE) {
+        else if (object.getObjectType() == ObjectType.FILE) {
 
-            references.add(request.getDefinition().getFile().getStorageId());
+            references.add(object.getFile().getStorageId());
         }
+    }
+
+    private void findReferences(List<ObjectDefinition> objects, List<TagSelector> references) {
+
+        objects.forEach(object -> findReferences(object, references));
+    }
+
+    private void findWriteBatchReferences(List<MetadataWriteRequest> requests, List<TagSelector> references) {
+
+        requests.forEach(request -> findReferences(request.getDefinition(), references));
     }
 
     private void loadReferences(
             String tenant, List<TagSelector> references,
-            Map<String, TagHeader> mapping,
-            Map<String, ObjectDefinition> objects) {
+            Map<String, TagHeader> bundleMapping,
+            Map<String, ObjectDefinition> bundleObjects) {
 
         try {
 
@@ -120,12 +141,12 @@ public class BundleLoader {
 
                 if (!ref.hasObjectVersion()) {
                     var refKey = MetadataUtil.objectKey(ref);
-                    mapping.put(refKey, tag.getHeader());
+                    bundleMapping.put(refKey, tag.getHeader());
                 }
 
                 var objectKey = MetadataUtil.objectKey(tag.getHeader());
 
-                objects.put(objectKey, tag.getDefinition());
+                bundleObjects.put(objectKey, tag.getDefinition());
             }
         }
         catch (EMetadataNotFound error) {
@@ -139,8 +160,8 @@ public class BundleLoader {
             List<TagSelector> references,
             MetadataWriteBatchRequest batchWriteRequest,
             RequestMetadata requestMetadata,
-            Map<String, TagHeader> mapping,
-            Map<String, ObjectDefinition> objects) {
+            Map<String, TagHeader> bundleMapping,
+            Map<String, ObjectDefinition> bundleObjects) {
 
         // For write requests, some references can refer to objects updated as part of a batch
         // These need to be resolved from the batch, the older stored versions have been superseded
@@ -180,10 +201,10 @@ public class BundleLoader {
 
                 if (ref.hasLatestObject()) {
                     var refKey = MetadataUtil.objectKey(ref);
-                    mapping.put(refKey, newId);
+                    bundleMapping.put(refKey, newId);
                 }
 
-                objects.put(MetadataUtil.objectKey(newId), request.getDefinition());
+                bundleObjects.put(MetadataUtil.objectKey(newId), request.getDefinition());
                 iter.remove();
             }
         }

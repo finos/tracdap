@@ -33,8 +33,6 @@ import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
 
 import io.grpc.Context;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,14 +42,14 @@ import java.util.stream.Collectors;
 
 public class ConfigService {
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
     private final Validator validator;
     private final IMetadataStore metadataStore;
+    private final BundleLoader bundleLoader;
 
     public ConfigService(IMetadataStore metadataStore) {
         this.validator = new Validator();
         this.metadataStore = metadataStore;
+        this.bundleLoader = new BundleLoader(metadataStore);
     }
 
     public ConfigWriteResponse createConfigObject(ConfigWriteRequest request) {
@@ -72,7 +70,7 @@ public class ConfigService {
         var deletedEntries = metadataStore.listConfigEntries(tenant, configClass, /* includeDeleted = */ true);
 
         // Build new metadata objects
-        var objects = newObjects(requests, requestMetadata, userMetadata);
+        var objects = newObjects(tenant, requests, requestMetadata, userMetadata);
         var entries = newEntries(requests, objects, deletedEntries, requestMetadata);
 
         // Save to the DAL in a single batch
@@ -110,7 +108,7 @@ public class ConfigService {
         validateDefinitionUpdates(requests, priorObjects);
 
         // Build new metadata objects
-        var objects = updateObjects(requests, priorObjects, requestMetadata, userMetadata);
+        var objects = updateObjects(tenant, requests, priorObjects, requestMetadata, userMetadata);
         var entries = updateEntries(requests, objects, requestMetadata);
 
         // Save to the DAL in a single batch
@@ -222,8 +220,11 @@ public class ConfigService {
     }
 
     private List<Tag> newObjects(
-            List<ConfigWriteRequest> requests,
+            String tenant, List<ConfigWriteRequest> requests,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
+
+        // Load reference bundle needed for object building
+        var references = bundleLoader.loadConfigReferenceBundle(tenant, requests);
 
         var newObjects = new ArrayList<Tag>(requests.size());
 
@@ -239,7 +240,7 @@ public class ConfigService {
 
             var newObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), configAttrs,
-                    requestMetadata, userMetadata);
+                    references, requestMetadata, userMetadata);
 
             newObjects.add(newObject);
         }
@@ -305,8 +306,11 @@ public class ConfigService {
     }
 
     private List<Tag> updateObjects(
-            List<ConfigWriteRequest> requests, List<Tag> priorVersions,
+            String tenant, List<ConfigWriteRequest> requests, List<Tag> priorVersions,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
+
+        // Load reference bundle needed for object building
+        var references = bundleLoader.loadConfigReferenceBundle(tenant, requests);
 
         var configAttrs = List.<TagUpdate>of();  // Allow config attrs to propagate from previous version
         var objects = new ArrayList<Tag>(requests.size());
@@ -318,7 +322,7 @@ public class ConfigService {
 
             var object = ObjectUpdateLogic.buildNewVersion(
                     priorVersion, request.getDefinition(), configAttrs,
-                    requestMetadata, userMetadata);
+                    references, requestMetadata, userMetadata);
 
             objects.add(object);
         }
