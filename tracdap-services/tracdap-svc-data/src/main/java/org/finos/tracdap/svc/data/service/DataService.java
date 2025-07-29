@@ -338,7 +338,7 @@ public class DataService {
 
         var opaqueKey = PartKeys.opaqueKey(PartKeys.ROOT);
 
-        // Snap index is not needed, since DataDefinition.Part only holds the current snap
+        // Snap index is not needed, since DataPartition only holds the current snap
 
         // Current implementation only supports snap updates, so delta is always zero
         var deltaIndex = 0;
@@ -526,15 +526,15 @@ public class DataService {
 
         // A new data def always means one new part/snap/delta
 
-        var delta = DataDefinition.Delta.newBuilder()
+        var delta = DataDelta.newBuilder()
                 .setDeltaIndex(state.delta)
                 .setDataItem(dataItem);
 
-        var snap = DataDefinition.Snap.newBuilder()
+        var snap = DataSnapshot.newBuilder()
                 .setSnapIndex(state.snap)
                 .addDeltas(state.delta, delta);
 
-        var part = DataDefinition.Part.newBuilder()
+        var part = DataPartition.newBuilder()
                 .setPartKey(state.part)
                 .setSnap(snap);
 
@@ -567,13 +567,13 @@ public class DataService {
 
         var part = priorDef.containsParts(opaqueKey)
                 ? priorDef.getPartsOrThrow(opaqueKey).toBuilder()
-                : DataDefinition.Part.newBuilder().setPartKey(state.part);
+                : DataPartition.newBuilder().setPartKey(state.part);
 
         var snap = part.hasSnap() && part.getSnap().getSnapIndex() == state.snap
                 ? part.getSnap().toBuilder()
-                : DataDefinition.Snap.newBuilder().setSnapIndex(state.snap);
+                : DataSnapshot.newBuilder().setSnapIndex(state.snap);
 
-        var delta = DataDefinition.Delta.newBuilder()
+        var delta = DataDelta.newBuilder()
                 .setDeltaIndex(state.delta)
                 .setDataItem(dataItem);
 
@@ -667,10 +667,10 @@ public class DataService {
         // Superseded snapshots are not included
 
         long totalRowCount = augmentedData.getPartsMap().values().stream()
-                .map(DataDefinition.Part::getSnap)
-                .map(DataDefinition.Snap::getDeltasList)
+                .map(DataPartition::getSnap)
+                .map(DataSnapshot::getDeltasList)
                 .flatMap(List::stream)
-                .mapToLong(DataDefinition.Delta::getDeltaRowCount)
+                .mapToLong(DataDelta::getDeltaRowCount)
                 .sum();
 
         state.data = augmentedData

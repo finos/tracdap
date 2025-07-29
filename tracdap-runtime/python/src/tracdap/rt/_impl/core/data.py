@@ -362,15 +362,15 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
             cls, data_def: _meta.DataDefinition,data_item: str,
             part_key: _meta.PartKey, snap_index: int):
 
-        delta = _meta.DataDefinition.Delta(
+        delta = _meta.DataDelta(
             deltaIndex=0,
             dataItem=data_item)
 
-        snap = _meta.DataDefinition.Snap(
+        snap = _meta.DataSnapshot(
             snapIndex=snap_index,
             deltas=[delta])
 
-        part = _meta.DataDefinition.Part(
+        part = _meta.DataPartition(
             partKey=part_key,
             snap=snap)
 

@@ -76,17 +76,17 @@ public class DataValidator {
         PK_PART_RANGE_MIN = field(PART_KEY, PartKey.PARTRANGEMIN_FIELD_NUMBER);
         PK_PART_RANGE_MAX = field(PART_KEY, PartKey.PARTRANGEMAX_FIELD_NUMBER);
 
-        DATA_PART = DataDefinition.Part.getDescriptor();
-        DP_PART_KEY = field(DATA_PART, DataDefinition.Part.PARTKEY_FIELD_NUMBER);
-        DP_SNAP = field(DATA_PART, DataDefinition.Part.SNAP_FIELD_NUMBER);
+        DATA_PART = DataPartition.getDescriptor();
+        DP_PART_KEY = field(DATA_PART, DataPartition.PARTKEY_FIELD_NUMBER);
+        DP_SNAP = field(DATA_PART, DataPartition.SNAP_FIELD_NUMBER);
 
-        DATA_SNAP = DataDefinition.Snap.getDescriptor();
-        DS_SNAP_INDEX = field(DATA_SNAP, DataDefinition.Snap.SNAPINDEX_FIELD_NUMBER);
-        DS_DELTAS = field(DATA_SNAP, DataDefinition.Snap.DELTAS_FIELD_NUMBER);
+        DATA_SNAP = DataSnapshot.getDescriptor();
+        DS_SNAP_INDEX = field(DATA_SNAP, DataSnapshot.SNAPINDEX_FIELD_NUMBER);
+        DS_DELTAS = field(DATA_SNAP, DataSnapshot.DELTAS_FIELD_NUMBER);
 
-        DATA_DELTA = DataDefinition.Delta.getDescriptor();
-        DD_DELTA_INDEX = field(DATA_DELTA, DataDefinition.Delta.DELTAINDEX_FIELD_NUMBER);
-        DD_DATA_ITEM = field(DATA_DELTA, DataDefinition.Delta.DATAITEM_FIELD_NUMBER);
+        DATA_DELTA = DataDelta.getDescriptor();
+        DD_DELTA_INDEX = field(DATA_DELTA, DataDelta.DELTAINDEX_FIELD_NUMBER);
+        DD_DATA_ITEM = field(DATA_DELTA, DataDelta.DATAITEM_FIELD_NUMBER);
     }
 
     @Validator
@@ -106,7 +106,7 @@ public class DataValidator {
         ctx = ctx.pushMap(DD_PARTS, DataDefinition::getPartsMap)
                 .apply(CommonValidators::mapNotEmpty)
                 .applyMapKeys(DataValidator::opaqueKey)
-                .applyMapValues(DataValidator::dataPart, DataDefinition.Part.class)
+                .applyMapValues(DataValidator::dataPart, DataPartition.class)
                 .apply(DataValidator::partMapIsConsistent, Map.class)
                 .pop();
 
@@ -121,7 +121,7 @@ public class DataValidator {
     }
 
     @Validator
-    public static ValidationContext dataPart(DataDefinition.Part msg, ValidationContext ctx) {
+    public static ValidationContext dataPart(DataPartition msg, ValidationContext ctx) {
 
         ctx = ctx.push(DP_PART_KEY)
                 .apply(CommonValidators::required)
@@ -130,14 +130,14 @@ public class DataValidator {
 
         ctx = ctx.push(DP_SNAP)
                 .apply(CommonValidators::required)
-                .apply(DataValidator::dataSnap, DataDefinition.Snap.class)
+                .apply(DataValidator::dataSnap, DataSnapshot.class)
                 .pop();
 
         return ctx;
     }
 
     @Validator
-    public static ValidationContext dataSnap(DataDefinition.Snap msg, ValidationContext ctx) {
+    public static ValidationContext dataSnap(DataSnapshot msg, ValidationContext ctx) {
 
         ctx = ctx.push(DS_SNAP_INDEX)
                 .apply(CommonValidators::notNegative, Integer.class)
@@ -145,15 +145,15 @@ public class DataValidator {
 
         ctx = ctx.pushRepeated(DS_DELTAS)
                 .apply(CommonValidators::listNotEmpty)
-                .applyRepeated(DataValidator::dataDelta, DataDefinition.Delta.class)
-                .applyRepeated(DataValidator::deltaMatchesIndex, DataDefinition.Delta.class, msg)
+                .applyRepeated(DataValidator::dataDelta, DataDelta.class)
+                .applyRepeated(DataValidator::deltaMatchesIndex, DataDelta.class, msg)
                 .pop();
 
         return ctx;
     }
 
     @Validator
-    public static ValidationContext dataDelta(DataDefinition.Delta msg, ValidationContext ctx) {
+    public static ValidationContext dataDelta(DataDelta msg, ValidationContext ctx) {
 
         ctx = ctx.push(DD_DELTA_INDEX)
                 .apply(CommonValidators::notNegative, Integer.class)
@@ -164,7 +164,7 @@ public class DataValidator {
                 .apply(StorageValidator::dataItemKey)
                 .pop();
 
-        var snap = (DataDefinition.Snap) ctx.parentMsg();
+        var snap = (DataSnapshot) ctx.parentMsg();
 
         if (snap.getDeltasCount() <= msg.getDeltaIndex() || snap.getDeltas(msg.getDeltaIndex()) != msg) {
 
@@ -175,7 +175,7 @@ public class DataValidator {
         return ctx;
     }
 
-    private static ValidationContext deltaMatchesIndex(DataDefinition.Delta msg, DataDefinition.Snap snap, ValidationContext ctx) {
+    private static ValidationContext deltaMatchesIndex(DataDelta msg, DataSnapshot snap, ValidationContext ctx) {
 
         if (snap.getDeltasCount() <= msg.getDeltaIndex() || snap.getDeltas(msg.getDeltaIndex()) != msg) {
 
@@ -256,7 +256,7 @@ public class DataValidator {
         return ctx;
     }
 
-    private static ValidationContext partMapIsConsistent(Map<String, DataDefinition.Part> partMap, ValidationContext ctx) {
+    private static ValidationContext partMapIsConsistent(Map<String, DataPartition> partMap, ValidationContext ctx) {
 
         for (var partEntry : partMap.entrySet()) {
 

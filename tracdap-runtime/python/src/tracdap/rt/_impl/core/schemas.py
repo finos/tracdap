@@ -123,6 +123,10 @@ class SchemaLoader:
                 cls._log.error(err)
                 raise _ex.EDataConformance(err)
 
+            # Always set the notNull flag for business keys
+            if business_key:
+                not_null = True
+
             field_schema = _meta.FieldSchema(
                 field_name, field_index, field_type, label,
                 business_key, categorical, not_null, format_code)

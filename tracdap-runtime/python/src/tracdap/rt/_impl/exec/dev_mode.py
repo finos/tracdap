@@ -1002,15 +1002,15 @@ class DevModeTranslator:
             schema: tp.Optional[_meta.SchemaDefinition], storage_id: _meta.TagHeader) \
             -> (_meta.ObjectDefinition, _meta.ObjectDefinition):
 
-        delta = _meta.DataDefinition.Delta(
+        delta = _meta.DataDelta(
             deltaIndex=delta_index,
             dataItem=data_item)
 
-        snap = _meta.DataDefinition.Snap(
+        snap = _meta.DataSnapshot(
             snapIndex=snap_index,
             deltas=[delta])
 
-        part = _meta.DataDefinition.Part(
+        part = _meta.DataPartition(
             partKey=part_key,
             snap=snap)
 
