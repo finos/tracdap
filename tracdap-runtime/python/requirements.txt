@@ -8,23 +8,23 @@
 
 # Core protobuf support for metadata / config classes
 # This should match the Java Protobuf version, if possible
-protobuf == 5.29.5
+protobuf == 6.31.1
 
 # Support for the gRPC runtime API server
 # Optional in the distributed package but required for development
-grpcio == 1.70.0
-grpcio-status == 1.70.0
-grpcio-tools == 1.70.0
+grpcio == 1.74.0
+grpcio-status == 1.74.0
+grpcio-tools == 1.74.0
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
-pyarrow == 18.1.0
+pyarrow == 21.0.0
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.2
 
 # Python implementation of Git, for model loading
-dulwich == 0.22.7
+dulwich == 0.23.2
 
 # Requests, used for downloading model packages
 requests == 2.32.4
