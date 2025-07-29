@@ -152,6 +152,37 @@ message PartKey {
 
 
 /**
+ * Incremental change applied to a data snapshot, allowing partitions to evolve over time
+ */
+message DataDelta {
+
+    uint32 deltaIndex = 1;
+    string dataItem = 2;
+
+    uint64 physicalRowCount = 3;
+    uint64 deltaRowCount = 4;
+}
+
+/*
+ * Snapshot of a data partition
+ */
+message DataSnapshot {
+
+    uint32 snapIndex = 1;
+    repeated DataDelta deltas = 2;
+}
+
+
+/**
+ * Partition of a dataset
+ */
+message DataPartition {
+
+    PartKey partKey = 1;
+    DataSnapshot snap = 2;
+}
+
+/**
  * Define a dataset that can be stored and managed in the TRAC platform
  */
 message DataDefinition {
@@ -162,31 +193,7 @@ message DataDefinition {
         SchemaDefinition schema = 2;
     }
 
-    /// Incremental change applied to a snapshot, allowing partitions to evolve over time
-    message Delta {
-
-        uint32 deltaIndex = 1;
-        string dataItem = 2;
-
-        uint64 physicalRowCount = 3;
-        uint64 deltaRowCount = 4;
-    }
-
-    /// Snapshot of a partition
-    message Snap {
-
-        uint32 snapIndex = 1;
-        repeated Delta deltas = 2;
-    }
-
-    /// Partition of a dataset
-    message Part {
-
-        PartKey partKey = 1;
-        Snap snap = 2;
-    }
-
-    map<string, Part> parts = 3;
+    map<string, DataPartition> parts = 3;
 
     TagSelector storageId = 4;
 
