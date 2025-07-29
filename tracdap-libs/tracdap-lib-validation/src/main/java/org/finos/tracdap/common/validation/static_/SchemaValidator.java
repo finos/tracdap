@@ -332,18 +332,6 @@ public class SchemaValidator {
             ctx = ctx.error(err);
         }
 
-        // Business key fields should always be marked not null
-        // We could remove this check in validation, and normalize instead
-
-        if (field.getBusinessKey() && !field.getNotNull()) {
-
-            var err = String.format(
-                    "Schema field [%s] cannot have notNull == false because it is a business key",
-                    ctx.fieldName());
-
-            ctx = ctx.error(err);
-        }
-
         if (TypeSystem.isPrimitive(field.getFieldType())) {
 
             if (field.getChildrenCount() > 0) {
