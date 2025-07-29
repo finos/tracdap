@@ -28,11 +28,12 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};PSF-2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};ISC License (ISCL)"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 
-# License for greenlet is specified this way
+# Some packages specify dual licensing as a string with both licenses
+# The license checker can't separate them out, so they are listed here
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
-
-# License for cryptography package is specified this way
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-3-Clause"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND MIT"
+
 
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed

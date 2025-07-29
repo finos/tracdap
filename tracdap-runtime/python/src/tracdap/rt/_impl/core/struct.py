@@ -122,7 +122,7 @@ class StructProcessor:
         StructQuoter.quote(struct, dst, dst_format)
 
     @classmethod
-    def parse_struct(cls, data: dict, schema: _meta.SchemaDefinition = None, python_type: type = None) -> object:
+    def parse_struct(cls, data: dict, python_type: type = None) -> object:
 
         parser = StructParser()
         return parser.parse(python_type, data)
@@ -414,6 +414,227 @@ class StructProcessor:
     __SHIM_PREFIX = "tracdap.shim."
 
 
+class StructConformance:
+
+    # This class is for enforcing conformance of STRUCT data against a schema
+    # Raw data can be supplied as a dict (e.g. if loaded directly from JSON / YAML),
+    # or as a dataclass or Pydantic model (e.g. if passed in from a model output).
+    # The result is always a dict of pure Python types, any fields not defined in
+    # the schema will be discarded. Any classes / types defined in client code are
+    # discarded by the conformance process.
+
+    __primitive_parse_func: _tp.Dict[type, callable] = {
+        bool: bool,
+        int: int,
+        float: float,
+        str: str,
+        _decimal.Decimal: _decimal.Decimal,
+        _dt.date: _dt.date.fromisoformat,
+        _dt.datetime: _dt.datetime.fromisoformat
+    }
+
+    @classmethod
+    def conform_to_schema(cls, schema: _meta.SchemaDefinition, raw_data: _tp.Any) -> dict:
+
+        conformance = StructConformance()
+        root_location = ""
+
+        conformed_value = conformance._conform_struct_fields(root_location, raw_data, schema.fields, schema)
+
+        if any(conformance._errors):
+
+            message = "One or more conformance errors in STRUCT data"
+
+            for (location, error) in conformance._errors:
+                location_info = f" (in {location})" if location else ""
+                message = message + f"\n{error}{location_info}"
+
+            raise _ex.EDataConformance(message)
+
+        return conformed_value
+
+    def __init__(self):
+        self._log = _logging.logger_for_object(self)
+        self._errors = []
+
+    def _conform_value(self, location: str, raw_value: _tp.Any, trac_field: _meta.FieldSchema, trac_schema: _meta.SchemaDefinition):
+
+        if raw_value is None:
+            if trac_field.notNull or trac_field.businessKey:
+                self._error(location, f"Field [{trac_field.fieldName}] cannot be null")
+            return None
+
+        if _meta_types.TypeMapping.is_primitive(trac_field.fieldType):
+            if trac_field.categorical:
+                return self._conform_categorical(location, raw_value, trac_field, trac_schema)
+            else:
+                return self._conform_primitive(location, raw_value, trac_field)
+
+        if trac_field.fieldType == _meta.BasicType.ARRAY:
+            return self._conform_list(location, raw_value, trac_field, trac_schema)
+
+        if trac_field.fieldType == _meta.BasicType.MAP:
+            return self._conform_map(location, raw_value, trac_field, trac_schema)
+
+        if trac_field.fieldType == _meta.BasicType.STRUCT:
+            return self._conform_struct(location, raw_value, trac_field, trac_schema)
+
+        return self._error(location, f"Type mapping not available for field [{trac_field.fieldName}]")
+
+    def _conform_primitive(self, location: str, raw_value: _tp.Any, trac_field):
+
+        python_type = _meta_types.TypeMapping.trac_to_python_basic_type(trac_field.fieldType)
+
+        try:
+            if isinstance(raw_value, python_type):
+                return raw_value
+
+            elif isinstance(raw_value, str):
+                parse_func = StructConformance.__primitive_parse_func[python_type]
+                return parse_func(raw_value)
+
+            elif python_type == str:
+                if isinstance(raw_value, _enum.Enum):
+                    return raw_value.name
+                else:
+                    return str(raw_value)
+
+            else:
+                raise TypeError
+
+        except (ValueError, TypeError):
+            str_value = str(raw_value)
+            short_value = str_value[:20] + "..." if len(str_value) > 20 else str_value
+            message = f"Invalid value [{short_value}] for field [{trac_field.fieldName}]" + \
+                      f" (expected type {python_type.__name__})"
+            return self._error(location, message)
+
+    def _conform_categorical(
+            self, location: str, raw_value: _tp.Any,
+            trac_field: _meta.FieldSchema,
+            trac_schema: _meta.SchemaDefinition):
+
+        primitive_value = self._conform_primitive(location, raw_value, trac_field)
+
+        if trac_field.namedEnum is not None:
+
+            if trac_field.namedEnum not in trac_schema.namedEnums:
+                return self._error(location, f"Invalid schema (named enum [{trac_field.namedType}] is not defined")
+
+            named_enum = trac_schema.namedEnums[trac_field.namedEnum]
+
+            if primitive_value not in named_enum.values:
+                str_value = str(raw_value)
+                short_value = str_value[:20] + "..." if len(str_value) > 20 else str_value
+                message = f"Invalid value [{short_value}] for field [{trac_field.fieldName}]" + \
+                          f" (using named enum: {trac_field.namedEnum})"
+                return self._error(location, message)
+
+        return primitive_value
+
+    def _conform_list(
+            self, location: str, raw_value: _tp.Any,
+            trac_field: _meta.FieldSchema,
+            trac_schema: _meta.SchemaDefinition):
+
+        if not isinstance(raw_value, list):
+            return self._error(location, f"Field [{trac_field.fieldName}] should be a list (got {type(raw_value)})")
+
+        item_field = trac_field.children[0]
+
+        return [
+            self._conform_value(self._child_location(location, index), item, item_field, trac_schema)
+            for index, item in enumerate(raw_value)
+        ]
+
+    def _conform_map(
+            self, location: str, raw_value: _tp.Any,
+            trac_field: _meta.FieldSchema,
+            trac_schema: _meta.SchemaDefinition):
+
+        if not isinstance(raw_value, dict):
+            return self._error(location, f"Field [{trac_field.fieldName}] should be a map (got {type(raw_value)})")
+
+        key_field = trac_field.children[0]
+        value_field = trac_field.children[1]
+
+        return {
+            self._conform_value(self._child_location(location, key), key, key_field, trac_schema):
+                self._conform_value(self._child_location(location, key), value, value_field, trac_schema)
+            for key, value in raw_value.items()
+        }
+
+    def _conform_struct(
+            self, location: str, raw_value: _tp.Any,
+            trac_field: _meta.FieldSchema,
+            trac_schema: _meta.SchemaDefinition):
+
+        if not isinstance(raw_value, dict) \
+                and not _dc.is_dataclass(type(raw_value)) \
+                and not isinstance(raw_value, _pyd.BaseModel):
+
+            return self._error(location, f"Field [{trac_field.fieldName}] should be a struct (got {type(raw_value)})")
+
+        if trac_field.namedType is not None:
+            if trac_field.namedType not in trac_schema.namedTypes:
+                return self._error(location, f"Invalid schema (named type [{trac_field.namedType}] is not defined")
+            struct_type = trac_schema.namedTypes[trac_field.namedType]
+            struct_fields = struct_type.fields
+        else:
+            struct_fields = trac_field.children
+
+        return self._conform_struct_fields(location, raw_value, struct_fields, trac_schema)
+
+    def _conform_struct_fields(
+            self, location: str, raw_value: _tp.Any,
+            struct_fields: _tp.List[_meta.FieldSchema],
+            trac_schema: _meta.SchemaDefinition):
+
+        struct = dict()
+
+        for struct_field in struct_fields:
+
+            struct_field_location = self._child_location(location, struct_field.fieldName)
+
+            if isinstance(raw_value, dict):
+                if struct_field.fieldName in raw_value:
+                    struct_value_present = True
+                    struct_value = raw_value.get(struct_field.fieldName)
+                else:
+                    struct_value_present = False
+                    struct_value = None
+            elif hasattr(raw_value, struct_field.fieldName):
+                struct_value_present = True
+                struct_value = getattr(raw_value, struct_field.fieldName)
+            else:
+                struct_value_present = False
+                struct_value = None
+
+            if not struct_value_present:
+                if struct_field.notNull or struct_field.businessKey:
+                    self._error(location, f"Missing STRUCT field [{struct_field.fieldName}] which cannot be null")
+                else:
+                    struct[struct_field.fieldName] = None
+            else:
+                struct[struct_field.fieldName] = self._conform_value(struct_field_location, struct_value, struct_field, trac_schema)
+
+        return struct
+
+    def _error(self, location: str, error: str) -> None:
+        self._errors.append((location, error))
+        return None
+
+    @staticmethod
+    def _child_location(parent_location: str, item: _tp.Union[str, int]):
+
+        if parent_location is None or parent_location == "":
+            return item
+        elif isinstance(item, int):
+            return f"{parent_location}[{item}]"
+        else:
+            return f"{parent_location}.{item}"
+
+
 class StructParser:
 
     # New implementation of STRUCT parsing, copied from config_parser
@@ -448,13 +669,13 @@ class StructParser:
         self._log = _logging.logger_for_object(self)
         self._errors = []
 
-    def parse(self, config_class: type[__STRUCT_TYPE], config_dict: dict) -> __STRUCT_TYPE:
+    def parse(self, config_class: type[__STRUCT_TYPE], raw_value: _tp.Any) -> __STRUCT_TYPE:
 
         # If config is empty, return a default (blank) config
-        if config_dict is None or len(config_dict) == 0:
+        if raw_value is None or (isinstance(raw_value, dict) and len(raw_value) == 0):
             return config_class()
 
-        config = self._parse_value("", config_dict, config_class)
+        config = self._parse_value("", raw_value, config_class)
 
         if any(self._errors):
 
@@ -630,7 +851,7 @@ class StructParser:
 
             return {
                 self._parse_value(self._child_location(location, key), key, key_type):
-                    self._parse_value(self._child_location(location, key), value, value_type)
+                self._parse_value(self._child_location(location, key), value, value_type)
                 for key, value in raw_value.items()}
 
         # Handle Optional, which is a shorthand for tp.Union[type, None]

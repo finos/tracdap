@@ -30,6 +30,16 @@ class TypeMapping:
     To map primary data, use :py:class:`DataMapping <tracdap.rt.impl.data.DataMapping>`.
     """
 
+    __PRIMITIVE_TYPES: tp.List[_meta.BasicType] = [
+        _meta.BasicType.BOOLEAN,
+        _meta.BasicType.INTEGER,
+        _meta.BasicType.FLOAT,
+        _meta.BasicType.DECIMAL,
+        _meta.BasicType.STRING,
+        _meta.BasicType.DATE,
+        _meta.BasicType.DATETIME
+    ]
+
     __TRAC_TO_PYTHON_BASIC_TYPE: tp.Dict[_meta.BasicType, type] = {
         _meta.BasicType.BOOLEAN: bool,
         _meta.BasicType.INTEGER: int,
@@ -49,6 +59,14 @@ class TypeMapping:
         dt.date: _meta.BasicType.DATE,
         dt.datetime: _meta.BasicType.DATETIME
     }
+
+    @classmethod
+    def is_primitive(cls, trac_type: tp.Union[_meta.BasicType, _meta.TypeDescriptor]) -> bool:
+
+        if isinstance(trac_type, _meta.BasicType):
+            return trac_type in cls.__PRIMITIVE_TYPES
+        else:
+            return trac_type.basicType in cls.__PRIMITIVE_TYPES
 
     @classmethod
     def trac_to_python(cls, trac_type: _meta.TypeDescriptor) -> type:
