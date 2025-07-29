@@ -199,7 +199,7 @@ class TracContextImpl(_api.TracContext):
 
         return self.get_table(dataset_name, _eapi.POLARS)
 
-    def get_struct(self, struct_name: str, python_class: type[_eapi.STRUCT_TYPE] = None) -> _eapi.STRUCT_TYPE:
+    def get_struct(self, struct_name: str, python_class: type[_eapi.STRUCT_TYPE] = dict) -> _eapi.STRUCT_TYPE:
 
         _val.validate_signature(self.get_struct, struct_name, python_class)
 
@@ -214,12 +214,15 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_context_data_view_type(struct_name, data_view, _meta.ObjectType.DATA)
         self.__val.check_dataset_schema_defined(struct_name, data_view)
 
-        struct_data = data_view.parts[part_key][0].content
+        struct_value = data_view.parts[part_key][0].content
 
-        if isinstance(struct_data, python_class):
-            return struct_data
+        # Apply STRUCT data conformance
+        conformed_value = _struct.StructConformance.conform_to_schema(data_view.trac_schema, struct_value)
+
+        if python_class is None or python_class == dict:
+            return conformed_value
         else:
-            return _struct.StructProcessor.parse_struct(struct_data, None, python_class)
+            return _struct.StructProcessor.parse_struct(conformed_value, python_class)
 
     def get_file(self, file_name: str) -> bytes:
 
@@ -354,7 +357,10 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_dataset_schema_defined(struct_name, data_view)
         self.__val.check_dataset_part_not_present(struct_name, data_view, part_key)
 
-        data_item = _data.DataItem.for_struct(struct)
+        # Apply STRUCT data conformance
+        conformed_struct = _struct.StructConformance.conform_to_schema(data_view.trac_schema, struct)
+
+        data_item = _data.DataItem.for_struct(conformed_struct)
         updated_view = _data.DataMapping.add_item_to_view(data_view, part_key, data_item)
 
         self.__local_ctx[struct_name] = updated_view
