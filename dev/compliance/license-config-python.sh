@@ -34,6 +34,9 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND MIT"
 
+# Dual licensing for Dulwich is Apache or GPL (we are choosing Apache)
+ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR GPL-2.0-or-later"
+
 
 # The "certifi" package is a dependency of Python Safety, licensed under MPL 2.0
 # It is OK to use since the compliance tools are not distributed
