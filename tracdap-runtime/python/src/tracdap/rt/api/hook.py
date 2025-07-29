@@ -107,7 +107,7 @@ class _StaticApiHook:
     @_abc.abstractmethod
     def define_field(
             self, field_name: str, field_type: _meta.BasicType, label: str,
-            business_key: bool = False, categorical: bool = False, not_null: _tp.Optional[bool] = None,
+            business_key: bool = False, categorical: bool = False, not_null: bool = False,
             format_code: _tp.Optional[str] = None, field_order: _tp.Optional[int] = None) \
             -> _meta.FieldSchema:
 
