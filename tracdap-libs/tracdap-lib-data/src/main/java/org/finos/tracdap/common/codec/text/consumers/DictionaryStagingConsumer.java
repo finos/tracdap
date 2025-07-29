@@ -111,4 +111,8 @@ public class DictionaryStagingConsumer<TStaging extends ElementAddressableVector
     public Dictionary getDictionary() {
         return dictionary;
     }
+
+    public TStaging getStagingVector() {
+        return delegate.getVector();
+    }
 }
