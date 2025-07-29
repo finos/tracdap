@@ -54,11 +54,11 @@ boto3 == 1.39.15
 
 google-auth == 2.40.3
 google-api-core == 2.25.1
-google-cloud-storage == 2.19.0
+google-cloud-storage == 3.2.0
 
 # GCS implementation of FS Spec
 
-gcsfs == 2025.7.0
+gcsfs == 2024.3.1
 
 # Force dependency versions for compliance
 
