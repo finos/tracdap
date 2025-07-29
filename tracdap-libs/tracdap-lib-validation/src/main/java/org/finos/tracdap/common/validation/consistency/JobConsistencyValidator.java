@@ -642,8 +642,8 @@ public class JobConsistencyValidator {
                     requiredField.getFieldName()));
         }
 
-        // Business keys are implicitly not null if the flag is not specified (currently notNull is optional)
-        var suppliedNNotNull = suppliedField.hasNotNull() ? suppliedField.getNotNull() : suppliedField.getBusinessKey();
+        // Business keys are implicitly not null
+        var suppliedNNotNull = suppliedField.getNotNull() || suppliedField.getBusinessKey();
 
         if (requiredField.getNotNull() && !suppliedNNotNull) {
             return ctx.error(String.format(
