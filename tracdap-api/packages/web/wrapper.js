@@ -261,7 +261,7 @@
         const GRPC_MESSAGE_HEADER = "grpc-message";
 
         const LPM_PREFIX_LENGTH = 5;
-        const CLOSE_GRACE_PERIOD = 1000;
+        const CLOSE_DELAY_GRACE_PERIOD = 1000;
 
         const STANDARD_REQUEST_HEADERS = {
             "content-type": "application/grpc-web+proto",
@@ -638,7 +638,7 @@
 
             else if (this.rcvMsgQueue.length > 0 && !this.closeDelay) {
                 this.closeDelay = true;
-                setTimeout(() => {this._wsHandleClose(event);}, CLOSE_GRACE_PERIOD);
+                setTimeout(() => this._wsHandleClose(event), CLOSE_DELAY_GRACE_PERIOD);
             }
 
             // Clean shutdown - complete right away
