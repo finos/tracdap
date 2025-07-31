@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.gateway.routing;
 
+import org.finos.tracdap.common.exception.ENetwork;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.config.RoutingProtocol;
@@ -199,6 +200,9 @@ public class WebSocketsRouter extends CoreRouter {
                 if (!closeFrameSent) {
                     ReferenceCountUtil.retain(msg);
                     ctx.write(frame, promise);
+                }
+                else {
+                    promise.setFailure(new ENetwork("Connection already closed"));
                 }
             }
         }
