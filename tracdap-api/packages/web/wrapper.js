@@ -261,6 +261,7 @@
         const GRPC_MESSAGE_HEADER = "grpc-message";
 
         const LPM_PREFIX_LENGTH = 5;
+        const CLOSE_GRACE_PERIOD = 1000;
 
         const STANDARD_REQUEST_HEADERS = {
             "content-type": "application/grpc-web+proto",
@@ -304,6 +305,7 @@
             this.rcvFlag = 0;
             this.rcvLength = -1;
             this.rcvDone = false;
+            this.closeDelay = false;
             this.finished = false;
 
             // Response state for a single streaming call
@@ -621,40 +623,42 @@
 
             this.options.debug && console.log("TracTransport _wsHandleClose")
 
+            // This request is already finished, don't call a handler that would call back to client code
+            // If there is a problem, put it in the console instead
+
+            if (this.finished) {
+                if (this.options.debug && !event.wasClean)
+                    console.log(`Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`)
+            }
+
             // When the stream closes, there is sometimes a delay before the messages are processed
             // This happens e.g. for compressed LPMs, where decompression is async
             // Give the processing time to complete before calling the finishing logic
             // If processing does not complete, client will be notified of an error
 
-            setTimeout(() => {
+            else if (this.rcvMsgQueue.length > 0 && !this.closeDelay) {
+                this.closeDelay = true;
+                setTimeout(() => {this._wsHandleClose(event);}, CLOSE_GRACE_PERIOD);
+            }
 
-                if (this.finished) {
+            // Clean shutdown - complete right away
 
-                    // This request is already finished, don't call a handler that would call back to client code
-                    // If there is a problem, put it in the console instead
+            else if (event.wasClean)
+                this._handleComplete();
 
-                    if (this.options.debug && !event.wasClean)
-                        console.log(`Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`)
-                }
+            // Sometimes there is a response from gRPC even when the connection did not close cleanly
+            // This happens if gRPC interrupts a stream to send an error response
+            // The response from gRPC is usually more helpful than a generic "connection closed early"
 
-                else if (event.wasClean)
-                    this._handleComplete();
+            else if (GRPC_STATUS_HEADER in this.responseMetadata)
+                this._handleComplete();
 
-                // Sometimes there is a response from gRPC even when the connection did not close cleanly
-                // This happens if gRPC interrupts a stream to send an error response
-                // The response from gRPC is usually more helpful than a generic "connection closed early"
+            else {
 
-                else if (GRPC_STATUS_HEADER in this.responseMetadata)
-                    this._handleComplete();
-
-                else {
-
-                    const status = grpc.StatusCode.UNKNOWN;
-                    const message = `Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`
-                    this._handlerError(status, message);
-                }
-
-            }, 1000);
+                const status = grpc.StatusCode.UNKNOWN;
+                const message = `Connection did not close cleanly: ${event.reason} (websockets code ${event.code})`
+                this._handlerError(status, message);
+            }
         }
 
         TracTransport.prototype._wsHandleMessage = function(event) {
