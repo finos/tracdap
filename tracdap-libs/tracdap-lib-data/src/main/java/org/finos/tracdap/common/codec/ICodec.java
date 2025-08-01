@@ -41,6 +41,7 @@ public interface ICodec {
     List<String> options();
 
     String defaultFileExtension();
+    String defaultMimeType();
 
     Encoder<?> getEncoder(
             BufferAllocator allocator,

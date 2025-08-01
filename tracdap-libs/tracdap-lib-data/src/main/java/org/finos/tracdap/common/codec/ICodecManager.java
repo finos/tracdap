@@ -21,4 +21,7 @@ package org.finos.tracdap.common.codec;
 public interface ICodecManager {
 
     ICodec getCodec(String format);
+
+    String getDefaultFileExtension(String format);
+    String getDefaultMimeType(String format);
 }

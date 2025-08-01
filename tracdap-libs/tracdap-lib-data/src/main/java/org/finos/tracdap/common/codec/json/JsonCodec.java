@@ -39,6 +39,8 @@ import java.util.Map;
 public class JsonCodec implements ICodec {
 
     private static final String DEFAULT_FILE_EXTENSION = "json";
+    private static final String DEFAULT_MIME_TYPE = "application/json";
+
     private static final int BATCH_SIZE = 1024;
 
     private static final JsonFactory jsonFactory = new JsonFactory()
@@ -53,6 +55,11 @@ public class JsonCodec implements ICodec {
     @Override
     public String defaultFileExtension() {
         return DEFAULT_FILE_EXTENSION;
+    }
+
+    @Override
+    public String defaultMimeType() {
+        return DEFAULT_MIME_TYPE;
     }
 
     @Override

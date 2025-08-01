@@ -31,6 +31,7 @@ import java.util.Map;
 public class ArrowStreamCodec implements ICodec {
 
     private static final String DEFAULT_FILE_EXTENSION = "arrows";
+    private static final String DEFAULT_MIME_TYPE = "application/vnd.apache.arrow.stream";
 
     @Override
     public List<String> options() {
@@ -40,6 +41,11 @@ public class ArrowStreamCodec implements ICodec {
     @Override
     public String defaultFileExtension() {
         return DEFAULT_FILE_EXTENSION;
+    }
+
+    @Override
+    public String defaultMimeType() {
+        return DEFAULT_MIME_TYPE;
     }
 
     @Override
