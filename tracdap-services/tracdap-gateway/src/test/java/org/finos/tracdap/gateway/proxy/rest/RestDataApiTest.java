@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.proxy.rest;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.async.Flows;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.gateway.TracPlatformGateway;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.svc.admin.TracAdminService;
@@ -314,11 +315,51 @@ public class RestDataApiTest {
     }
 
     @Test
-    void simpleDownload() throws Exception {
+    void simpleDataDownload() throws Exception {
 
         var dataClient = platform.dataClientBlocking();
 
-        var content = Files.readAllBytes(tracRepoDir.resolve(TEST_FILE));
+        var content = Files.readAllBytes(tracRepoDir.resolve(SMALL_TEST_FILE));
+
+        var upload = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                .setFormat("text/csv")
+                .setContent(ByteString.copyFrom(content))
+                .build();
+
+        var dataId = dataClient.createSmallDataset(upload);
+
+        var downloadUrl = String.format(
+                "/trac-data/api/v1/%s/DATA/%s/versions/%d/basic_data.csv",
+                TEST_TENANT, dataId.getObjectId(), dataId.getObjectVersion());
+
+        var downloadRequest = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl + "?format=csv"))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader = downloadResponse.headers().firstValue("content-type");
+        Assertions.assertEquals(200, downloadResponse.statusCode());
+        Assertions.assertTrue(contentTypeHeader.isPresent());
+        Assertions.assertEquals("text/csv", contentTypeHeader.get());
+
+        var downloadContent = downloadResponse.body();
+        var downloadAsText = new String(downloadContent);
+
+        Assertions.assertTrue(downloadContent.length > 0);
+        Assertions.assertTrue(downloadAsText.contains("Hello world 9"));
+    }
+
+    @Test
+    void simpleFileDownload() throws Exception {
+
+        var dataClient = platform.dataClientBlocking();
+
+        var content = Files.readAllBytes(tracRepoDir.resolve(SMALL_TEST_FILE));
 
         var upload = FileWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -352,6 +393,60 @@ public class RestDataApiTest {
         var downloadContent = downloadResponse.body();
 
         Assertions.assertArrayEquals(content, downloadContent);
+    }
+
+    @Test
+    void largeDataDownload() throws Exception {
+
+        var dataClient = platform.dataClient();
+
+        var msg0 = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                .setFormat("text/csv")
+                .build();
+
+        var content = Files.readAllBytes(tracRepoDir.resolve(LARGE_TEST_FILE));
+
+        var msgs = new ArrayList<DataWriteRequest>();
+        msgs.add(msg0);
+
+        for (long offset = 0; offset < content.length; offset += UPLOAD_CHUNK_SIZE) {
+
+            var length = Math.min(UPLOAD_CHUNK_SIZE, content.length - offset);
+            var msg = DataWriteRequest.newBuilder()
+                    .setContent(ByteString.copyFrom(content, (int) offset, (int) length))
+                    .build();
+            msgs.add(msg);
+        }
+
+        var upload = DataApiTestHelpers.clientStreaming(dataClient::createDataset, Flows.publish(msgs));
+        waitFor(Duration.ofMillis(TEST_TIMEOUT), upload);
+
+        var fileId = getResultOf(upload);
+
+        var downloadUrl = String.format(
+                "/trac-data/api/v1/%s/DATA/%s/versions/%d/large_data.csv?format=csv",
+                TEST_TENANT, fileId.getObjectId(), fileId.getObjectVersion());
+
+        var downloadRequest = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader = downloadResponse.headers().firstValue("content-type");
+        Assertions.assertEquals(200, downloadResponse.statusCode());
+        Assertions.assertTrue(contentTypeHeader.isPresent());
+        Assertions.assertEquals("text/csv", contentTypeHeader.get());
+
+        var downloadContent = downloadResponse.body();
+        var downloadAsText = new String(downloadContent);
+
+        Assertions.assertArrayEquals(content, downloadContent);
+        Assertions.assertTrue(downloadAsText.contains("Hello world 9"));
     }
 
     @Test
@@ -410,7 +505,84 @@ public class RestDataApiTest {
     }
 
     @Test
-    void latestVersionDownload(@TempDir Path tempDir) throws Exception {
+    void latestVersionDataDownload() throws Exception {
+
+        var dataClient = platform.dataClientBlocking();
+
+        var originalFile = tracRepoDir.resolve(SMALL_TEST_FILE);
+        var content = Files.readAllBytes(originalFile);
+
+        var upload = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                .setFormat("text/csv")
+                .setContent(ByteString.copyFrom(content))
+                .build();
+
+        var dataId = dataClient.createSmallDataset(upload);
+
+        var downloadUrl = String.format(
+                "/trac-data/api/v1/%s/DATA/%s/versions/latest/basic_data_1.csv?format=csv",
+                TEST_TENANT, dataId.getObjectId());
+
+        var downloadRequest = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var downloadResponse = client.send(downloadRequest, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader = downloadResponse.headers().firstValue("content-type");
+        Assertions.assertEquals(200, downloadResponse.statusCode());
+        Assertions.assertTrue(contentTypeHeader.isPresent());
+        Assertions.assertEquals("text/csv", contentTypeHeader.get());
+
+        var downloadContent = downloadResponse.body();
+        var downloadAsText = new String(downloadContent);
+
+        Assertions.assertTrue(downloadContent.length > 0);
+        Assertions.assertTrue(downloadAsText.contains("Hello world 9"));
+
+
+        var updatedFile = tracRepoDir.resolve(SMALL_TEST_FILE_V2);
+        var updatedContent = Files.readAllBytes(updatedFile);
+
+
+        var update = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setPriorVersion(MetadataUtil.selectorFor(dataId))
+                .setSchema(SampleData.BASIC_TABLE_SCHEMA_V2)
+                .setFormat("text/csv")
+                .setContent(ByteString.copyFrom(updatedContent))
+                .build();
+
+        var dataIdV2 = dataClient.updateSmallDataset(update);
+
+        Assertions.assertTrue(dataIdV2.getObjectVersion() > dataId.getObjectVersion());
+
+        var downloadRequest2 = HttpRequest.newBuilder()
+                .GET()
+                .uri(new URI("http://localhost:" + TEST_GW_PORT + downloadUrl))
+                .version(HttpClient.Version.HTTP_1_1)
+                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .build();
+
+        var downloadResponse2 = client.send(downloadRequest2, HttpResponse.BodyHandlers.ofByteArray());
+        var contentTypeHeader2 = downloadResponse2.headers().firstValue("content-type");
+        Assertions.assertEquals(200, downloadResponse2.statusCode());
+        Assertions.assertTrue(contentTypeHeader2.isPresent());
+        Assertions.assertEquals("text/markdown", contentTypeHeader2.get());
+
+        var downloadContent2 = downloadResponse2.body();
+        var downloadAsText2 = new String(downloadContent);
+
+        Assertions.assertTrue(downloadContent2.length > 0);
+        Assertions.assertTrue(downloadAsText2.contains("Hello world 9"));
+    }
+
+    @Test
+    void latestVersionFileDownload(@TempDir Path tempDir) throws Exception {
 
         var dataClient = platform.dataClientBlocking();
 
