@@ -348,6 +348,42 @@ public class CommonValidators {
                 "is a TRAC reserved identifier", value, ctx);
     }
 
+    public static ValidationContext dataFormat(String value, ValidationContext ctx) {
+
+        var formatCodeMatch = MetadataConstants.VALID_IDENTIFIER.matcher(value);
+
+        if (formatCodeMatch.matches()) {
+
+            var reservedMatch = MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(value);
+
+            if (reservedMatch.matches()) {
+                var err = String.format("Invalid data format [%s]: Format code cannot be a reserved identifier", value);
+                return ctx.error(err);
+            }
+            else {
+                return ctx;
+            }
+        }
+
+        var mimeTypeMatch = ValidationConstants.MIME_TYPE.matcher(value);
+
+        if (mimeTypeMatch.matches()) {
+
+            var mainType = value.substring(0, value.indexOf("/"));
+
+            if (!ValidationConstants.REGISTERED_MIME_TYPES.contains(mainType)) {
+                var err = String.format("Invalid data format [%s]: Not a registered mime type", value);
+                return ctx.error(err);
+            }
+            else {
+                return ctx;
+            }
+        }
+
+        var err = String.format("Invalid data format [%s]: Not a mime type or format code", value);
+        return ctx.error(err);
+    }
+
     public static ValidationContext mimeType(String value, ValidationContext ctx) {
 
         // First check the value matches the mime type regex, i.e. has the right form
