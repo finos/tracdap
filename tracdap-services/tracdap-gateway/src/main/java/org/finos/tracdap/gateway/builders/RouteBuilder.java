@@ -17,12 +17,13 @@
 
 package org.finos.tracdap.gateway.builders;
 
-import io.netty.handler.codec.http.HttpMethod;
-import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.*;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.gateway.exec.IRouteMatcher;
 import org.finos.tracdap.gateway.exec.Route;
+import org.finos.tracdap.gateway.proxy.rest.RestApiMethodBuilder;
 
+import io.netty.handler.codec.http.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,7 +167,7 @@ public class RouteBuilder {
         var routing = RoutingUtils.serviceTarget(platformConfig, serviceInfo.serviceKey());
 
         var restMethodPrefix = restPath.endsWith("/") ? restPath.substring(0, restPath.length() - 1) : restPath;
-        var restMethods = RestApiBuilder.buildAllMethods(serviceInfo.descriptor(), restMethodPrefix, API_CLASSLOADER);
+        var restMethods = RestApiMethodBuilder.buildService(serviceInfo.descriptor(), restMethodPrefix, API_CLASSLOADER);
 
         var match = RoutingMatch.newBuilder()
                 .setPath(restPath);

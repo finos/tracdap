@@ -17,8 +17,6 @@
 
 package org.finos.tracdap.gateway.proxy.rest.translate;
 
-import io.netty.buffer.ByteBufAllocator;
-import org.finos.tracdap.gateway.proxy.grpc.GrpcUtils;
 import org.finos.tracdap.gateway.proxy.rest.RestApiRequest;
 
 import com.google.protobuf.Message;
@@ -66,10 +64,5 @@ public class RequestTranslator {
         requestBodyTranslator.translate(builder, bodyBuffer);
 
         return builder.build();
-    }
-
-    public ByteBuf encodeLpm(Message msg, ByteBufAllocator allocator) {
-
-        return GrpcUtils.encodeLpm(msg, allocator);
     }
 }

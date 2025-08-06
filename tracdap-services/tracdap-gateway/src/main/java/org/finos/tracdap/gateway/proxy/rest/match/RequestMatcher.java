@@ -35,7 +35,7 @@ public class RequestMatcher implements Matcher<RestApiRequest> {
     @Override
     public boolean matches(RestApiRequest request) {
 
-        return methodMatcher.matches(request.method()) &&
+        return methodMatcher.matches(request.httpMethod()) &&
                 pathMatcher.matches(request.pathSegments());
     }
 }

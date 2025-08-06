@@ -17,14 +17,11 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
-import java.text.MessageFormat;
 
 public class RestApiErrors {
 
-    public static String formatError(String errorMessage, Object... args) {
 
-        return MessageFormat.format(errorMessage, args);
-    }
+    // User facing errors - can happen at runtime during request translation
 
     public static final String INVALID_REQUEST_ENUM_VALUE =
             "Invalid REST API request: Bad enum value [%s] for field [%s]";
@@ -43,4 +40,22 @@ public class RestApiErrors {
 
     public static final String INVALID_REQUEST_BAD_JSON_CONTENT =
             "Invalid REST API request: Error in JSON payload: %s";
+
+
+    // Developer facing errors - can happen when trying to integrate new mappings
+
+    public static final String INVALID_MAPPING_UNKNOWN_FIELD =
+            "Invalid REST API mapping: Unknown field [%s] in type {%s] for method [%s]";
+
+    public static final String INVALID_MAPPING_REQUIRED_FIELD_TYPE =
+            "Invalid REST API mapping: Field [%s] used in %s has unsupported field type [%s] in method [%s]";
+
+    public static final String INVALID_MAPPING_BAD_FIELD_TYPE =
+            "Invalid REST API mapping: Field [%s] used in %s does not field type [%s] in method [%s]";
+
+    public static final String INVALID_MAPPING_BAD_TEMPLATE =
+            "Invalid REST API mapping: Illegal path template for method [%s]: %s";
+
+    public static final String INVALID_MAPPING_BAD_HTTP_RULE =
+            "Invalid REST API mapping: Illegal HTTP rule for method [%s]: %s";
 }
