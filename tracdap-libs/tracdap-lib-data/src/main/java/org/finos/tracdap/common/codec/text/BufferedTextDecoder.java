@@ -177,6 +177,9 @@ public class BufferedTextDecoder extends BufferDecoder {
                 consumer().onBatch();
 
             if (context.readyToLoad() && reader.hasBatch()) {
+
+                reader.resetBatch(context.getBackBuffer());
+
                 if (reader.readBatch())
                     context.setLoaded();
                 else

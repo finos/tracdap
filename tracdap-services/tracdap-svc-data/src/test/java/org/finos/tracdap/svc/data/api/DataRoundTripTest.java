@@ -139,6 +139,7 @@ abstract class DataRoundTripTest {
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
     private static final String STRUCT_JSON_DATA = SampleData.STRUCT_JSON_DATA_RESOURCE;
     private static final String LARGE_CSV_DATA = "/large_csv_data_100000.csv";
+    private static final long LARGE_CSV_DATA_ROW_COUNT = 100000;
 
     private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
@@ -269,11 +270,17 @@ abstract class DataRoundTripTest {
             var roundTripBytes = resultOf(readBytes);
 
             var roundTripData = DataApiTestHelpers.decodeCsv(roundTripSchema, List.of(roundTripBytes));
-
             var integerField = roundTripData.get(1);
+            var stringField = roundTripData.get(4);
 
-            for (var i = 0; i < integerField.size(); i++)
+            // Check the right number of rows came through the round tripe
+            Assertions.assertEquals(LARGE_CSV_DATA_ROW_COUNT, integerField.size());
+
+            // Just testing the int and string fields - exhaustive encoding checks in -lib-data
+            for (var i = 0; i < integerField.size(); i++) {
                 Assertions.assertEquals((long) i % 10000 + 1, integerField.get(i));
+                Assertions.assertEquals("hello " + ((long) i % 10000 + 1), stringField.get(i));
+            }
         }
     }
 

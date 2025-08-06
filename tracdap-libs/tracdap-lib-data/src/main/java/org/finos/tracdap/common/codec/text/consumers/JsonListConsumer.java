@@ -110,7 +110,7 @@ public class JsonListConsumer extends BaseJsonConsumer<ListVector> {
     @Override
     @SuppressWarnings("unchecked")
     public void resetVector(ListVector vector) {
-        ((IJsonConsumer<FieldVector>) delegate).resetVector(vector);
+        ((IJsonConsumer<FieldVector>) delegate).resetVector(vector.getDataVector());
         super.resetVector(vector);
     }
 

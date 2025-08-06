@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import org.apache.arrow.vector.FieldVector;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.io.IOException;
 
@@ -47,10 +48,22 @@ public class JsonScalarConsumer<TVector extends FieldVector> extends BaseJsonCon
                 return true;
             }
             else {
-                throw new JsonParseException(parser, "Null value not allowed");  // TODO
+                throw new JsonParseException(parser, "Invalid input: (null not allowed)");
             }
         }
 
         return delegate.consumeElement(parser);
+    }
+
+    @Override
+    public void setNull() {
+        delegate.setNull();
+        currentIndex++;
+    }
+
+    @Override
+    public void resetVector(TVector vector) {
+        delegate.resetVector(vector);
+        super.resetVector(vector);
     }
 }

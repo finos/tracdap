@@ -34,7 +34,7 @@ public abstract class BaseJsonConsumer<TVector extends FieldVector> implements I
     public void setNull() {
 
         if (!vector.getField().isNullable())
-            throw new IllegalArgumentException("Field is not nullable");  // TODO
+            throw new IllegalArgumentException("Invalid input (null not allowed)");
 
         vector.setNull(currentIndex++);
     }
