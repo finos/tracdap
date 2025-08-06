@@ -35,7 +35,9 @@ public class BatchConsumer implements IBatchConsumer {
     private VectorSchemaRoot batch;
     private List<DictionaryStagingConsumer<?>> staging;
 
+    private JsonToken token;
     private int currentIndex;
+
     private boolean midRecord;
     private boolean gotFirstToken;
     private boolean gotLastToken;
@@ -63,45 +65,56 @@ public class BatchConsumer implements IBatchConsumer {
     @Override
     public boolean consumeBatch(JsonParser parser) throws IOException {
 
-        if (!gotFirstToken) {
-            if (parser.nextToken() == JsonToken.START_ARRAY)
-                parser.nextToken();
-            gotFirstToken = true;
-        }
-
         if (currentIndex >= batchSize) {
             throw new IllegalStateException("Previous batch has not been reset");
         }
 
-        for (var token = parser.currentToken(); token != null && token != JsonToken.NOT_AVAILABLE; token = parser.nextToken()) {
+        if (!gotFirstToken) {
+            token = parser.nextToken();
+            if (token == JsonToken.START_ARRAY)
+                token = parser.nextToken();
+            gotFirstToken = true;
+        }
 
-            if (gotLastToken)
+        if (gotLastToken && token == null)
+            return false;
+
+        // for (var token = parser.nextToken(); token != null && token != JsonToken.NOT_AVAILABLE; token = parser.nextToken())
+
+        while (token != null && token !=  JsonToken.NOT_AVAILABLE) {
+
+            if (gotLastToken) {
+
                 throw new EDataCorruption("Unexpected token: " + token);
+            }
+            else if (midRecord || token.isStructStart()) {
 
-            if (midRecord || token.isStructStart()) {
                 if (currentIndex == batchSize) {
                     break;
                 }
                 else if (recordConsumer.consumeElement(parser)) {
                     currentIndex++;
                     midRecord = false;
-                    continue;
+                    token = parser.nextToken();
                 }
                 else {
                     midRecord = true;
                     return false;
                 }
             }
+            else if (token == JsonToken.END_ARRAY) {
 
-            if (token == JsonToken.END_ARRAY) {
                 gotLastToken = true;
-                continue;
+                token = parser.nextToken();
             }
+            else {
 
-            throw new EDataCorruption("Unexpected token: " + token);
+                throw new EDataCorruption("Unexpected token: " + token);
+            }
         }
 
-        if (gotLastToken || (parser.nextToken() != JsonToken.START_OBJECT && parser.nextToken() != JsonToken.NOT_AVAILABLE)) {
+        if (gotLastToken || token == null) {
+            gotLastToken = true;
             parseComplete = true;
         }
 
