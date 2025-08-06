@@ -124,7 +124,7 @@ public class JsonMapConsumer extends BaseJsonConsumer<MapVector> {
         var valueVector = entryVector.getChildrenFromFields().get(1);
 
         this.keyVector = keyVector;
-        ((IJsonProducer<FieldVector>) valueDelegate).resetVector(valueVector);
+        ((IJsonConsumer<FieldVector>) valueDelegate).resetVector(valueVector);
 
         super.resetVector(vector);
     }
