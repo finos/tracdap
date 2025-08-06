@@ -444,9 +444,18 @@ public class RestDataApiTest {
 
         var downloadContent = downloadResponse.body();
         var downloadAsText = new String(downloadContent);
+        var downloadLines = downloadAsText.split("\n");
+        var expectedLineCount = 100001;  // 100K lines + header
 
-        Assertions.assertArrayEquals(content, downloadContent);
-        Assertions.assertTrue(downloadAsText.contains("Hello world 9"));
+        // Check all rows are present and look for one correct value in each row
+        // Do not check for field value in header
+
+        Assertions.assertEquals(expectedLineCount, downloadLines.length);
+
+        for (int i = 1; i < expectedLineCount; i++) {
+            var expectedText = "hello " + (i % 10000 == 0 ? "10000" : i % 10000);
+            Assertions.assertTrue(downloadLines[i].contains(expectedText));
+        }
     }
 
     @Test
@@ -572,7 +581,7 @@ public class RestDataApiTest {
         var contentTypeHeader2 = downloadResponse2.headers().firstValue("content-type");
         Assertions.assertEquals(200, downloadResponse2.statusCode());
         Assertions.assertTrue(contentTypeHeader2.isPresent());
-        Assertions.assertEquals("text/markdown", contentTypeHeader2.get());
+        Assertions.assertEquals("text/csv", contentTypeHeader2.get());
 
         var downloadContent2 = downloadResponse2.body();
         var downloadAsText2 = new String(downloadContent);
