@@ -138,8 +138,10 @@ abstract class DataRoundTripTest {
     private static final String BASIC_CSV_DATA = SampleData.BASIC_CSV_DATA_RESOURCE;
     private static final String BASIC_JSON_DATA = SampleData.BASIC_JSON_DATA_RESOURCE;
     private static final String STRUCT_JSON_DATA = SampleData.STRUCT_JSON_DATA_RESOURCE;
+
     private static final String LARGE_CSV_DATA = "/large_csv_data_100000.csv";
-    private static final long LARGE_CSV_DATA_ROW_COUNT = 100000;
+    private static final String LARGE_JSON_DATA = "/large_json_data_100000.json";
+    private static final long LARGE_DATA_ROW_COUNT = 100000;
 
     private static final byte[] BASIC_CSV_CONTENT = ResourceHelpers.loadResourceAsBytes(BASIC_CSV_DATA);
 
@@ -274,7 +276,7 @@ abstract class DataRoundTripTest {
             var stringField = roundTripData.get(4);
 
             // Check the right number of rows came through the round tripe
-            Assertions.assertEquals(LARGE_CSV_DATA_ROW_COUNT, integerField.size());
+            Assertions.assertEquals(LARGE_DATA_ROW_COUNT, integerField.size());
 
             // Just testing the int and string fields - exhaustive encoding checks in -lib-data
             for (var i = 0; i < integerField.size(); i++) {
@@ -298,6 +300,73 @@ abstract class DataRoundTripTest {
             var mimeType = "application/json";
             roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, true);
             roundTripTest(testData, mimeType, mimeType, DataApiTestHelpers::decodeJson, false);
+        }
+    }
+
+    @Test
+    void roundTrip_jsonLarge() throws Exception {
+
+        try (var testDataStream = getClass().getResourceAsStream(LARGE_JSON_DATA)) {
+
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
+
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = new ArrayList<ByteString>();
+            var mb2 = 2 * 1024 * 1024;
+
+            for (var offset = 0; offset < testDataBytes.length; offset += mb2) {
+
+                var sliceSize = Math.min(mb2, testDataBytes.length - offset);
+                var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
+                testData.add(slice);
+            }
+
+            var mimeType = "application/json";
+
+
+            var requestParams = DataWriteRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                    .setFormat(mimeType)
+                    .build();
+
+            var createDatasetRequest = dataWriteRequest(requestParams, testData, false);
+            var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createDatasetRequest);
+
+            waitFor(TEST_TIMEOUT, createDataset);
+            var objHeader = resultOf(createDataset);
+
+            var dataRequest = DataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(selectorFor(objHeader))
+                    .setFormat(mimeType)
+                    .build();
+
+            var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
+            var readResponse0 = Flows.first(readResponse);
+            var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
+            var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
+
+            DataApiTestHelpers.serverStreaming(dataClient::readDataset, dataRequest, readResponse);
+
+            waitFor(Duration.ofMinutes(20), readResponse0, readBytes);
+            var roundTripResponse = resultOf(readResponse0);
+            var roundTripSchema = roundTripResponse.getSchema();
+            var roundTripBytes = resultOf(readBytes);
+
+            var roundTripData = DataApiTestHelpers.decodeJson(roundTripSchema, List.of(roundTripBytes));
+            var integerField = roundTripData.get(1);
+            var stringField = roundTripData.get(4);
+
+            // Check the right number of rows came through the round tripe
+            Assertions.assertEquals(LARGE_DATA_ROW_COUNT, integerField.size());
+
+            // Just testing the int and string fields - exhaustive encoding checks in -lib-data
+            for (var i = 0; i < integerField.size(); i++) {
+                Assertions.assertEquals((long) i % 10000 + 1, integerField.get(i));
+                Assertions.assertEquals("hello " + ((long) i % 10000 + 1), stringField.get(i));
+            }
         }
     }
 
