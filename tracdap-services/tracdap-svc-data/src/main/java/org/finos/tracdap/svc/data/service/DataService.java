@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.data.service;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.data.pipeline.CounterStage;
+import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.DataPipeline;
@@ -745,6 +746,9 @@ public class DataService {
         state.fileSize = fileSize;
         state.dataRowCount = counter.getRowCount();
         state.dataBatchCount = counter.getBatchCount();
+
+        log.info("Uploaded {} records in {} batches, size on disk = {}",
+                state.dataRowCount, state.dataBatchCount, LoggingHelpers.formatFileSize(fileSize));
 
         return state;
     }
