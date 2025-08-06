@@ -190,7 +190,7 @@ public class TracDataService extends TracServiceBase {
             var fileService = new FileService(storageManager, metaClient);
             var storageService = new StorageService(storageManager);
 
-            var dataApi = new TracDataApi(dataService, fileService, eventLoopResolver, arrowAllocator, commonConcerns);
+            var dataApi = new TracDataApi(dataService, fileService, formats, eventLoopResolver, arrowAllocator, commonConcerns);
             var storageApi = new TracStorageApi(storageService, eventLoopResolver, arrowAllocator);
             var messageProcessor = new MessageProcessor(storageManager, offloadExecutor);
 

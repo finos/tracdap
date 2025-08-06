@@ -48,6 +48,18 @@ public class CodecManager implements ICodecManager {
     }
 
     @Override
+    public String getDefaultFileExtension(String format) {
+
+        return getCodec(format).defaultFileExtension();
+    }
+
+    @Override
+    public String getDefaultMimeType(String format) {
+
+        return getCodec(format).defaultMimeType();
+    }
+
+    @Override
     public ICodec getCodec(String format) {
 
         var protocol = format.toLowerCase();
@@ -60,7 +72,7 @@ public class CodecManager implements ICodecManager {
 
             // Make a slightly prettier message that the regular plugin not available message
             // Since this error is likely to be user-facing
-            var message = String.format("Codec not available for data format: [%s]", format);
+            var message = String.format("Data format not supported: [%s] (no suitable codec is available)", format);
             log.error(message);
             throw new EPluginNotAvailable(message);
         }

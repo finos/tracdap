@@ -46,6 +46,7 @@ public class CsvCodec implements ICodec {
     private static final int BATCH_SIZE = 1024;
 
     private static final String DEFAULT_FILE_EXTENSION = "csv";
+    private static final String DEFAULT_MIME_TYPE = "text/csv";
 
     private static final CsvFactory csvFactory = new CsvFactory()
             // Make sure empty strings are quoted, so they can be distinguished from nulls
@@ -65,6 +66,11 @@ public class CsvCodec implements ICodec {
     @Override
     public String defaultFileExtension() {
         return DEFAULT_FILE_EXTENSION;
+    }
+
+    @Override
+    public String defaultMimeType() {
+        return DEFAULT_MIME_TYPE;
     }
 
     @Override

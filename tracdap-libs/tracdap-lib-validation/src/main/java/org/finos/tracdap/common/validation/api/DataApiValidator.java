@@ -52,6 +52,12 @@ public class DataApiValidator {
     private static final Descriptors.FieldDescriptor DRR_SELECTOR;
     private static final Descriptors.FieldDescriptor DRR_FORMAT;
 
+    private static final Descriptors.Descriptor DATA_DOWNLOAD_REQUEST;
+    private static final Descriptors.FieldDescriptor DDR_TENANT;
+    private static final Descriptors.FieldDescriptor DDR_OBJECT_ID;
+    private static final Descriptors.FieldDescriptor DDR_OBJECT_VERSION;
+    private static final Descriptors.FieldDescriptor DDR_FORMAT;
+
     private static final Descriptors.Descriptor FILE_WRITE_REQUEST;
     private static final Descriptors.FieldDescriptor FWR_TENANT;
     private static final Descriptors.FieldDescriptor FWR_TAG_UPDATES;
@@ -65,11 +71,10 @@ public class DataApiValidator {
     private static final Descriptors.FieldDescriptor FRR_TENANT;
     private static final Descriptors.FieldDescriptor FRR_SELECTOR;
 
-    private static final Descriptors.Descriptor DOWNLOAD_REQUEST;
-    private static final Descriptors.FieldDescriptor DR_TENANT;
-    private static final Descriptors.FieldDescriptor DR_OBJECT_TYPE;
-    private static final Descriptors.FieldDescriptor DR_OBJECT_ID;
-    private static final Descriptors.FieldDescriptor DR_OBJECT_VERSION;
+    private static final Descriptors.Descriptor FILE_DOWNLOAD_REQUEST;
+    private static final Descriptors.FieldDescriptor FDR_TENANT;
+    private static final Descriptors.FieldDescriptor FDR_OBJECT_ID;
+    private static final Descriptors.FieldDescriptor FDR_OBJECT_VERSION;
 
     static {
 
@@ -88,6 +93,12 @@ public class DataApiValidator {
         DRR_SELECTOR = ValidatorUtils.field(DATA_READ_REQUEST, DataReadRequest.SELECTOR_FIELD_NUMBER);
         DRR_FORMAT = ValidatorUtils.field(DATA_READ_REQUEST, DataReadRequest.FORMAT_FIELD_NUMBER);
 
+        DATA_DOWNLOAD_REQUEST = DataDownloadRequest.getDescriptor();
+        DDR_TENANT = ValidatorUtils.field(DATA_DOWNLOAD_REQUEST, DataDownloadRequest.TENANT_FIELD_NUMBER);
+        DDR_OBJECT_ID = ValidatorUtils.field(DATA_DOWNLOAD_REQUEST, DataDownloadRequest.OBJECTID_FIELD_NUMBER);
+        DDR_OBJECT_VERSION = ValidatorUtils.field(DATA_DOWNLOAD_REQUEST, DataDownloadRequest.OBJECTVERSION_FIELD_NUMBER);
+        DDR_FORMAT = ValidatorUtils.field(DATA_DOWNLOAD_REQUEST, DataDownloadRequest.FORMAT_FIELD_NUMBER);
+
         FILE_WRITE_REQUEST = FileWriteRequest.getDescriptor();
         FWR_TENANT = ValidatorUtils.field(FILE_WRITE_REQUEST, FileWriteRequest.TENANT_FIELD_NUMBER);
         FWR_TAG_UPDATES = ValidatorUtils.field(FILE_WRITE_REQUEST, FileWriteRequest.TAGUPDATES_FIELD_NUMBER);
@@ -101,11 +112,10 @@ public class DataApiValidator {
         FRR_TENANT = ValidatorUtils.field(FILE_READ_REQUEST, FileReadRequest.TENANT_FIELD_NUMBER);
         FRR_SELECTOR = ValidatorUtils.field(FILE_READ_REQUEST, FileReadRequest.SELECTOR_FIELD_NUMBER);
 
-        DOWNLOAD_REQUEST = DownloadRequest.getDescriptor();
-        DR_TENANT = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.TENANT_FIELD_NUMBER);
-        DR_OBJECT_TYPE = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.OBJECTTYPE_FIELD_NUMBER);
-        DR_OBJECT_ID = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.OBJECTID_FIELD_NUMBER);
-        DR_OBJECT_VERSION = ValidatorUtils.field(DOWNLOAD_REQUEST, DownloadRequest.OBJECTVERSION_FIELD_NUMBER);
+        FILE_DOWNLOAD_REQUEST = FileDownloadRequest.getDescriptor();
+        FDR_TENANT = ValidatorUtils.field(FILE_DOWNLOAD_REQUEST, FileDownloadRequest.TENANT_FIELD_NUMBER);
+        FDR_OBJECT_ID = ValidatorUtils.field(FILE_DOWNLOAD_REQUEST, FileDownloadRequest.OBJECTID_FIELD_NUMBER);
+        FDR_OBJECT_VERSION = ValidatorUtils.field(FILE_DOWNLOAD_REQUEST, FileDownloadRequest.OBJECTVERSION_FIELD_NUMBER);
     }
 
     @Validator(method = "createDataset")
@@ -182,7 +192,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(DWR_FORMAT)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::mimeType)
+                .apply(CommonValidators::dataFormat)
                 .pop();
 
         return ctx;
@@ -204,7 +214,7 @@ public class DataApiValidator {
 
         ctx = ctx.push(DRR_FORMAT)
                 .apply(CommonValidators::required)
-                .apply(CommonValidators::mimeType)
+                .apply(CommonValidators::dataFormat)
                 .pop();
 
         return ctx;
@@ -214,6 +224,57 @@ public class DataApiValidator {
     public static ValidationContext readSmallDataset(DataReadRequest msg, ValidationContext ctx) {
 
         return readDataset(msg, ctx);
+    }
+
+    @Validator(method = "downloadData")
+    public static ValidationContext downloadData(DataDownloadRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DDR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(DDR_OBJECT_ID)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
+                .pop();
+
+        ctx = ctx.push(DDR_OBJECT_VERSION)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::positive, Integer.class)
+                .pop();
+
+        ctx = ctx.push(DDR_FORMAT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::dataFormat)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "downloadLatestData")
+    public static ValidationContext downloadLatestData(DataDownloadRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(DDR_TENANT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::identifier)
+                .pop();
+
+        ctx = ctx.push(DDR_OBJECT_ID)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::uuid)
+                .pop();
+
+        ctx = ctx.push(DDR_OBJECT_VERSION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(DDR_FORMAT)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::dataFormat)
+                .pop();
+
+        return ctx;
     }
 
     @Validator(method = "createFile")
@@ -333,19 +394,19 @@ public class DataApiValidator {
     }
 
     @Validator(method = "downloadFile")
-    public static ValidationContext downloadFile(DownloadRequest msg, ValidationContext ctx) {
+    public static ValidationContext downloadFile(FileDownloadRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(DR_TENANT)
+        ctx = ctx.push(FDR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.push(DR_OBJECT_ID)
+        ctx = ctx.push(FDR_OBJECT_ID)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::uuid)
                 .pop();
 
-        ctx = ctx.push(DR_OBJECT_VERSION)
+        ctx = ctx.push(FDR_OBJECT_VERSION)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::positive, Integer.class)
                 .pop();
@@ -354,19 +415,19 @@ public class DataApiValidator {
     }
 
     @Validator(method = "downloadLatestFile")
-    public static ValidationContext downloadLatestFile(DownloadRequest msg, ValidationContext ctx) {
+    public static ValidationContext downloadLatestFile(FileDownloadRequest msg, ValidationContext ctx) {
 
-        ctx = ctx.push(DR_TENANT)
+        ctx = ctx.push(FDR_TENANT)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::identifier)
                 .pop();
 
-        ctx = ctx.push(DR_OBJECT_ID)
+        ctx = ctx.push(FDR_OBJECT_ID)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::uuid)
                 .pop();
 
-        ctx = ctx.push(DR_OBJECT_VERSION)
+        ctx = ctx.push(FDR_OBJECT_VERSION)
                 .apply(CommonValidators::omitted)
                 .pop();
 
