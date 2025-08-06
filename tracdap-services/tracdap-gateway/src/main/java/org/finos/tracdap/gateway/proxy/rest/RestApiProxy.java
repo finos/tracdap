@@ -62,11 +62,11 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
     private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
     private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
-    private final List<RestApiMethod<?, ?>> methods;
+    private final List<RestApiMethod> methods;
     private final Map<Http2FrameStream, RestApiCallState> callStateMap;
 
 
-    public RestApiProxy(List<RestApiMethod<?, ?>> methods) {
+    public RestApiProxy(List<RestApiMethod> methods) {
         this.methods = methods;
         this.callStateMap = new HashMap<>();
     }
@@ -152,7 +152,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             var frame = (Http2StreamFrame) msg;
             var stream = frame.stream();
             var state = callStateMap.get(stream);
-            var unaryResponse = ! state.method.grpcMethod.isServerStreaming();
+            var unaryResponse = ! state.method.methodDescriptor.isServerStreaming();
 
             if (frame instanceof Http2HeadersFrame) {
 
@@ -215,16 +215,19 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
         try {
 
-            var url = state.requestHeaders.path().toString();
+            var httpMethod = state.requestHeaders.method().toString();
+            var httpPath = URI.create(state.requestHeaders.path().toString());
+            var restRequest = new RestApiRequest(httpMethod, httpPath);
 
-            state.method = lookupMethod(state.requestHeaders);
-            state.translator = state.method != null ? state.method.translator : null;
+            var method = lookupMethod(restRequest);
 
-            if (state.method == null) {
+            if (method == null) {
                 sendErrorResponse(state.stream, ctx, HttpResponseStatus.NOT_FOUND, "REST API METHOD NOT FOUND");
                 promise.setFailure(new ENetworkHttp(HttpResponseStatus.NOT_FOUND.code(), "REST API METHOD NOT FOUND"));
                 return;
             }
+
+            state.method = method;
 
             // TODO: This content type checking should happen in the router for grpc and rest routes
 
@@ -238,11 +241,12 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
             var restHeaders = state.requestHeaders;
             var grpcHeaders = translateRequestHeaders(restHeaders, state);
-            var grpcMessage = state.method.hasBody
-                    ? state.translator.decodeRestRequest(url, state.requestContent)
-                    : state.translator.decodeRestRequest(url);
 
-            var lpm = state.translator.encodeGrpcRequest(grpcMessage, ctx.alloc());
+            var grpcMessage = state.method.hasBody
+                    ? state.method.requestTranslator.translateRequest(restRequest, state.requestContent)
+                    : state.method.requestTranslator.translateRequest(restRequest);
+
+            var lpm = GrpcUtils.encodeLpm(grpcMessage, ctx.alloc());
 
             var headersFrame = new DefaultHttp2HeadersFrame(grpcHeaders).stream(state.stream);
             var dataFrame = new DefaultHttp2DataFrame(lpm, true).stream(state.stream);
@@ -289,8 +293,8 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
                 restResponse = Unpooled.EMPTY_BUFFER;
             }
             else {
-                var grpcMessage = state.translator.decodeGrpcResponse(state.responseContent);
-                restResponse = state.translator.encodeRestResponse(grpcMessage);
+                var grpcMessage = state.method.responseTranslator.decodeLpm(state.responseContent);
+                restResponse = state.method.responseTranslator.translateResponse(grpcMessage);
             }
 
             var restHeaders = translateResponseHeaders(grpcHeaders, state, /* streaming = */ false);
@@ -363,14 +367,15 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         try {
             while (GrpcUtils.canDecodeLpm(state.responseContent)) {
 
-                var msg = state.translator.decodeGrpcResponse(state.responseContent);
+                var translator = state.method.responseTranslator;
+                var msg = translator.decodeLpm(state.responseContent);
 
                 // This is some TRAC magic to set the correct content headers for REST-ful data download streams
                 // It is not possible to define this behavior using the HTTP options in the proto file
                 if (!state.responseHeadersSent && msg instanceof DownloadResponse)
                     dispatchDownloadStreamHeaders(state, ctx, (DownloadResponse) msg);
 
-                var httpContent = state.translator.encodeRestResponse(msg);
+                var httpContent = translator.translateResponse(msg);
                 var dataFrame = new DefaultHttp2DataFrame(httpContent).stream(state.stream);
                 ctx.fireChannelRead(dataFrame);
             }
@@ -390,9 +395,11 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         // Otherwise, send an empty EOS data frame
         // Sending trailers is not compatible with HTTP/1 clients
 
+        var translator = state.method.responseTranslator;
+
         var finalGrpcStatus = state.responseHeaders.getInt("grpc-status", Status.Code.UNKNOWN.value());
         var finalGrpcCode = Status.fromCodeValue(finalGrpcStatus).getCode();
-        var finalHttpStatus = state.translator.translateGrpcErrorCode(finalGrpcCode);
+        var finalHttpStatus = translator.translateGrpcErrorCode(finalGrpcCode);
 
         if (state.responseHttpStatus.equals(HttpResponseStatus.OK) && !finalHttpStatus.equals(HttpResponseStatus.OK)) {
             var error = new ETracInternal("Download stream failed with error code " + finalGrpcCode.name());
@@ -403,14 +410,10 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         }
     }
 
-    private RestApiMethod<?, ?> lookupMethod(Http2Headers headers) {
+    private RestApiMethod lookupMethod(RestApiRequest restRequest) {
 
         for (var method: this.methods) {
-
-            var httpMethod = HttpMethod.valueOf(headers.method().toString());
-            var uri = URI.create(headers.path().toString());
-
-            if (method.matcher.matches(httpMethod, uri))
+            if (method.requestMatcher.matches(restRequest))
                 return method;
         }
 
@@ -430,7 +433,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
         // gRPC method
 
-        var grpcMethod = state.method.grpcMethod;
+        var grpcMethod = state.method.methodDescriptor;
         var httpPath = String.format("/%s/%s", grpcMethod.getService().getFullName(), grpcMethod.getName());
 
         grpcHeaders.method(HttpMethod.POST.asciiName());
@@ -469,7 +472,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         // If gRPC status code is available, translate that
         else if (grpcStatus != null) {
             var grpcStatusCode = Status.fromCodeValue(grpcStatus).getCode();
-            var restStatusCode = state.method.translator.translateGrpcErrorCode(grpcStatusCode);
+            var restStatusCode = state.method.responseTranslator.translateGrpcErrorCode(grpcStatusCode);
             var restMessage = grpcMessage != null ? grpcMessage.toString() : restStatusCode.reasonPhrase();
             var restStatus = new HttpResponseStatus(restStatusCode.code(), restMessage);
             restHeaders.status(restStatus.toString());
@@ -517,7 +520,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
         // Server streaming methods are for downloads and must accept whatever type the server sends
         // E.g. downloading a file, the response content type will depend on the type of the file
 
-        if (!state.method.grpcMethod.isServerStreaming()) {
+        if (!state.method.methodDescriptor.isServerStreaming()) {
 
             if (!restHeaders.contains(HttpHeaderNames.ACCEPT))
                 throw new EInputValidation("Missing required HTTP header [" + HttpHeaderNames.ACCEPT + "]");
@@ -527,11 +530,11 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
             if (!acceptHeader.equals("application/json"))
                 throw new EInputValidation("Invalid [accept] header (expected application/json for REST calls)");
         }
-        else {
-
-            if (restHeaders.contains(HttpHeaderNames.ACCEPT))
-                throw new EInputValidation("Unexpected HTTP header [" + HttpHeaderNames.ACCEPT + "]");
-        }
+//        else {
+//
+//            if (restHeaders.contains(HttpHeaderNames.ACCEPT))
+//                throw new EInputValidation("Unexpected HTTP header [" + HttpHeaderNames.ACCEPT + "]");
+//        }
     }
 
     private void sendErrorResponse(
@@ -571,8 +574,7 @@ public class RestApiProxy extends Http2ChannelDuplexHandler {
 
         Http2FrameStream stream;
 
-        RestApiMethod<?, ?> method;
-        RestApiTranslator<?, ?> translator;
+        RestApiMethod method;
 
         Http2Headers requestHeaders;
         CompositeByteBuf requestContent;

@@ -17,60 +17,38 @@
 
 package org.finos.tracdap.gateway.proxy.rest;
 
+import org.finos.tracdap.gateway.proxy.rest.match.RequestMatcher;
+import org.finos.tracdap.gateway.proxy.rest.translate.RequestTranslator;
+import org.finos.tracdap.gateway.proxy.rest.translate.ResponseTranslator;
+
 import com.google.protobuf.Descriptors;
-import com.google.protobuf.Message;
-import io.netty.handler.codec.http.HttpMethod;
-import org.finos.tracdap.api.DownloadResponse;
 
 
-public class RestApiMethod <TRequest extends Message, TResponse extends Message> {
+public class RestApiMethod {
 
-    final Descriptors.MethodDescriptor grpcMethod;
-    final RestApiTranslator<TRequest, TResponse> translator;
-    final RestApiMatcher matcher;
+    final Descriptors.MethodDescriptor methodDescriptor;
+
+    final RequestMatcher requestMatcher;
+    final RequestTranslator requestTranslator;
+    final ResponseTranslator responseTranslator;
+
     final boolean hasBody;
     final boolean isDownload;
 
-    private RestApiMethod(
-            Descriptors.MethodDescriptor grpcMethod,
-            RestApiTranslator<TRequest, TResponse> translator,
-            RestApiMatcher matcher,
+    public RestApiMethod(
+            Descriptors.MethodDescriptor methodDescriptor,
+            RequestMatcher requestMatcher,
+            RequestTranslator requestTranslator,
+            ResponseTranslator responseTranslator,
             boolean hasBody,
             boolean isDownload) {
 
-        this.grpcMethod = grpcMethod;
-        this.translator = translator;
-        this.matcher = matcher;
+        this.methodDescriptor = methodDescriptor;
+        this.requestMatcher = requestMatcher;
+        this.requestTranslator = requestTranslator;
+        this.responseTranslator = responseTranslator;
+
         this.hasBody = hasBody;
         this.isDownload = isDownload;
-    }
-
-    public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, TResponse> POST(
-            Descriptors.MethodDescriptor grpcMethod,
-            TRequest blankRequest, TResponse blankResponse,
-            String urlTemplate, String requestBody, String responseBody) {
-
-        // Matcher and builder created once and reused for all matching requests
-        var matcher = new RestApiMatcher(HttpMethod.POST, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, requestBody, responseBody);
-
-        return new RestApiMethod<>(grpcMethod, translator, matcher, true, false);
-    }
-
-    public static <TRequest extends Message, TResponse extends Message>
-    RestApiMethod<TRequest, TResponse> GET(
-            Descriptors.MethodDescriptor grpcMethod,
-            TRequest blankRequest, TResponse blankResponse,
-            String urlTemplate, String responseBody) {
-
-        // Matcher and builder created once and reused for all matching requests
-        var matcher = new RestApiMatcher(HttpMethod.GET, urlTemplate, blankRequest);
-        var translator = new RestApiTranslator<>(blankRequest, blankResponse, urlTemplate, null, responseBody);
-
-        // Check if this method is a data download endpoint
-        var isDownload = blankResponse instanceof DownloadResponse;
-
-        return new RestApiMethod<>(grpcMethod, translator, matcher, false, isDownload);
     }
 }

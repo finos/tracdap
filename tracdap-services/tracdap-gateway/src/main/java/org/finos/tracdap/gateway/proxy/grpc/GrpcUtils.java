@@ -54,9 +54,7 @@ public class GrpcUtils {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    public static <TMsg extends Message>
-    TMsg decodeLpm(TMsg blankMsg, ByteBuf buffer) throws InvalidProtocolBufferException {
+    public static Message decodeLpm(Message.Builder builder, ByteBuf buffer) throws InvalidProtocolBufferException {
 
         if (buffer.readableBytes() < LPM_PREFIX_LENGTH)
             throw new InvalidProtocolBufferException("Unexpected end of stream");
@@ -73,10 +71,9 @@ public class GrpcUtils {
 
         try (var stream = new ByteBufInputStream(buffer, msgSize)) {
 
-            var builder = blankMsg.newBuilderForType();
             builder.mergeFrom(stream);
 
-            return (TMsg) builder.build();
+            return builder.build();
         }
         catch (InvalidProtocolBufferException e) {
             throw e;
