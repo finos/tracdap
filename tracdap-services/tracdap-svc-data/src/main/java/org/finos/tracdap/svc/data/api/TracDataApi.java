@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.codec.ICodecManager;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.data.pipeline.GrpcDownloadSink;
 import org.finos.tracdap.common.data.pipeline.GrpcUploadSource;
@@ -37,6 +38,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     private final DataService dataService;
     private final FileService fileService;
+    private final ICodecManager formats;
 
     private final GrpcConcern commonConcerns;
     private final DataContextHelpers helpers;
@@ -44,12 +46,14 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
 
     public TracDataApi(
             DataService dataService, FileService fileService,
+            ICodecManager formats,
             EventLoopResolver eventLoopResolver,
             BufferAllocator allocator,
             GrpcConcern commonConcerns) {
 
         this.dataService = dataService;
         this.fileService = fileService;
+        this.formats = formats;
         this.commonConcerns = commonConcerns;
 
         var log = LoggerFactory.getLogger(getClass());
@@ -250,7 +254,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
-    public void downloadFile(DownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
+    public void downloadFile(FileDownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.FILE)
@@ -264,7 +268,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     @Override
-    public void downloadLatestFile(DownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
+    public void downloadLatestFile(FileDownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
 
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.FILE)
@@ -278,7 +282,7 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
     }
 
     private void downloadFile(
-            DownloadRequest downloadRequest, TagSelector selector,
+            FileDownloadRequest downloadRequest, TagSelector selector,
             GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
 
         var requestMetadata = RequestMetadata.get(Context.current());
@@ -306,5 +310,73 @@ public class TracDataApi extends TracDataApiGrpc.TracDataApiImplBase {
                         firstMessage, dataStream,
                         dataContext, clientConfig))
                 .exceptionally(download::failed);
+    }
+
+    @Override
+    public void downloadData(DataDownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(request.getObjectId())
+                .setObjectVersion(request.getObjectVersion())
+                .setLatestTag(true)
+                .build();
+
+        var download = new GrpcDownloadSink<>(responseObserver, DownloadResponse::newBuilder, GrpcDownloadSink.STREAMING);
+        downloadData(request, selector, download);
+    }
+
+    @Override
+    public void downloadLatestData(DataDownloadRequest request, StreamObserver<DownloadResponse> responseObserver) {
+
+        var selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(request.getObjectId())
+                .setLatestObject(true)
+                .setLatestTag(true)
+                .build();
+
+        var download = new GrpcDownloadSink<>(responseObserver, DownloadResponse::newBuilder, GrpcDownloadSink.STREAMING);
+        downloadData(request, selector, download);
+    }
+
+    private void downloadData(
+            DataDownloadRequest downloadRequest, TagSelector selector,
+            GrpcDownloadSink<DownloadResponse, DownloadResponse.Builder> download) {
+
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var clientConfig = commonConcerns.prepareClientCall(Context.current());
+
+        var dataContext = helpers.prepareDataContext(requestMetadata);
+        download.whenComplete(() -> helpers.closeDataContext(dataContext));
+
+        var firstMessage = download.firstMessage(
+                (response, schema) -> downloadDataFirstMessage(downloadRequest, response),
+                SchemaDefinition.class);
+
+        var dataStream = download.dataStream(DownloadResponse.Builder::setContent);
+
+        // Translate into a regular file read request for the service layer
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(downloadRequest.getTenant())
+                .setSelector(selector)
+                .setFormat(downloadRequest.getFormat())
+                .build();
+
+        download.start(readRequest)
+                .thenAccept(req -> dataService.readDataset(req, firstMessage, dataStream, dataContext, requestMetadata, clientConfig))
+                .exceptionally(download::failed);
+
+    }
+
+    private DownloadResponse.Builder downloadDataFirstMessage(
+            DataDownloadRequest downloadRequest,
+            DownloadResponse.Builder response) {
+
+        var mimeType = formats.getDefaultMimeType(downloadRequest.getFormat());
+
+        return response
+                .setContentType(mimeType)
+                .clearContentLength();
     }
 }
