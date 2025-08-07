@@ -201,27 +201,25 @@ public class BaseTextDecoder extends StreamingDecoder {
 
     boolean doParse() throws IOException {
 
-        do {
+        // Push through everything that can be read from the current chunk
+        while (reader.readBatch()) {
 
-            if (context.readyToFlip())
-                context.flip();
+            context.setLoaded();
+            context.flip();
+            consumer().onBatch();
+            context.setUnloaded();
 
-            if (context.readyToUnload() && consumerReady())
-                consumer().onBatch();
+            reader.resetBatch(context.getBackBuffer());
+        }
 
-            if (context.readyToLoad() && reader.hasBatch()) {
+        return reader.endOfStream();
+    }
 
-                reader.resetBatch(context.getBackBuffer());
+    @Override
+    public boolean isReady() {
 
-                if (reader.readBatch())
-                    context.setLoaded();
-                else
-                    return false;
-            }
-
-        } while (context.readyToFlip());
-
-        return ! reader.hasBatch();
+        // Make sure the consumer is ready, since we don't buffer in doParse()
+        return consumerReady();
     }
 
     @Override

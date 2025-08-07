@@ -170,15 +170,17 @@ public class BufferedTextDecoder extends BufferDecoder {
 
         do {
 
-            if (context.readyToFlip())
+            if (context.readyToFlip()) {
                 context.flip();
-
-            if (context.readyToUnload() && consumerReady())
-                consumer().onBatch();
-
-            if (context.readyToLoad() && reader.hasBatch()) {
-
                 reader.resetBatch(context.getBackBuffer());
+            }
+
+            if (context.readyToUnload() && consumerReady()) {
+                consumer().onBatch();
+                context.setUnloaded();
+            }
+
+            if (context.readyToLoad() && ! reader.endOfStream()) {
 
                 if (reader.readBatch())
                     context.setLoaded();
@@ -188,7 +190,7 @@ public class BufferedTextDecoder extends BufferDecoder {
 
         } while (context.readyToFlip());
 
-        return ! reader.hasBatch();
+        return reader.endOfStream();
     }
 
     void handleErrors(Callable<Void> parseFunc) {
