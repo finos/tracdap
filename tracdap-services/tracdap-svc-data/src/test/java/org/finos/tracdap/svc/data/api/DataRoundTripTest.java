@@ -49,6 +49,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.WritableByteChannel;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.Flow;
 import java.util.function.BiConsumer;
@@ -287,6 +288,78 @@ abstract class DataRoundTripTest {
     }
 
     @Test
+    void roundTrip_csvRandomChunks() throws Exception {
+
+        try (var testDataStream = getClass().getResourceAsStream(LARGE_CSV_DATA)) {
+
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
+
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = new ArrayList<ByteString>();
+
+            var offset = 0;
+            var random = new Random(Instant.now().getEpochSecond());
+
+            while (offset < testDataBytes.length) {
+
+                var randomSliceSize = random.nextInt(1, 512 * 1024);
+                var sliceSize = Math.min(randomSliceSize, testDataBytes.length - offset);
+                var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
+                testData.add(slice);
+
+                offset += sliceSize;
+            }
+
+            var mimeType = "text/csv";
+
+
+            var requestParams = DataWriteRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                    .setFormat(mimeType)
+                    .build();
+
+            var createDatasetRequest = dataWriteRequest(requestParams, testData, false);
+            var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createDatasetRequest);
+
+            waitFor(TEST_TIMEOUT, createDataset);
+            var objHeader = resultOf(createDataset);
+
+            var dataRequest = DataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(selectorFor(objHeader))
+                    .setFormat(mimeType)
+                    .build();
+
+            var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
+            var readResponse0 = Flows.first(readResponse);
+            var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
+            var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
+
+            DataApiTestHelpers.serverStreaming(dataClient::readDataset, dataRequest, readResponse);
+
+            waitFor(Duration.ofMinutes(20), readResponse0, readBytes);
+            var roundTripResponse = resultOf(readResponse0);
+            var roundTripSchema = roundTripResponse.getSchema();
+            var roundTripBytes = resultOf(readBytes);
+
+            var roundTripData = DataApiTestHelpers.decodeCsv(roundTripSchema, List.of(roundTripBytes));
+            var integerField = roundTripData.get(1);
+            var stringField = roundTripData.get(4);
+
+            // Check the right number of rows came through the round tripe
+            Assertions.assertEquals(LARGE_DATA_ROW_COUNT, integerField.size());
+
+            // Just testing the int and string fields - exhaustive encoding checks in -lib-data
+            for (var i = 0; i < integerField.size(); i++) {
+                Assertions.assertEquals((long) i % 10000 + 1, integerField.get(i));
+                Assertions.assertEquals("hello " + ((long) i % 10000 + 1), stringField.get(i));
+            }
+        }
+    }
+
+    @Test
     void roundTrip_json() throws Exception {
 
         try (var testDataStream = getClass().getResourceAsStream(BASIC_JSON_DATA)) {
@@ -320,6 +393,78 @@ abstract class DataRoundTripTest {
                 var sliceSize = Math.min(mb2, testDataBytes.length - offset);
                 var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
                 testData.add(slice);
+            }
+
+            var mimeType = "application/json";
+
+
+            var requestParams = DataWriteRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                    .setFormat(mimeType)
+                    .build();
+
+            var createDatasetRequest = dataWriteRequest(requestParams, testData, false);
+            var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, createDatasetRequest);
+
+            waitFor(TEST_TIMEOUT, createDataset);
+            var objHeader = resultOf(createDataset);
+
+            var dataRequest = DataReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(selectorFor(objHeader))
+                    .setFormat(mimeType)
+                    .build();
+
+            var readResponse = Flows.<DataReadResponse>hub(execContext.eventLoopExecutor());
+            var readResponse0 = Flows.first(readResponse);
+            var readByteStream = Flows.map(readResponse, DataReadResponse::getContent);
+            var readBytes = Flows.fold(readByteStream, ByteString::concat, ByteString.EMPTY);
+
+            DataApiTestHelpers.serverStreaming(dataClient::readDataset, dataRequest, readResponse);
+
+            waitFor(Duration.ofMinutes(20), readResponse0, readBytes);
+            var roundTripResponse = resultOf(readResponse0);
+            var roundTripSchema = roundTripResponse.getSchema();
+            var roundTripBytes = resultOf(readBytes);
+
+            var roundTripData = DataApiTestHelpers.decodeJson(roundTripSchema, List.of(roundTripBytes));
+            var integerField = roundTripData.get(1);
+            var stringField = roundTripData.get(4);
+
+            // Check the right number of rows came through the round tripe
+            Assertions.assertEquals(LARGE_DATA_ROW_COUNT, integerField.size());
+
+            // Just testing the int and string fields - exhaustive encoding checks in -lib-data
+            for (var i = 0; i < integerField.size(); i++) {
+                Assertions.assertEquals((long) i % 10000 + 1, integerField.get(i));
+                Assertions.assertEquals("hello " + ((long) i % 10000 + 1), stringField.get(i));
+            }
+        }
+    }
+
+    @Test
+    void roundTrip_jsonRandomChunks() throws Exception {
+
+        try (var testDataStream = getClass().getResourceAsStream(LARGE_JSON_DATA)) {
+
+            if (testDataStream == null)
+                throw new RuntimeException("Test data not found");
+
+            var testDataBytes = testDataStream.readAllBytes();
+            var testData = new ArrayList<ByteString>();
+
+            var offset = 0;
+            var random = new Random(Instant.now().getEpochSecond());
+
+            while (offset < testDataBytes.length) {
+
+                var randomSliceSize = random.nextInt(1, 512 * 1024);
+                var sliceSize = Math.min(randomSliceSize, testDataBytes.length - offset);
+                var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
+                testData.add(slice);
+
+                offset += sliceSize;
             }
 
             var mimeType = "application/json";
