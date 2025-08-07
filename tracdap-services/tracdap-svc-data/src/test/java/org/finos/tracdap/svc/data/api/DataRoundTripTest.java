@@ -303,7 +303,7 @@ abstract class DataRoundTripTest {
 
             while (offset < testDataBytes.length) {
 
-                var randomSliceSize = random.nextInt(1, 512 * 1024);
+                var randomSliceSize = random.nextInt(512 * 1024) + 1;
                 var sliceSize = Math.min(randomSliceSize, testDataBytes.length - offset);
                 var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
                 testData.add(slice);
@@ -459,7 +459,7 @@ abstract class DataRoundTripTest {
 
             while (offset < testDataBytes.length) {
 
-                var randomSliceSize = random.nextInt(1, 512 * 1024);
+                var randomSliceSize = random.nextInt(512 * 1024) + 1;
                 var sliceSize = Math.min(randomSliceSize, testDataBytes.length - offset);
                 var slice = ByteString.copyFrom(testDataBytes, offset, sliceSize);
                 testData.add(slice);
