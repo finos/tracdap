@@ -39,11 +39,12 @@ public class CompositeObjectConsumer {
 
     private final boolean useFieldNames;
     private final Map<String, Integer> fieldNameMap;
-
     private final boolean[] consumedFields;
-    private boolean gotFirstToken = false;
-    private boolean gotLastToken = false;
-    private boolean midValue = false;
+
+    JsonToken token;
+    private boolean active = false;
+    private boolean delegateActive = false;
+    private boolean gotValue = false;
     private int currentFieldIndex;
 
     public CompositeObjectConsumer(List<IJsonConsumer<?>> delegates, boolean isCaseSensitive) {
@@ -79,70 +80,76 @@ public class CompositeObjectConsumer {
 
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        if (!gotFirstToken) {
+        if (!active) {
 
-            if (parser.currentToken() != JsonToken.START_OBJECT)
+            token = parser.currentToken();
+            active = true;
+
+            if (token != JsonToken.START_OBJECT)
                 throw new EDataCorruption("Unexpected token: " + parser.currentToken() + parser.currentLocation());
-
-            gotFirstToken = true;
-            currentFieldIndex = 0;
-
-            parser.nextValue();
         }
 
-        for (var token = parser.currentToken(); token != null && token != JsonToken.NOT_AVAILABLE; token = parser.nextValue()) {
+        if (!delegateActive) {
+            token = parser.nextValue();
+        }
 
-            if (gotLastToken)
-                throw new EDataCorruption("Unexpected token: " + token);
+        while (token != null && token != JsonToken.NOT_AVAILABLE) {
 
-            if (midValue || token.isScalarValue() || token.isStructStart() || token == JsonToken.START_ARRAY) {
-
-                if (!midValue) {
-                    var fieldName = parser.currentName();
-                    var fieldIndex = fieldNameMap.get(fieldName);
-                    if (fieldIndex == null)
-                        throw new EDataCorruption("Unknown field name: " + fieldName);
-                    currentFieldIndex = fieldIndex;
-                }
+            if (delegateActive) {
 
                 var delegate = delegates.get(currentFieldIndex);
 
                 if(delegate.consumeElement(parser)) {
                     consumedFields[currentFieldIndex] = true;
-                    midValue =false;
+                    delegateActive = false;
                 }
                 else {
-                    midValue = true;
                     return false;
                 }
             }
+            else if (token.isScalarValue() || token.isStructStart() || token == JsonToken.START_ARRAY) {
 
+                var fieldName = parser.currentName();
+                var fieldIndex = fieldNameMap.get(fieldName);
+
+                if (fieldIndex == null)
+                    throw new EDataCorruption("Unknown field name: " + fieldName);
+
+                currentFieldIndex = fieldIndex;
+
+                var delegate = delegates.get(currentFieldIndex);
+
+                if(delegate.consumeElement(parser)) {
+                    consumedFields[currentFieldIndex] = true;
+                }
+                else {
+                    delegateActive = true;
+                    return false;
+                }
+            }
             else if (token == JsonToken.END_OBJECT) {
-                gotLastToken = true;
+                gotValue = true;
                 break;
             }
-
             else {
                 throw new EDataCorruption("Unexpected token: " + token);
             }
+
+            token = parser.nextValue();
         }
 
-        if (gotLastToken) {
-
-            checkConsumedFields(parser);
-
-            resetConsumedFields();
-            currentFieldIndex = -1;
-            gotFirstToken = false;
-            gotLastToken = false;
-            midValue = false;
-
-            return true;
-        }
-        else {
-
+        if (!gotValue) {
             return false;
         }
+
+        checkConsumedFields(parser);
+
+        active = false;
+        gotValue = false;
+        currentFieldIndex = -1;
+        resetConsumedFields();
+
+        return true;
     }
 
     IJsonConsumer<?> getFieldDelegate(JsonParser parser) throws IOException {
@@ -189,6 +196,9 @@ public class CompositeObjectConsumer {
     }
 
     public void resetVectors(List<FieldVector> vectors) {
+
+        if (active || delegateActive)
+            throw new IllegalStateException("JSON consumer reset mid-value");
 
         for (int i = 0; i < vectors.size(); i++) {
 
