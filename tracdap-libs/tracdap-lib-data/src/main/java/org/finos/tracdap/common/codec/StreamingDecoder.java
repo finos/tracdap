@@ -58,7 +58,9 @@ public abstract class StreamingDecoder
         if (context.readyToFlip())
             context.flip();
 
-        if (context.readyToUnload() && consumerReady())
+        if (context.readyToUnload() && consumerReady()) {
             consumer().onBatch();
+            context.setUnloaded();
+        }
     }
 }
