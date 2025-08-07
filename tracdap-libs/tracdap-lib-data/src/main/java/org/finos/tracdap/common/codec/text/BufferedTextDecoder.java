@@ -168,27 +168,18 @@ public class BufferedTextDecoder extends BufferDecoder {
 
     boolean doParse() throws Exception {
 
-        do {
+        // Keep pushing batches as long as the consumer is ready
+        while (consumerReady() && reader.readBatch()) {
 
-            if (context.readyToFlip())
-                context.flip();
+            context.setLoaded();
+            context.flip();
+            consumer().onBatch();
+            context.setUnloaded();
 
-            if (context.readyToUnload() && consumerReady())
-                consumer().onBatch();
+            reader.resetBatch(context.getBackBuffer());
+        }
 
-            if (context.readyToLoad() && reader.hasBatch()) {
-
-                reader.resetBatch(context.getBackBuffer());
-
-                if (reader.readBatch())
-                    context.setLoaded();
-                else
-                    return false;
-            }
-
-        } while (context.readyToFlip());
-
-        return ! reader.hasBatch();
+        return reader.endOfStream();
     }
 
     void handleErrors(Callable<Void> parseFunc) {

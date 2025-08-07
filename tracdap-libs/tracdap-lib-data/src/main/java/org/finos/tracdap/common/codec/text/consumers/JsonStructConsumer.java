@@ -26,28 +26,29 @@ import java.util.List;
 
 public class JsonStructConsumer extends BaseJsonConsumer<StructVector> {
 
-    private final CompositeObjectConsumer composite;
+    private final CompositeObjectConsumer delegate;
+    private boolean delegateActive;
 
     public JsonStructConsumer(StructVector vector, List<IJsonConsumer<?>> delegates) {
         this(vector, delegates, true);
     }
 
     public JsonStructConsumer(StructVector vector, List<IJsonConsumer<?>> delegates, boolean isCaseSensitive) {
-
         super(vector);
-        this.composite = new CompositeObjectConsumer(delegates, isCaseSensitive);
+        this.delegate = new CompositeObjectConsumer(delegates, isCaseSensitive);
+        this.delegateActive = false;
     }
 
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        if (composite.consumeElement(parser)) {
-
+        if (delegate.consumeElement(parser)) {
             vector.setIndexDefined(currentIndex++);
+            delegateActive = false;
             return true;
         }
         else {
-
+            delegateActive = true;
             return false;
         }
     }
@@ -55,7 +56,10 @@ public class JsonStructConsumer extends BaseJsonConsumer<StructVector> {
     @Override
     public void resetVector(StructVector vector) {
 
-        composite.resetVectors(vector.getChildrenFromFields());
+        if (delegateActive)
+            throw new IllegalStateException("JSON consumer reset mid-value");
+
+        delegate.resetVectors(vector.getChildrenFromFields());
         super.resetVector(vector);
     }
 }

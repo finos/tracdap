@@ -159,6 +159,10 @@ public class TextFileReader implements DictionaryProvider {
         if (feeder == null)
             throw new IllegalStateException("Cannot feed more input, file reader is in blocking mode");
 
+        if (!feeder.needMoreInput()) {
+            throw new IllegalStateException("Cannot feed more input, existing data has not been consumed");
+        }
+
         feeder.feedInput(buffer);
     }
 
@@ -167,18 +171,10 @@ public class TextFileReader implements DictionaryProvider {
         if (feeder == null)
             throw new IllegalStateException("Cannot feed more input, file reader is in blocking mode");
 
+        if (!feeder.needMoreInput())
+            throw new IllegalStateException("Cannot feed more input, existing data has not been consumed");
+
         feeder.feedInput(ByteBuffer.wrap(buffer));
-    }
-
-
-    public void readStart() throws IOException {
-
-        // no-op
-    }
-
-    public boolean hasBatch() {
-
-        return ! consumer.endOfStream();
     }
 
     public boolean readBatch() throws IOException {
@@ -189,6 +185,11 @@ public class TextFileReader implements DictionaryProvider {
     public void resetBatch(VectorSchemaRoot batch) throws IOException {
 
         consumer.resetBatch(batch);
+    }
+
+    public boolean endOfStream() {
+
+        return consumer.endOfStream();
     }
 
     public void close() throws IOException {
