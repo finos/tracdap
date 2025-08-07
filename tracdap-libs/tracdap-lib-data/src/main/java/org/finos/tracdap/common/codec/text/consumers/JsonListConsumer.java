@@ -31,9 +31,11 @@ public class JsonListConsumer extends BaseJsonConsumer<ListVector> {
 
     private final IJsonConsumer<?> delegate;
 
-    private boolean gotFirstToken = false;
-    private boolean gotLastToken = false;
-    private boolean midValue = false;
+    JsonToken token;
+    private boolean active = false;
+    private boolean delegateActive = false;
+    private boolean gotValue = false;
+
     private int nItems = 0;
     private int totalItems = 0;
 
@@ -45,71 +47,82 @@ public class JsonListConsumer extends BaseJsonConsumer<ListVector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        if (!gotFirstToken) {
+        if (!active) {
 
-            if (parser.currentToken() != JsonToken.START_ARRAY)
+            token = parser.currentToken();
+            active = true;
+
+            if (token != JsonToken.START_ARRAY)
                 throw new EDataCorruption("Unexpected token: " + parser.currentToken());
 
             vector.startNewValue(currentIndex);
-
-            gotFirstToken = true;
-            nItems = 0;
-
-            parser.nextToken();
         }
 
-        for (var token = parser.currentToken(); token != null && token != JsonToken.NOT_AVAILABLE; token = parser.nextToken()) {
+        if (!delegateActive) {
+            token = parser.nextToken();
+        }
 
-            if (gotLastToken)
-                throw new EDataCorruption("Unexpected token: " + token);
+        while (token != null && token != JsonToken.NOT_AVAILABLE) {
 
-            if (midValue || token.isScalarValue() || token.isStructStart() || token == JsonToken.START_ARRAY) {
+            if (delegateActive) {
 
-                if (!midValue)
-                    ensureInnerVectorCapacity(totalItems + 1);
-
-                if(delegate.consumeElement(parser)) {
-                    midValue =false;
+                if (delegate.consumeElement(parser)) {
+                    delegateActive = false;
                     nItems++;
                     totalItems++;
                 }
                 else {
-                    midValue = true;
                     return false;
                 }
             }
+            else if (token.isScalarValue() || token.isStructStart() || token == JsonToken.START_ARRAY) {
 
+                ensureInnerVectorCapacity(totalItems + 1);
+
+                if (delegate.consumeElement(parser)) {
+                    nItems++;
+                    totalItems++;
+                }
+                else {
+                    delegateActive = true;
+                    return false;
+                }
+            }
             else if (token == JsonToken.END_ARRAY) {
-                gotLastToken = true;
+                gotValue = true;
                 break;
             }
-
             else {
                 throw new EDataCorruption("Unexpected token: " + token);
             }
+
+            token = parser.nextToken();
         }
 
-        if (gotLastToken) {
-
-            vector.endValue(currentIndex, nItems);
-            currentIndex++;
-
-            gotFirstToken = false;
-            gotLastToken = false;
-            midValue = false;
-            nItems = 0;
-
-            return true;
-        }
-        else {
-
+        if (!gotValue) {
             return false;
         }
+
+        vector.endValue(currentIndex, nItems);
+        currentIndex++;
+
+        active = false;
+        gotValue = false;
+        nItems = 0;
+
+        return true;
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void resetVector(ListVector vector) {
+
+        if (active || delegateActive)
+            throw new IllegalStateException("JSON consumer reset mid-value");
+
+        nItems = 0;
+        totalItems = 0;
+
         ((IJsonConsumer<FieldVector>) delegate).resetVector(vector.getDataVector());
         super.resetVector(vector);
     }

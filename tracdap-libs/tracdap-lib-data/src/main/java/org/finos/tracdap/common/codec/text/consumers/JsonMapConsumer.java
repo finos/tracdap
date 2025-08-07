@@ -23,7 +23,6 @@ import org.apache.arrow.vector.FieldVector;
 import org.apache.arrow.vector.VarCharVector;
 import org.apache.arrow.vector.complex.MapVector;
 import org.apache.arrow.vector.complex.StructVector;
-import org.finos.tracdap.common.codec.text.producers.IJsonProducer;
 import org.finos.tracdap.common.exception.EDataCorruption;
 
 import java.io.IOException;
@@ -34,9 +33,11 @@ public class JsonMapConsumer extends BaseJsonConsumer<MapVector> {
     private VarCharVector keyVector;
     private final IJsonConsumer<?> valueDelegate;
 
-    private boolean gotFirstToken = false;
-    private boolean gotLastToken = false;
-    private boolean midValue = false;
+    JsonToken token;
+    private boolean active = false;
+    private boolean delegateActive = false;
+    private boolean gotValue = false;
+
     private int nItems = 0;
     private int totalItems = 0;
 
@@ -49,75 +50,86 @@ public class JsonMapConsumer extends BaseJsonConsumer<MapVector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        if (!gotFirstToken) {
+        if (!active) {
+
+            token = parser.getCurrentToken();
+            active = true;
 
             if (parser.currentToken() != JsonToken.START_OBJECT)
                 throw new EDataCorruption("Unexpected token: " + parser.currentToken());
 
             vector.startNewValue(currentIndex);
-
-            gotFirstToken = true;
-            nItems = 0;
-
-            parser.nextValue();
         }
 
-        for (var token = parser.currentToken(); token != null && token != JsonToken.NOT_AVAILABLE; token = parser.nextValue()) {
+        if (!delegateActive) {
+            token = parser.nextValue();
+        }
 
-            if (gotLastToken)
-                throw new EDataCorruption("Unexpected token: " + token);
+        while (token != null && token != JsonToken.NOT_AVAILABLE) {
 
-            if (midValue || token.isScalarValue() || token.isStructStart() || token == JsonToken.START_ARRAY) {
-
-                if (!midValue) {
-                    ensureInnerVectorCapacity(totalItems + 1);
-                    var key = parser.currentName();
-                    keyVector.setSafe(totalItems, key.getBytes(StandardCharsets.UTF_8));
-                }
+            if (delegateActive) {
 
                 if(valueDelegate.consumeElement(parser)) {
                     ((StructVector)vector.getDataVector()).setIndexDefined(totalItems);
-                    midValue =false;
+                    delegateActive = false;
                     nItems++;
                     totalItems++;
                 }
                 else {
-                    midValue = true;
                     return false;
                 }
             }
+            else if (token.isScalarValue() || token.isStructStart() || token == JsonToken.START_ARRAY) {
 
+                ensureInnerVectorCapacity(totalItems + 1);
+
+                var key = parser.currentName();
+                keyVector.setSafe(totalItems, key.getBytes(StandardCharsets.UTF_8));
+
+                if(valueDelegate.consumeElement(parser)) {
+                    ((StructVector)vector.getDataVector()).setIndexDefined(totalItems);
+                    nItems++;
+                    totalItems++;
+                }
+                else {
+                    delegateActive = true;
+                    return false;
+                }
+            }
             else if (token == JsonToken.END_OBJECT) {
-                gotLastToken = true;
+                gotValue = true;
                 break;
             }
-
             else {
                 throw new EDataCorruption("Unexpected token: " + token);
             }
+
+            token = parser.nextValue();
         }
 
-        if (gotLastToken) {
-
-            vector.endValue(currentIndex, nItems);
-            currentIndex++;
-
-            gotFirstToken = false;
-            gotLastToken = false;
-            midValue = false;
-            nItems = 0;
-
-            return true;
-        }
-        else {
-
+        if (!gotValue) {
             return false;
         }
+
+        vector.endValue(currentIndex, nItems);
+        currentIndex++;
+
+        active = false;
+        gotValue = false;
+        nItems = 0;
+
+        return true;
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public void resetVector(MapVector vector) {
+
+        if (active || delegateActive)
+            throw new IllegalStateException("JSON consumer reset mid-value");
+
+        nItems = 0;
+        totalItems = 0;
 
         var entryVector = (StructVector) vector.getDataVector();
         var keyVector = (VarCharVector) entryVector.getChildrenFromFields().get(0);
