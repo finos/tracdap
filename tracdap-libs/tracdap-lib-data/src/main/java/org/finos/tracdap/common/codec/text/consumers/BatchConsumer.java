@@ -30,36 +30,32 @@ import java.util.List;
 public class BatchConsumer implements IBatchConsumer {
 
     private final CompositeObjectConsumer recordConsumer;
+    private final List<DictionaryStagingConsumer<?>> staging;
     private final int batchSize;
-
     private VectorSchemaRoot batch;
-    private List<DictionaryStagingConsumer<?>> staging;
 
     private JsonToken token;
+    private boolean active;
+    private boolean delegateActive;
     private int currentIndex;
-
-    private boolean midRecord;
-    private boolean gotFirstToken;
+    private boolean gotBatch;
     private boolean gotLastToken;
-    private boolean parseComplete;
 
     public BatchConsumer(
             CompositeObjectConsumer recordConsumer,
-            VectorSchemaRoot batch,
             List<DictionaryStagingConsumer<?>> staging,
-            int batchSize) {
+            VectorSchemaRoot batch, int batchSize) {
 
         this.recordConsumer = recordConsumer;
-        this.batchSize = batchSize;
-
-        this.batch = batch;
         this.staging = staging;
+        this.batchSize = batchSize;
+        this.batch = batch;
 
+        this.active =false;
+        this.delegateActive = false;
         this.currentIndex = 0;
-        this.midRecord = false;
-        this.gotFirstToken = false;
+        this.gotBatch = false;
         this.gotLastToken = false;
-        this.parseComplete = false;
     }
 
     @Override
@@ -69,56 +65,60 @@ public class BatchConsumer implements IBatchConsumer {
             throw new IllegalStateException("Previous batch has not been reset");
         }
 
-        if (!gotFirstToken) {
+        if (!active) {
+
             token = parser.nextToken();
+            active = true;
+
+            // Outer start array token is present in some formats (JSON) and not others (CSV)
             if (token == JsonToken.START_ARRAY)
                 token = parser.nextToken();
-            gotFirstToken = true;
+        }
+        else if (!delegateActive) {
+            token = parser.nextToken();
         }
 
-        if (gotLastToken && token == null)
+        if (gotLastToken && (token == null || token == JsonToken.NOT_AVAILABLE)) {
+            active = false;
             return false;
-
-        // for (var token = parser.nextToken(); token != null && token != JsonToken.NOT_AVAILABLE; token = parser.nextToken())
+        }
 
         while (token != null && token !=  JsonToken.NOT_AVAILABLE) {
 
-            if (gotLastToken) {
+            if (token.isStructStart() || delegateActive) {
 
-                throw new EDataCorruption("Unexpected token: " + token);
-            }
-            else if (midRecord || token.isStructStart()) {
-
-                if (currentIndex == batchSize) {
-                    break;
-                }
-                else if (recordConsumer.consumeElement(parser)) {
+                if (recordConsumer.consumeElement(parser)) {
+                    delegateActive = false;
                     currentIndex++;
-                    midRecord = false;
-                    token = parser.nextToken();
                 }
                 else {
-                    midRecord = true;
+                    delegateActive = true;
                     return false;
+                }
+
+                if (currentIndex == batchSize) {
+                    gotBatch = true;
+                    break;
                 }
             }
             else if (token == JsonToken.END_ARRAY) {
-
                 gotLastToken = true;
-                token = parser.nextToken();
+                break;
             }
             else {
-
                 throw new EDataCorruption("Unexpected token: " + token);
             }
+
+            token = parser.nextToken();
         }
 
-        if (gotLastToken || token == null) {
+        // Outer start array token is present in some formats (JSON) and not others (CSV)
+        // Since CSV is synchronous only, token == null => end of stream
+        if (token == null && !delegateActive) {
             gotLastToken = true;
-            parseComplete = true;
         }
 
-        if (parseComplete || currentIndex == batchSize) {
+        if (gotBatch || gotLastToken) {
 
             if (staging != null) {
                 for (var staged : staging) {
@@ -127,6 +127,8 @@ public class BatchConsumer implements IBatchConsumer {
             }
 
             batch.setRowCount(currentIndex);
+
+            gotBatch = false;
 
             return true;
         }
@@ -138,11 +140,14 @@ public class BatchConsumer implements IBatchConsumer {
 
     @Override
     public boolean endOfStream() {
-        return parseComplete;
+        return gotLastToken && !active;
     }
 
     @Override
     public void resetBatch(VectorSchemaRoot batch) {
+
+        if (delegateActive)
+            throw new IllegalStateException("JSON consumer reset mid-value");
 
         recordConsumer.resetVectors(batch.getFieldVectors());
 

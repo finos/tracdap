@@ -204,9 +204,9 @@ public class TextFileUtils {
         var recordConsumer = new CompositeObjectConsumer(fieldConsumers, /* caseSensitive = */ true);
 
         if (config.isSingleRecord())
-            return new SingleRecordConsumer(recordConsumer, root, staging);
+            return new SingleRecordConsumer(recordConsumer, staging, root);
         else
-            return new BatchConsumer(recordConsumer, root, staging, config.getBatchSize());
+            return new BatchConsumer(recordConsumer, staging, root, config.getBatchSize());
     }
 
     public static List<IJsonConsumer<?>> createConsumers(

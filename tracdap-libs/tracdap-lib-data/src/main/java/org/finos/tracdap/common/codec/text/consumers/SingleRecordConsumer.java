@@ -30,45 +30,60 @@ import java.util.List;
 public class SingleRecordConsumer implements IBatchConsumer {
 
     private final CompositeObjectConsumer recordConsumer;
-    private final VectorSchemaRoot batch;
     private final List<DictionaryStagingConsumer<?>> stagingContainers;
+    private VectorSchemaRoot batch;
 
-    private boolean gotFirstToken;
-    private boolean recordConsumed;
+    private JsonToken token;
+    private boolean active;
+    private boolean delegateActive;
+    private boolean gotRecord;
 
     public SingleRecordConsumer(
             CompositeObjectConsumer recordConsumer,
-            VectorSchemaRoot batch,
-            List<DictionaryStagingConsumer<?>>stagingContainers) {
+            List<DictionaryStagingConsumer<?>>stagingContainers,
+            VectorSchemaRoot batch) {
 
         this.recordConsumer = recordConsumer;
-        this.batch = batch;
         this.stagingContainers = stagingContainers;
+        this.batch = batch;
+
+        token = null;
+        active = false;
+        delegateActive = false;
+        gotRecord = false;
     }
 
     @Override
     public boolean consumeBatch(JsonParser parser) throws IOException {
 
-        if (!gotFirstToken) {
+        if (!active) {
 
-            if (parser.nextToken() != JsonToken.START_OBJECT)
+            token = parser.nextToken();
+            active = true;
+
+            if (token != JsonToken.START_OBJECT)
                 throw new EDataCorruption("Unexpected token: " + parser.getCurrentToken());
+        }
+        else if (!delegateActive) {
 
-            gotFirstToken = true;
+            token = parser.nextToken();
         }
 
-        if (recordConsumed)
-            throw new IllegalStateException("Record has already been consumed");
-
-        recordConsumed = recordConsumer.consumeElement(parser);
-
-        if (!recordConsumed)
+        if (token == null || token == JsonToken.NOT_AVAILABLE) {
+            if (gotRecord) {
+                active = false;
+            }
             return false;
+        }
 
-        var nextToken = parser.nextToken();
-
-        if (nextToken != null && nextToken != JsonToken.NOT_AVAILABLE)
-            throw new EDataCorruption("Unexpected token: " + nextToken);
+        if (recordConsumer.consumeElement(parser)) {
+            delegateActive = false;
+            gotRecord = true;
+        }
+        else {
+            delegateActive = true;
+            return false;
+        }
 
         if (stagingContainers != null) {
             for (var container : stagingContainers) {
@@ -83,12 +98,17 @@ public class SingleRecordConsumer implements IBatchConsumer {
 
     @Override
     public boolean endOfStream() {
-        return recordConsumed;
+        return gotRecord && !active;
     }
 
     @Override
     public void resetBatch(VectorSchemaRoot batch) {
 
+        if (delegateActive)
+            throw new IllegalStateException("JSON consumer reset mid-value");
+
         recordConsumer.resetVectors(batch.getFieldVectors());
+
+        this.batch = batch;
     }
 }
