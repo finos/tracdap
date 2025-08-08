@@ -41,10 +41,12 @@ public class SingleBatchDataSource
     @Override
     public void pump() {
 
-        consumer().onStart(root);
-        consumer().onBatch();
-        markAsDone();
-        consumer().onComplete();
+        if (!isDone()) {
+            consumer().onStart(root);
+            consumer().onBatch();
+            markAsDone();
+            consumer().onComplete();
+        }
     }
 
     @Override public boolean isReady() {
