@@ -158,24 +158,10 @@ public class AzureBlobStorage extends CommonFileStorage {
 
     private void checkRootExists() {
 
-        boolean rootExists;
-
-        if (prefix == null || prefix.isEmpty()) {
-
-            var existsResult = containerClient.exists();
-            var exists0 = existsResult.blockOptional(STARTUP_TIMEOUT);
-            rootExists = exists0.isPresent() && exists0.get();
-        }
-        else {
-
-            var listOptions = new ListBlobsOptions()
-                    .setPrefix(prefix)
-                    .setMaxResultsPerPage(1);
-
-            var listResult = containerClient.listBlobs(listOptions);
-            var listResult0 = listResult.blockFirst(STARTUP_TIMEOUT);
-            rootExists = listResult0 != null;
-        }
+        // Container should already exist, the data service cannot create it
+        var existsResult = containerClient.exists();
+        var exists0 = existsResult.blockOptional(STARTUP_TIMEOUT);
+        var rootExists = exists0.isPresent() && exists0.get();
 
         if (!rootExists) {
 
@@ -187,6 +173,15 @@ public class AzureBlobStorage extends CommonFileStorage {
 
             throw new EStartup(message);
         }
+
+        // Prefix does not have to exist, the data service can create it on write
+        // This just checks list permissions on the bucket
+        var listOptions = new ListBlobsOptions()
+                .setPrefix(prefix)
+                .setMaxResultsPerPage(1);
+
+        var listResult = containerClient.listBlobs(listOptions);
+        listResult.blockFirst(STARTUP_TIMEOUT);
     }
 
     @Override
