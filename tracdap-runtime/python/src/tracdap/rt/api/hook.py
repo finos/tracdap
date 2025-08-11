@@ -38,7 +38,7 @@ class _Named(_tp.Generic[_T]):
     item: _T
 
 
-class _StaticApiHook:
+class _StaticApiHook(_abc.ABC):
 
     __static_api_hook: _StaticApiHook = None
 
@@ -127,14 +127,6 @@ class _StaticApiHook:
         pass
 
     @_abc.abstractmethod
-    def load_schema(
-            self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
-            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
-            -> _meta.SchemaDefinition:
-
-        pass
-
-    @_abc.abstractmethod
     def infer_schema(self, dataset: _tp.Any) -> _meta.SchemaDefinition:
 
         pass
@@ -164,8 +156,67 @@ class _StaticApiHook:
 
         pass
 
-X = _tp.TypeVar("X")
+    @_abc.abstractmethod
+    def load_schema(
+            self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
+            -> _meta.SchemaDefinition:
 
-def do_x(x: type[X]) -> X:
+        pass
 
-    return x.__new__(x)
+    @_abc.abstractmethod
+    def load_resource(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str) \
+            -> bytes:
+
+        pass
+
+    @_abc.abstractmethod
+    def load_resource_stream(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str) \
+            -> _tp.ContextManager[_tp.BinaryIO]:
+
+        pass
+
+    @_abc.abstractmethod
+    def load_text_resource(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str, encoding: str = "utf-8") \
+            -> str:
+
+        pass
+
+    @_abc.abstractmethod
+    def load_text_resource_stream(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str, encoding: str = "utf-8") \
+            -> _tp.ContextManager[_tp.TextIO]:
+
+        pass
+
+
+class _ApiContextHook(_abc.ABC):
+
+    @_abc.abstractmethod
+    def register_context_manager(self, name: str, open_func: _tp.Callable, close_func: _tp.Callable) -> int:
+        pass
+
+    @_abc.abstractmethod
+    def enter_context_manager(self, hook_id: int):
+        pass
+
+    @_abc.abstractmethod
+    def exit_context_manager(self, hook_id: int, exc_type, exc_val, exc_tb):
+        pass
+
+
+class _ApiContextWrapper(_tp.ContextManager[_T]):
+
+    def __init__(self, hook: _ApiContextHook, delegate: _tp.ContextManager[_T], name: str):
+        super().__init__()
+        self.__hook = hook
+        self.__hook_id = hook.register_context_manager(name, delegate.__enter__, delegate.__exit__)  # noqa
+
+    def __enter__(self):
+        return self.__hook.enter_context_manager(self.__hook_id)  # noqa
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.__hook.exit_context_manager(self.__hook_id, exc_type, exc_val, exc_tb)  # noqa

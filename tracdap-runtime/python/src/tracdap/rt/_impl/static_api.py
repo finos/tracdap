@@ -19,18 +19,23 @@ import types as _ts
 import tracdap.rt.api.experimental as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
+import tracdap.rt._impl.core.config_parser as _config
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.schemas as _schemas
+import tracdap.rt._impl.core.shim as _shim
 import tracdap.rt._impl.core.struct as _struct
 import tracdap.rt._impl.core.type_system as _type_system
+import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
 # Import hook interfaces into this module namespace
 from tracdap.rt.api.hook import _StaticApiHook  # noqa
 from tracdap.rt.api.hook import _Named  # noqa
+from tracdap.rt.api.hook import _ApiContextHook  # noqa
+from tracdap.rt.api.hook import _ApiContextWrapper  # noqa
 
 
-class StaticApiImpl(_StaticApiHook):
+class StaticApiImpl(_StaticApiHook, _ApiContextHook):
 
     _T = _tp.TypeVar("_T")
 
@@ -39,6 +44,20 @@ class StaticApiImpl(_StaticApiHook):
 
         if not _StaticApiHook._is_registered():
             _StaticApiHook._register(StaticApiImpl())
+
+    @classmethod
+    def supply_config(cls, sys_config: _config.RuntimeConfig):
+        impl: StaticApiImpl = _StaticApiHook.get_instance()  # noqa
+        impl.__sys_config = sys_config
+
+    @classmethod
+    def shutdown_impl(cls, silent: bool = False):
+        impl: StaticApiImpl = _StaticApiHook.get_instance()  # noqa
+        impl._shutdown_context_managers(silent = silent)
+
+    def __init__(self):
+        self.__sys_config = _config.RuntimeConfig()
+        self.__cxm_hooks = {}
 
     def array_type(self, item_type: _meta.BasicType) -> _meta.TypeDescriptor:
 
@@ -175,15 +194,6 @@ class StaticApiImpl(_StaticApiHook):
 
         raise _ex.ERuntimeValidation(f"Invalid schema type [{schema_type.name}]")
 
-    def load_schema(
-            self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
-            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE_SCHEMA) \
-            -> _meta.SchemaDefinition:
-
-        _val.validate_signature(self.load_schema, package, schema_file, schema_type)
-
-        return _schemas.SchemaLoader.load_schema(package, schema_file)
-
     def infer_schema(self, dataset: _api.DATA_API) -> _meta.SchemaDefinition:
 
         _val.validate_signature(self.infer_schema, dataset)
@@ -280,3 +290,118 @@ class StaticApiImpl(_StaticApiHook):
                 field.fieldOrder = index
 
         return _meta.TableSchema([*fields_])
+
+    def load_schema(
+            self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
+            schema_type: _meta.SchemaType = _meta.SchemaType.TABLE_SCHEMA) \
+            -> _meta.SchemaDefinition:
+
+        _val.validate_signature(self.load_schema, package, schema_file, schema_type)
+
+        return _schemas.SchemaLoader.load_schema(package, schema_file)
+
+    def load_resource(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str) -> bytes:
+
+        _val.validate_signature(self.load_resource, package, resource_file)
+
+        resource_size_limit = _util.read_property(
+            self.__sys_config.properties,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            int)
+
+        return _shim.ShimLoader.load_resource(package, resource_file, resource_size_limit)
+
+    def load_resource_stream(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str) \
+            -> _tp.ContextManager[_tp.BinaryIO]:
+
+        _val.validate_signature(self.load_resource_stream, package, resource_file)
+
+        resource_size_limit = _util.read_property(
+            self.__sys_config.properties,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            int)
+
+        stream = _shim.ShimLoader.open_resource(package, resource_file, resource_size_limit)
+        return _ApiContextWrapper(self, stream, resource_file)
+
+    def load_text_resource(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str,
+            encoding: str = "utf-8") \
+            -> _tp.Union[bytes, str]:
+
+        _val.validate_signature(self.load_text_resource, package, resource_file, encoding)
+
+        resource_size_limit = _util.read_property(
+            self.__sys_config.properties,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            int)
+
+        return _shim.ShimLoader.load_text_resource(package, resource_file, encoding, resource_size_limit)
+
+    def load_text_resource_stream(
+            self, package: _tp.Union[_ts.ModuleType, str], resource_file: str,
+            encoding: str = "utf-8") \
+            -> _tp.ContextManager[_tp.TextIO]:
+
+        _val.validate_signature(self.load_text_resource_stream, package, resource_file, encoding)
+
+        resource_size_limit = _util.read_property(
+            self.__sys_config.properties,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            int)
+
+        stream = _shim.ShimLoader.open_text_resource(package, resource_file, encoding, resource_size_limit)
+        return _ApiContextWrapper(self, stream, resource_file)
+
+    def register_context_manager(self, name: str, enter_func: _tp.Callable, exit_func: _tp.Callable) -> int:
+
+        hook_id = id(enter_func)
+
+        self.__cxm_hooks[hook_id] = (name, enter_func, exit_func)
+
+        return hook_id
+
+    def enter_context_manager(self, hook_id: int):
+
+        hook_funcs = self.__cxm_hooks.get(hook_id)
+
+        if hook_funcs is None:
+            raise _ex.ERuntimeValidation("Attempt to open an unknown resource")
+
+        name, enter_func, exit_func = hook_funcs
+
+        if enter_func is None:
+            raise _ex.ERuntimeValidation(f"Resource [{name}] has already been opened")
+
+        self.__cxm_hooks[hook_id] = (name, None, exit_func)
+
+        return enter_func.__call__()
+
+    def exit_context_manager(self, hook_id: int, exc_type, exc_val, exc_tb):
+
+        hook_funcs = self.__cxm_hooks.pop(hook_id)
+
+        if hook_funcs is not None:
+            name, enter_func, exit_func = hook_funcs
+            exit_func.__call__(exc_type, exc_val, exc_tb)
+
+    def _shutdown_context_managers(self, silent: bool = False):
+
+        if any(self.__cxm_hooks):
+
+            names = []
+
+            for hook_funcs in self.__cxm_hooks.values():
+                name, enter_func, exit_func = hook_funcs
+                names.append(name)
+                exit_func.__call__(None, None, None)
+
+            if not silent:
+                names = ", ".join(names)
+                raise _ex.ERuntimeValidation(f"One or more resources were not closed: [{names}]")

@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
 import typing as tp
 import types
 import itertools
@@ -22,7 +23,6 @@ import sys
 import contextlib
 import functools as fn
 
-import inspect
 import importlib as _il
 import importlib.util as _ilu
 import importlib.abc as _ila
@@ -312,6 +312,7 @@ class _NamespaceShimLoader(_ilm.SourceFileLoader):
 class ShimLoader:
 
     SHIM_NAMESPACE = "tracdap.shim"
+    _KB = 1024
 
     _T = tp.TypeVar("_T")
 
@@ -324,11 +325,15 @@ class ShimLoader:
     @classmethod
     def _init(cls):
 
+        _guard.run_model_guard()
+
         sys.meta_path.append(_NamespaceShimFinder(cls.__shim_map, cls.__active_shim))
         sys.meta_path.append(_ActiveShimFinder(cls.__shim_map, cls.__active_shim))
 
     @classmethod
     def create_shim(cls, shim_root_path: tp.Union[str, pathlib.Path], source_paths: tp.List[str] = None) -> str:
+
+        _guard.run_model_guard()
 
         # If source paths not specified, preserve the old behavior and look in the shim root
         if not source_paths:
@@ -350,6 +355,8 @@ class ShimLoader:
 
     @classmethod
     def activate_shim(cls, shim_namespace: str):
+
+        _guard.run_model_guard()
 
         if shim_namespace not in cls.__shim_map:
             msg = f"Cannot activate module loading shim, shim is not registered for [{shim_namespace}]"
@@ -381,6 +388,8 @@ class ShimLoader:
     @classmethod
     def deactivate_shim(cls):
 
+        _guard.run_model_guard()
+
         if cls.__active_shim.shim is None:
             msg = f"Cannot deactivate module loading shim, no shim is active"
             cls._log.error(msg)
@@ -406,6 +415,8 @@ class ShimLoader:
     @contextlib.contextmanager
     def use_shim(cls, shim_namespace: str):
 
+        _guard.run_model_guard()
+
         try:
 
             if shim_namespace:
@@ -423,7 +434,7 @@ class ShimLoader:
             cls, module: tp.Union[types.ModuleType, str],
             class_name: str, class_type: tp.Type[_T]) -> tp.Type[_T]:
 
-        cls._run_model_guard()
+        _guard.run_model_guard()
 
         if isinstance(module, types.ModuleType):
             module_name = module.__name__
@@ -484,30 +495,59 @@ class ShimLoader:
         # This method turns off some of the rails that interfere with importing
         # This method name is used as a hook in PythonGuardRails, to detect model code imports
 
+        _guard.run_model_guard()
+
         with _guard.PythonGuardRails.enable_import_functions():
             return _il.import_module(module_name)
 
     @classmethod
     def load_resource(
             cls, module: tp.Union[types.ModuleType, str],
-            resource_name: str) -> bytes:
+            resource_name: str, resource_size_limit: tp.Optional[int] = None) -> bytes:
 
-        return cls._load_or_open_resource(module, resource_name, _ilr.read_binary)
+        def load_func(mod: tp.Union[types.ModuleType, str], res: str):
+            return _ilr.files(mod).joinpath(res).read_bytes()
+
+        return cls._load_or_open_resource(module, resource_name, load_func, resource_size_limit)
 
     @classmethod
     def open_resource(
             cls, module: tp.Union[types.ModuleType, str],
-            resource_name: str) -> tp.BinaryIO:
+            resource_name: str, resource_size_limit: tp.Optional[int] = None) -> tp.BinaryIO:
 
-        return cls._load_or_open_resource(module, resource_name, _ilr.open_binary)
+        def open_func(mod: tp.Union[types.ModuleType, str], res: str) -> tp.BinaryIO:
+            return _ilr.files(mod).joinpath(res).open("rb")  # noqa
+
+        return cls._load_or_open_resource(module, resource_name, open_func, resource_size_limit)
+
+    @classmethod
+    def load_text_resource(
+            cls, module: tp.Union[types.ModuleType, str],
+            resource_name: str, encoding: str = "utf-8",
+            resource_size_limit: tp.Optional[int] = None) -> str:
+
+        def load_func(mod: tp.Union[types.ModuleType, str], res: str):
+            return _ilr.files(mod).joinpath(res).read_text(encoding)
+
+        return cls._load_or_open_resource(module, resource_name, load_func, resource_size_limit)
+
+    @classmethod
+    def open_text_resource(
+            cls, module: tp.Union[types.ModuleType, str],
+            resource_name: str, encoding: str = "utf-8",
+            resource_size_limit: tp.Optional[int] = None) -> tp.TextIO:
+
+        def open_func(mod: tp.Union[types.ModuleType, str], res: str) -> tp.TextIO:
+            return _ilr.files(mod).joinpath(res).open("rt", encoding=encoding)  # noqa
+
+        return cls._load_or_open_resource(module, resource_name, open_func, resource_size_limit)
 
     @classmethod
     def _load_or_open_resource(
             cls, module: tp.Union[types.ModuleType, str], resource_name: str,
-            load_func: tp.Callable[[types.ModuleType, str], tp.Union[bytes, tp.BinaryIO]]) \
-            -> tp.Union[bytes, tp.BinaryIO]:
-
-        cls._run_model_guard()
+            load_func: tp.Callable[[types.ModuleType, str], tp.Union[bytes, str, tp.BinaryIO, tp.TextIO]],
+            resource_size_limit: tp.Optional[int] = None) \
+            -> tp.Union[bytes, str, tp.BinaryIO, tp.TextIO]:
 
         if isinstance(module, types.ModuleType):
             module_name = module.__name__
@@ -521,9 +561,25 @@ class ShimLoader:
             if isinstance(module, str):
                 module = _il.import_module(module_name)
 
+            if resource_size_limit is not None:
+
+                with _ilr.files(module).joinpath(resource_name).open("rb") as resource_check:
+                    resource_check.seek(0, os.SEEK_END)
+                    resource_size = resource_check.tell()
+
+                if resource_size > resource_size_limit * cls._KB:
+
+                    err = f"Resource exceeds the configured size limit: " + \
+                          f"Size = {_util.format_file_size(resource_size)}, " + \
+                          f"limit = [{_util.format_file_size(resource_size_limit * cls._KB)}], " + \
+                          f"resource = [{resource_name}], module = [{module_name}]"
+
+                    cls._log.error(err)
+                    raise _ex.ERuntimeValidation(err)
+
             return load_func(module, resource_name)
 
-        except _ex.EModelLoad:
+        except (_ex.EModelLoad, _ex.ERuntimeValidation):
             raise
 
         except (ModuleNotFoundError, NameError) as e:
@@ -541,25 +597,6 @@ class ShimLoader:
             err = f"Loading resources failed in module [{module_name}]: Unexpected error"
             cls._log.error(err)
             raise _ex.EModelLoad(err) from e
-
-    @classmethod
-    def _run_model_guard(cls):
-
-        # Loading resources from inside run_model is an invalid use of the runtime API
-        # If a model attempts this, throw back a runtime validation error
-
-        stack = inspect.stack()
-        frame = stack[-1]
-
-        for frame_index in range(len(stack) - 2, 0, -1):
-
-            parent_frame = frame
-            frame = stack[frame_index]
-
-            if frame.function == "run_model" and parent_frame.function == "_execute":
-                err = f"Loading resources is not allowed inside run_model()"
-                cls._log.error(err)
-                raise _ex.ERuntimeValidation(err)
 
 
 ShimLoader._log = _log.logger_for_class(ShimLoader)
