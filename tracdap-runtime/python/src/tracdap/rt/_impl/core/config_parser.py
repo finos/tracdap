@@ -27,12 +27,13 @@ import typing as tp
 import urllib.parse as _urlp
 import uuid
 
-import tracdap.rt.config as _config
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt.ext.config as _config_ext
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.util as _util
+
+from tracdap.rt.config import *
 
 import yaml
 import yaml.parser
@@ -51,6 +52,8 @@ class ConfigKeys:
     STORAGE_DEFAULT_FORMAT = "storage.default.format"
     STORAGE_DEFAULT_LAYOUT = "storage.default.layout"
 
+    RUNTIME_RESOURCE_SIZE_LIMIT = "runtime.resource.sizeLimit"
+
     RESULT_ENABLED = "result.enabled"
     RESULT_LOGS_ENABLED = "result.logs.enabled"
     RESULT_STORAGE_LOCATION = "result.storage.location"
@@ -63,6 +66,8 @@ class ConfigKDefaults:
 
     STORAGE_DEFAULT_FORMAT = "CSV"
     STORAGE_DEFAULT_LAYOUT = "OBJECT_ID_LAYOUT"
+
+    RUNTIME_RESOURCE_SIZE_LIMIT = 100  # KB
 
 
 class ConfigManager:
@@ -284,7 +289,7 @@ class ConfigManager:
     def _get_loader(self, resolved_url: _urlp.ParseResult) -> _config_ext.IConfigLoader:
 
         protocol = resolved_url.scheme
-        loader_config = _config.PluginConfig(protocol)
+        loader_config = PluginConfig(protocol)
 
         if not _plugins.PluginManager.is_plugin_available(_config_ext.IConfigLoader, protocol):
             message = f"No config loader available for protocol [{protocol}]: {self._url_to_str(resolved_url)}"

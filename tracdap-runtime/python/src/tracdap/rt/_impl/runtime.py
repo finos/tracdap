@@ -30,7 +30,6 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.core.config_parser as _cparse
-import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
@@ -149,8 +148,6 @@ class TracRuntime:
             for plugin_package in self._plugin_packages:
                 _plugins.PluginManager.register_plugin_package(plugin_package)
 
-            _static_api.StaticApiImpl.register_impl()
-
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()
 
@@ -163,6 +160,8 @@ class TracRuntime:
                     config_file_name="system")
             else:
                 self._log.info("Using embedded system config")
+
+            _static_api.StaticApiImpl.register_impl(self._sys_config)
 
             # Dev mode translation is controlled by the dev mode flag
             # I.e. it can be applied to embedded configs
@@ -253,6 +252,8 @@ class TracRuntime:
         self._system.stop()
         self._system.wait_for_shutdown()
         self._clean_scratch_dir()
+
+        _static_api.StaticApiImpl.shutdown_impl()
 
         # If there are errors in the engine code or actor system, this is the most serious failure
         # Report these errors as the highest priority
