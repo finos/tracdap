@@ -27,7 +27,8 @@ import tutorial.resources as resources
 class ResourcesExample(trac.TracModel):
 
     def define_parameters(self) -> _tp.Dict[str, trac.ModelParameter]:
-        return dict()
+
+        return trac.define_parameters()
 
     def define_inputs(self) -> _tp.Dict[str, trac.ModelInputSchema]:
 
