@@ -40,18 +40,23 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
     _T = _tp.TypeVar("_T")
 
     @classmethod
-    def register_impl(cls, sys_config: _config.RuntimeConfig):
+    def register_impl(cls):
 
         if not _StaticApiHook._is_registered():
-            _StaticApiHook._register(StaticApiImpl(sys_config))
+            _StaticApiHook._register(StaticApiImpl())
+
+    @classmethod
+    def supply_config(cls, sys_config: _config.RuntimeConfig):
+        impl: StaticApiImpl = _StaticApiHook.get_instance()  # noqa
+        impl.__sys_config = sys_config
 
     @classmethod
     def shutdown_impl(cls, silent: bool = False):
         impl: StaticApiImpl = _StaticApiHook.get_instance()  # noqa
         impl._shutdown_context_managers(silent = silent)
 
-    def __init__(self, sys_config: _config.RuntimeConfig):
-        self.__sys_config = sys_config
+    def __init__(self):
+        self.__sys_config = _config.RuntimeConfig()
         self.__cxm_hooks = {}
 
     def array_type(self, item_type: _meta.BasicType) -> _meta.TypeDescriptor:

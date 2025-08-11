@@ -161,7 +161,8 @@ class TracRuntime:
             else:
                 self._log.info("Using embedded system config")
 
-            _static_api.StaticApiImpl.register_impl(self._sys_config)
+            _static_api.StaticApiImpl.register_impl()
+            _static_api.StaticApiImpl.supply_config(self._sys_config)
 
             # Dev mode translation is controlled by the dev mode flag
             # I.e. it can be applied to embedded configs
