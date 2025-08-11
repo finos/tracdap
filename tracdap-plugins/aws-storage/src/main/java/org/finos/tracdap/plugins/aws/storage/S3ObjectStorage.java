@@ -184,6 +184,41 @@ public class S3ObjectStorage extends CommonFileStorage {
             clientBuilder.endpointOverride(endpoint);
 
         this.client = clientBuilder.build();
+
+        checkRootExists();
+    }
+
+    private void checkRootExists() {
+
+        try {
+
+            // Bucket should already exist, the data service cannot create it
+
+            var bucketRequest = HeadBucketRequest.builder()
+                    .bucket(bucket)
+                    .build();
+
+            var bucketResponse = client.headBucket(bucketRequest).get();
+
+            log.info("S3 bucket [{}], region = [{}]",
+                    bucket, bucketResponse.bucketRegion());
+
+            // Prefix does not have to exist, the data service can create it on write
+            // This just checks list permissions on the bucket
+
+            var listRequest = ListObjectsV2Request.builder()
+                    .bucket(bucket)
+                    .prefix(prefix)
+                    .maxKeys(1)
+                    .build();
+
+            // Send request and get response onto the EL for execContext
+            client.listObjectsV2(listRequest).get();
+        }
+        catch (Exception e) {
+            var message = "S3 storage failed to start: " + e.getMessage();
+            throw new EStartup(message, e);
+        }
     }
 
     @Override
