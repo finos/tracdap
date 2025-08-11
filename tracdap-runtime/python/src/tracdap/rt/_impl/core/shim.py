@@ -505,14 +505,20 @@ class ShimLoader:
             cls, module: tp.Union[types.ModuleType, str],
             resource_name: str, resource_size_limit: tp.Optional[int] = None) -> bytes:
 
-        return cls._load_or_open_resource(module, resource_name, _ilr.read_binary, resource_size_limit)
+        def load_func(mod: tp.Union[types.ModuleType, str], res: str):
+            return _ilr.files(mod).joinpath(res).read_bytes()
+
+        return cls._load_or_open_resource(module, resource_name, load_func, resource_size_limit)
 
     @classmethod
     def open_resource(
             cls, module: tp.Union[types.ModuleType, str],
             resource_name: str, resource_size_limit: tp.Optional[int] = None) -> tp.BinaryIO:
 
-        return cls._load_or_open_resource(module, resource_name, _ilr.open_binary, resource_size_limit)
+        def open_func(mod: tp.Union[types.ModuleType, str], res: str) -> tp.BinaryIO:
+            return _ilr.files(mod).joinpath(res).open("rb")  # noqa
+
+        return cls._load_or_open_resource(module, resource_name, open_func, resource_size_limit)
 
     @classmethod
     def load_text_resource(
@@ -520,10 +526,10 @@ class ShimLoader:
             resource_name: str, encoding: str = "utf-8",
             resource_size_limit: tp.Optional[int] = None) -> str:
 
-        return cls._load_or_open_resource(
-            module, resource_name,
-            lambda mod, res: _ilr.read_text(mod, res, encoding),
-            resource_size_limit)
+        def load_func(mod: tp.Union[types.ModuleType, str], res: str):
+            return _ilr.files(mod).joinpath(res).read_text(encoding)
+
+        return cls._load_or_open_resource(module, resource_name, load_func, resource_size_limit)
 
     @classmethod
     def open_text_resource(
@@ -531,10 +537,10 @@ class ShimLoader:
             resource_name: str, encoding: str = "utf-8",
             resource_size_limit: tp.Optional[int] = None) -> tp.TextIO:
 
-        return cls._load_or_open_resource(
-            module, resource_name,
-            lambda mod, res: _ilr.open_text(mod, res, encoding),
-            resource_size_limit)
+        def open_func(mod: tp.Union[types.ModuleType, str], res: str) -> tp.TextIO:
+            return _ilr.files(mod).joinpath(res).open("rt", encoding=encoding)  # noqa
+
+        return cls._load_or_open_resource(module, resource_name, open_func, resource_size_limit)
 
     @classmethod
     def _load_or_open_resource(
@@ -557,7 +563,7 @@ class ShimLoader:
 
             if resource_size_limit is not None:
 
-                with _ilr.open_binary(module, resource_name) as resource_check:
+                with _ilr.files(module).joinpath(resource_name).open("rb") as resource_check:
                     resource_check.seek(0, os.SEEK_END)
                     resource_size = resource_check.tell()
 
