@@ -158,6 +158,8 @@ public class GcsObjectStorage extends CommonFileStorage {
         try {
 
             // Bucket should already exist, the data service cannot create it
+            // List objects will fail for a non-existent bucket
+
             // Prefix does not have to exist, the data service can create it on write
             // This just checks list permissions on the bucket
 
