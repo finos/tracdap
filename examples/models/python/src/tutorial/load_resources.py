@@ -77,4 +77,4 @@ class ResourcesExample(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(ResourcesExample, "config/file_io_matplotlib.yaml", "config/sys_config.yaml")
+    launch.launch_model(ResourcesExample, "config/load_resources.yaml", "config/sys_config.yaml")
