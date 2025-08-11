@@ -339,49 +339,6 @@ def define_schema(
     return sa.define_schema(*fields, schema_type=schema_type, dynamic=dynamic)
 
 
-def load_schema(
-        package: _tp.Union[_ts.ModuleType, str], schema_file: str,
-        schema_type: SchemaType = SchemaType.TABLE) \
-        -> SchemaDefinition:
-
-    """
-    Load a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a CSV file in the model package
-
-    The schema CSV file must contain the following columns:
-
-    * field_name (string, required)
-    * field_type (:py:class:`BasicType <tracdap.rt.metadata.BasicType>`, required)
-    * label (string, required)
-    * business_key (boolean, optional)
-    * categorical (boolean, optional)
-    * format_code (string, optional)
-
-    Field ordering is assigned by the order the fields are listed in the CSV file.
-    A schema type can be specified explicitly using the schema_type parameter, currently only
-    :py:attr:`TABLE <tracdap.rt.metadata.SchemaType.TABLE>` is supported and this
-    is also the default.
-
-    .. note::
-       To define the inputs or outputs of a :py:class:`TracModel <tracdap.rt.api.TracModel>`,
-       a schema can be loaded with this function and used to construct a
-       :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>` or
-       :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`.
-
-    :param package: Package (or package name) in the model repository that contains the schema file
-    :param schema_file: Name of the schema file to load, which must be in the specified package
-    :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
-    :return: A schema definition loaded from the schema file
-
-    :type package: ModuleType | str
-    :type schema_file: str
-    :type schema_type: :py:class:`SchemaType <tracdap.rt.metadata.SchemaType>`
-    :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
-    """
-
-    sa = _StaticApiHook.get_instance()
-    return sa.load_schema(package, schema_file, schema_type=schema_type)
-
-
 def define_file_type(extension: str, mime_type: str) -> FileType:
 
     """
@@ -566,6 +523,177 @@ def define_output_file(
 
     file_type = define_file_type(extension, mime_type)
     return define_output(file_type, label=label, optional=optional, output_props=output_props)
+
+
+def load_schema(
+        package: _tp.Union[_ts.ModuleType, str], schema_file: str,
+        schema_type: SchemaType = SchemaType.TABLE) \
+        -> SchemaDefinition:
+
+    """
+    Load a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` from a CSV file in the model package
+
+    The schema CSV file must contain the following columns:
+
+    * field_name (string, required)
+    * field_type (:py:class:`BasicType <tracdap.rt.metadata.BasicType>`, required)
+    * label (string, required)
+    * business_key (boolean, optional)
+    * categorical (boolean, optional)
+    * format_code (string, optional)
+
+    Field ordering is assigned by the order the fields are listed in the CSV file.
+    A schema type can be specified explicitly using the schema_type parameter, currently only
+    :py:attr:`TABLE <tracdap.rt.metadata.SchemaType.TABLE>` is supported and this
+    is also the default.
+
+    .. note::
+       To define the inputs or outputs of a :py:class:`TracModel <tracdap.rt.api.TracModel>`,
+       a schema can be loaded with this function and used to construct a
+       :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>` or
+       :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`.
+
+    :param package: Package (or package name) in the model repository that contains the schema file
+    :param schema_file: Name of the schema file to load, which must be in the specified package
+    :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
+    :return: A schema definition loaded from the schema file
+
+    :type package: ModuleType | str
+    :type schema_file: str
+    :type schema_type: :py:class:`SchemaType <tracdap.rt.metadata.SchemaType>`
+    :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.load_schema(package, schema_file, schema_type=schema_type)
+
+
+def load_resource(
+        package: _tp.Union[_ts.ModuleType, str], resource_file: str) \
+        -> bytes:
+
+    """
+    Load a binary resource from the model repository
+
+    Resources are files included in the Python package structure of the model repository.
+    This method loads a binary resource file into memory as a bytes object.
+
+    .. note::
+        Checking large resource files into the model repository has a significant performance impact.
+        For this reason, TRAC enforces a limit on the size of resource files. In production deployments
+        of TRAC the resource size limit is set by the system administrator. The default limit is 256 KB.
+        Larger files can be passed into a model as model inputs.
+
+    :param package: The package to load resources from (either a module object or the package name)
+    :param resource_file: The name of the resource file to load
+    :return: The loaded resource as a bytes object
+
+    :type package: ModuleType | str
+    :type resource_file: str
+    :rtype: bytes
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.load_resource(package, resource_file)
+
+
+def load_resource_stream(
+        package: _tp.Union[_ts.ModuleType, str], resource_file: str) \
+        -> _tp.ContextManager[_tp.BinaryIO]:
+
+    """
+    Load a binary resource from the model repository as a readable stream
+
+    Resources are files included in the Python package structure of the model repository.
+    This method makes a binary resource available as a readable byte stream.
+    The stream can only be used in a Python `with` block.
+
+    .. note::
+        Checking large resource files into the model repository has a significant performance impact.
+        For this reason, TRAC enforces a limit on the size of resource files. In production deployments
+        of TRAC the resource size limit is set by the system administrator. The default limit is 256 KB.
+        Larger files can be passed into a model as model inputs.
+
+    :param package: The package to load resources from (either a module object or the package name)
+    :param resource_file: The name of the resource file to load
+    :return: A readable binary stream for the resource
+
+    :type package: ModuleType | str
+    :type resource_file: str
+    :rtype: BinaryIO
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.load_resource_stream(package, resource_file)
+
+
+def load_text_resource(
+        package: _tp.Union[_ts.ModuleType, str], resource_file: str,
+        encoding: str = "utf-8") \
+        -> str:
+
+    """
+    Load a text resource from the model repository
+
+    Resources are files included in the Python package structure of the model repository.
+    This method loads a text resource file into memory as a str object.
+    The resource is loaded with utf-8 encoding by default,
+    different encodings can be specified using the encoding parameter.
+
+    .. note::
+        Checking large resource files into the model repository has a significant performance impact.
+        For this reason, TRAC enforces a limit on the size of resource files. In production deployments
+        of TRAC the resource size limit is set by the system administrator. The default limit is 256 KB.
+        Larger files can be passed into a model as model inputs.
+
+    :param package: The package to load resources from (either a module object or the package name)
+    :param resource_file: The name of the resource file to load
+    :param encoding: Resource encoding (default: utf-8)
+    :return: The loaded resource, as a string if text = True, otherwise as bytes
+
+    :type package: ModuleType | str
+    :type resource_file: str
+    :type encoding: str
+    :rtype: bytes
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.load_text_resource(package, resource_file, encoding)
+
+
+def load_text_resource_stream(
+        package: _tp.Union[_ts.ModuleType, str], resource_file: str,
+        encoding: str = "utf-8") \
+        -> _tp.ContextManager[_tp.TextIO]:
+
+    """
+    Load a text resource from the model repository as a text stream
+
+    Resources are files included in the Python package structure of the model repository.
+    This method makes a binary resource available as a readable text stream.
+    The resource is loaded with utf-8 encoding by default,
+    different encodings can be specified using the encoding parameter.
+    The stream can only be used in a Python `with` block.
+
+    .. note::
+        Checking large resource files into the model repository has a significant performance impact.
+        For this reason, TRAC enforces a limit on the size of resource files. In production deployments
+        of TRAC the resource size limit is set by the system administrator. The default limit is 256 KB.
+        Larger files can be passed into a model as model inputs.
+
+    :param package: The package to load resources from (either a module object or the package name)
+    :param resource_file: The name of the resource file to load
+    :param encoding: Resource encoding (default: utf-8)
+    :return: A readable text stream for the resource
+
+    :type package: ModuleType | str
+    :type resource_file: str
+    :type encoding: str
+    :rtype: TextIO
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.load_text_resource_stream(package, resource_file, encoding)
 
 
 def ModelInputSchema(  # noqa
