@@ -52,7 +52,7 @@ class ConfigKeys:
     STORAGE_DEFAULT_FORMAT = "storage.default.format"
     STORAGE_DEFAULT_LAYOUT = "storage.default.layout"
 
-    RUNTIME_RESOURCE_SIZE_LIMIT = "runtime.resource.sizeLimit"
+    RUNTIME_LIMIT_RESOURCE_SIZE = "runtime.limit.resourceSize"
 
     RESULT_ENABLED = "result.enabled"
     RESULT_LOGS_ENABLED = "result.logs.enabled"
@@ -67,7 +67,7 @@ class ConfigKDefaults:
     STORAGE_DEFAULT_FORMAT = "CSV"
     STORAGE_DEFAULT_LAYOUT = "OBJECT_ID_LAYOUT"
 
-    RUNTIME_RESOURCE_SIZE_LIMIT = 100  # KB
+    RUNTIME_LIMIT_RESOURCE_SIZE = 256  # KB
 
 
 class ConfigManager:

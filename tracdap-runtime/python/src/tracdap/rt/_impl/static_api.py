@@ -307,8 +307,8 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_RESOURCE_SIZE_LIMIT,
-            _config.ConfigKDefaults.RUNTIME_RESOURCE_SIZE_LIMIT,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         return _shim.ShimLoader.load_resource(package, resource_file, resource_size_limit)
@@ -321,8 +321,8 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_RESOURCE_SIZE_LIMIT,
-            _config.ConfigKDefaults.RUNTIME_RESOURCE_SIZE_LIMIT,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         stream = _shim.ShimLoader.open_resource(package, resource_file, resource_size_limit)
@@ -337,8 +337,8 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_RESOURCE_SIZE_LIMIT,
-            _config.ConfigKDefaults.RUNTIME_RESOURCE_SIZE_LIMIT,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         return _shim.ShimLoader.load_text_resource(package, resource_file, encoding, resource_size_limit)
@@ -352,8 +352,8 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_RESOURCE_SIZE_LIMIT,
-            _config.ConfigKDefaults.RUNTIME_RESOURCE_SIZE_LIMIT,
+            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         stream = _shim.ShimLoader.open_text_resource(package, resource_file, encoding, resource_size_limit)
