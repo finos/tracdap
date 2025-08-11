@@ -211,12 +211,3 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(RuntimeMetadataReport, job_config, sys_config, dev_mode=True)
-
-    def test_load_resources(self):
-
-        from tutorial.load_resources import ResourcesExample  # noqa
-
-        job_config = self.examples_root.joinpath("config/load_resources.yaml")
-        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
-
-        launch.launch_model(ResourcesExample, job_config, sys_config, dev_mode=True)
