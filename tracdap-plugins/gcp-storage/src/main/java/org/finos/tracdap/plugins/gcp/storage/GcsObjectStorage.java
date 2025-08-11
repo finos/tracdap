@@ -158,13 +158,6 @@ public class GcsObjectStorage extends CommonFileStorage {
         try {
 
             // Bucket should already exist, the data service cannot create it
-
-            var bucket = storageClient.getBucket(bucketName);
-
-            log.info("GCS bucket [{}], project = [{}], location = [{}], storage class = [{}]",
-                    bucket.getName(), bucket.getProject(),
-                    bucket.getLocation(), bucket.getStorageClass());
-
             // Prefix does not have to exist, the data service can create it on write
             // This just checks list permissions on the bucket
 
