@@ -22,6 +22,8 @@ import tracdap.rt.api as api
 import tracdap.rt.launch as launch
 import tracdap.rt.exceptions as ex
 
+import tracdap_test.rt.jobs.resources as test_resources
+
 
 class RuntimeMetadataTest(api.TracModel):
 
@@ -78,6 +80,41 @@ class RuntimeMetadataTest(api.TracModel):
         self.TEST_CASE.assertIsNone(output_metadata)
 
 
+class LoadResourcesTest(api.TracModel):
+
+    TEST_CASE: unittest.TestCase
+
+    def define_parameters(self) -> _tp.Dict[str, api.ModelParameter]:
+
+        return api.define_parameters(
+            api.P("meaning_of_life", api.INTEGER, "Let this test work with hello_world.yaml job config")
+        )
+
+    def define_inputs(self) -> _tp.Dict[str, api.ModelInputSchema]:
+
+        return {}
+
+    def define_outputs(self) -> _tp.Dict[str, api.ModelOutputSchema]:
+
+        return {}
+
+    def run_model(self, ctx: api.TracContext):
+
+        banner_logo = api.load_resource(test_resources, "tracdap_banner_logo.png")
+        banner_text = api.load_text_resource(test_resources, "tracdap_banner.md")
+
+        self.TEST_CASE.assertTrue("The Modern Model Platform" in banner_text)
+        self.TEST_CASE.assertTrue(len(banner_logo) > 0)
+
+        with api.load_resource_stream(test_resources, "tracdap_banner_logo.png") as logo_stream:
+            banner_logo_content = logo_stream.read()
+            self.TEST_CASE.assertEqual(banner_logo, banner_logo_content)
+
+        with api.load_text_resource_stream(test_resources, "tracdap_banner.md") as banner_stream:
+            banner_text_content = banner_stream.read()
+            self.TEST_CASE.assertEqual(banner_text, banner_text_content)
+
+
 class AssertJobsTest(unittest.TestCase):
 
     examples_root: pathlib.Path
@@ -100,3 +137,12 @@ class AssertJobsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(RuntimeMetadataTest, job_config, sys_config)
+
+    def test_load_resources(self):
+
+        LoadResourcesTest.TEST_CASE = self
+
+        job_config = self.examples_root.joinpath("config/hello_world.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(LoadResourcesTest, job_config, sys_config)
