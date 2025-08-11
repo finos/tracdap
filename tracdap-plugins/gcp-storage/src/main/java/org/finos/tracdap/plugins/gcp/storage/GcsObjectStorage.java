@@ -113,16 +113,7 @@ public class GcsObjectStorage extends CommonFileStorage {
 
             legacyClient = StorageOptions.http().build().getService();
 
-            // Make a basic request so any connectivity errors are detected during startup
-
-            var request = ListObjectsRequest.newBuilder()
-                    .setParent(bucketName.toString())
-                    .setPrefix(prefix)
-                    .setDelimiter(BACKSLASH)
-                    .setPageSize(10)
-                    .build();
-
-            storageClient.listObjects(request);
+            checkRootExists();
         }
         catch (ApiException e) {
 
@@ -159,6 +150,47 @@ public class GcsObjectStorage extends CommonFileStorage {
         }
         else {
             return channelBuilder;
+        }
+    }
+
+    private void checkRootExists() {
+
+        try {
+
+            // Bucket should already exist, the data service cannot create it
+
+            var bucket = storageClient.getBucket(bucketName);
+
+            log.info("GCS bucket [{}], project = [{}], location = [{}], storage class = [{}]",
+                    bucket.getName(), bucket.getProject(),
+                    bucket.getLocation(), bucket.getStorageClass());
+
+            // Prefix does not have to exist, the data service can create it on write
+            // This just checks list permissions on the bucket
+
+            var request = ListObjectsRequest.newBuilder()
+                    .setParent(bucketName.toString())
+                    .setPrefix(prefix)
+                    .setDelimiter(BACKSLASH)
+                    .setPageSize(10)
+                    .build();
+
+            storageClient.listObjects(request);
+        }
+        catch (ApiException e) {
+
+            var cause = e.getCause();
+
+            var statusMessage = cause instanceof StatusRuntimeException
+                    ? ((StatusRuntimeException) cause).getStatus().getDescription()
+                    : cause.getMessage();
+
+            var message = "GCS storage failed to start: " + statusMessage;
+            throw new EStartup(message, e);
+        }
+        catch (Exception e) {
+            var message = "GCS storage failed to start: " + e.getMessage();
+            throw new EStartup(message, e);
         }
     }
 
