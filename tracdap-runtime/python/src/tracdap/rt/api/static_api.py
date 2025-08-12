@@ -19,6 +19,7 @@ import sys
 import typing as _tp
 import types as _ts
 
+from .constants import STRUCT_TYPE
 from .hook import _StaticApiHook
 from .hook import _Named
 
@@ -339,6 +340,12 @@ def define_schema(
     return sa.define_schema(*fields, schema_type=schema_type, dynamic=dynamic)
 
 
+def define_struct(python_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
+    """Build schema definition for a STRUCT"""
+    sa = _StaticApiHook.get_instance()
+    return sa.define_struct(python_type)
+
+
 def define_file_type(extension: str, mime_type: str) -> FileType:
 
     """
@@ -440,6 +447,36 @@ def define_input_table(
     return define_input(schema, label=label, optional=optional, dynamic=dynamic, input_props=input_props)
 
 
+def define_input_struct(
+        python_type: _tp.Type[STRUCT_TYPE], *,
+        label: _tp.Optional[str] = None, optional: bool = False,
+        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelInputSchema:
+
+    schema = define_struct(python_type)
+    return define_input(schema, label=label, optional=optional, input_props=input_props)
+
+
+def define_input_file(
+        extension: str, mime_type: str, *,
+        label: _tp.Optional[str] = None, optional: bool = False,
+        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
+        -> ModelInputSchema:
+
+    """
+    Define a model input for a :py:class:`FileType <tracdap.rt.metadata.FileType>`
+
+    :type extension str
+    :type mime_type: sr
+    :type label: str | None
+    :type optional: bool
+    :type input_props: dict[str, Any] | None
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    """
+
+    file_type = define_file_type(extension, mime_type)
+    return define_input(file_type, label=label, optional=optional, input_props=input_props)
+
+
 def define_output_table(
         *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
         label: _tp.Optional[str] = None, optional: bool = False, dynamic: bool = False,
@@ -483,25 +520,13 @@ def define_output_table(
     return define_output(schema, label=label, optional=optional, dynamic=dynamic, output_props=output_props)
 
 
-def define_input_file(
-        extension: str, mime_type: str, *,
+def define_output_struct(
+        python_type: _tp.Type[STRUCT_TYPE], *,
         label: _tp.Optional[str] = None, optional: bool = False,
-        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
-        -> ModelInputSchema:
+        output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelOutputSchema:
 
-    """
-    Define a model input for a :py:class:`FileType <tracdap.rt.metadata.FileType>`
-
-    :type extension str
-    :type mime_type: sr
-    :type label: str | None
-    :type optional: bool
-    :type input_props: dict[str, Any] | None
-    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
-    """
-
-    file_type = define_file_type(extension, mime_type)
-    return define_input(file_type, label=label, optional=optional, input_props=input_props)
+    schema = define_struct(python_type)
+    return define_output(schema, label=label, optional=optional, output_props=output_props)
 
 
 def define_output_file(

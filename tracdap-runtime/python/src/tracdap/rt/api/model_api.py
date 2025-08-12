@@ -18,6 +18,8 @@ import dataclasses as _dc
 import typing as _tp
 import logging as _logging
 
+from .constants import STRUCT_TYPE
+
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
@@ -214,6 +216,10 @@ class TracContext(metaclass=_abc.ABCMeta):
 
         pass
 
+    def get_struct(self, struct_name: str, python_class: _tp.Type[STRUCT_TYPE]) -> STRUCT_TYPE:
+
+        pass
+
     def get_file(self, file_name: str) -> bytes:
 
         pass
@@ -333,6 +339,10 @@ class TracContext(metaclass=_abc.ABCMeta):
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
         """
+
+        pass
+
+    def put_struct(self, struct_name: str, struct_data: STRUCT_TYPE):
 
         pass
 
