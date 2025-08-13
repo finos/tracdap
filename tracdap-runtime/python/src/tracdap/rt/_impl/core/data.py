@@ -464,7 +464,7 @@ class ObjectIdLayout(BaseLayout):
 
 class DevelopmentLayout(BaseLayout):
 
-    __DEFAULT_OUTPUT_DIR = "Dev Outputs"
+    DEFAULT_DEV_OUTPUT_DIR = "Dev Outputs"
 
     __DATA_STORAGE_PATH = "{}/{}{}.{}"
     __FILE_STORAGE_PATH = "{}/{}{}.{}"
@@ -509,14 +509,14 @@ class DevelopmentLayout(BaseLayout):
     def _dev_storage_dir(self, prior_copy: _meta.StorageCopy):
 
         if prior_copy is None:
-            return self.__DEFAULT_OUTPUT_DIR
+            return self.DEFAULT_DEV_OUTPUT_DIR
 
         prior_path = pathlib.Path(prior_copy.storagePath)
 
         if len(prior_path.parts) > 1:
             return prior_path.parent
         else:
-            return self.__DEFAULT_OUTPUT_DIR
+            return self.DEFAULT_DEV_OUTPUT_DIR
 
 
 def build_data_spec(
