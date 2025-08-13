@@ -18,7 +18,7 @@ import dataclasses as _dc
 import typing as _tp
 import logging as _logging
 
-from .constants import STRUCT_TYPE
+from .constants import STRUCT_TYPE  # DOCGEN_REMOVE
 
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs

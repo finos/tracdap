@@ -19,7 +19,7 @@ import sys
 import typing as _tp
 import types as _ts
 
-from .constants import STRUCT_TYPE
+from .constants import STRUCT_TYPE  # DOCGEN_REMOVE
 from .hook import _StaticApiHook
 from .hook import _Named
 
