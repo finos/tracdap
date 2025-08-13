@@ -173,7 +173,6 @@ public class SchemaValidator {
         ctx = ctx.pushOneOf(SD_SCHEMA_DETAILS)
                 .apply(CommonValidators::required)
                 .apply(SchemaValidator::schemaMatchesType)
-                .applyRegistered()
                 .applyIf(schema.getSchemaType() == SchemaType.TABLE_SCHEMA, SchemaValidator::tableSchema, TableSchema.class, parentSchema)
                 .applyIf(schema.getSchemaType() == SchemaType.STRUCT_SCHEMA, SchemaValidator::structSchema, StructSchema.class, parentSchema)
                 .pop();
@@ -288,7 +287,7 @@ public class SchemaValidator {
     @Validator
     public static ValidationContext fieldSchema(FieldSchema field, ValidationContext ctx) {
 
-        return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, SchemaType.TABLE_SCHEMA, ctx);
+        return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, SchemaType.SCHEMA_TYPE_NOT_SET, ctx);
     }
 
     public static ValidationContext fieldSchema(FieldSchema field, SchemaDefinition root, ValidationContext ctx) {
@@ -296,7 +295,7 @@ public class SchemaValidator {
         if (root != null)
             return fieldSchema(field, root.getNamedTypesMap(), root.getNamedEnumsMap(), root.getSchemaType(), ctx);
         else
-            return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, SchemaType.TABLE_SCHEMA, ctx);
+            return fieldSchema(field, NO_NAMED_TYPES, NO_NAMED_ENUMS, SchemaType.SCHEMA_TYPE_NOT_SET, ctx);
     }
 
     public static ValidationContext fieldSchema(
@@ -331,7 +330,7 @@ public class SchemaValidator {
         if (field.getBusinessKey() && !ALLOWED_BUSINESS_KEY_TYPES.contains(field.getFieldType())) {
 
             var err = String.format("Schema field [%s] cannot be a business key because it has type [%s]",
-                    ctx.fieldName(), field.getFieldType());
+                    field.getFieldName(), field.getFieldType());
 
             ctx = ctx.error(err);
         }
@@ -339,7 +338,7 @@ public class SchemaValidator {
         if (field.getCategorical() && !ALLOWED_CATEGORICAL_TYPES.contains(field.getFieldType())) {
 
             var err = String.format("Schema field [%s] cannot be categorical because it has type [%s]",
-                    ctx.fieldName(), field.getFieldType());
+                    field.getFieldName(), field.getFieldType());
 
             ctx = ctx.error(err);
         }
@@ -350,7 +349,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] cannot have children because it is primitive type [%s]",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -361,7 +360,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] mast have exactly 1 child because it is type [%s]",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -372,7 +371,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] mast have exactly 2 children because it is type [%s]",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -380,7 +379,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] is type [%s], it mast define a child of type STRING as the key",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -391,7 +390,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] mast define at least one child or have a named type because it is type [%s]",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -403,7 +402,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] cannot use named type [%s] because it is not a STRUCT field",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -411,7 +410,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] cannot use named type [%s] because it defines its own children",
-                        ctx.fieldName(), field.getFieldType());
+                        field.getFieldName(), field.getFieldType());
 
                 ctx = ctx.error(err);
             }
@@ -419,7 +418,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] refers to unknown type [%s]]",
-                        ctx.fieldName(), field.getNamedType());
+                        field.getFieldName(), field.getNamedType());
 
                 ctx = ctx.error(err);
             }
@@ -431,7 +430,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] cannot use named enum [%s] because it is not a categorical field",
-                        ctx.fieldName(), field.getNamedEnum());
+                        field.getFieldName(), field.getNamedEnum());
 
                 ctx = ctx.error(err);
             }
@@ -439,7 +438,7 @@ public class SchemaValidator {
 
                 var err = String.format(
                         "Schema field [%s] refers to unknown enum [%s]]",
-                        ctx.fieldName(), field.getNamedEnum());
+                        field.getFieldName(), field.getNamedEnum());
 
                 ctx = ctx.error(err);
             }
