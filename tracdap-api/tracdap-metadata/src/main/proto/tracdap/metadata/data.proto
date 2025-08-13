@@ -26,9 +26,7 @@ import "tracdap/metadata/object_id.proto";
 
 
 /**
- * Enumeration of the available types of data schema
- *
- * Currently only table schemas are supported, other schema types may be added later.
+ * Enumeration of the available schema types
  *
  * @see SchemaDefinition
  */
@@ -40,6 +38,8 @@ enum SchemaType {
 
     /// Tabular data
     TABLE_SCHEMA = 1;
+
+    /// Alias for TABLE_SCHEMA (for compatibility with early versions of TRAC)
     TABLE = 1;
 
     /// Structured objects
