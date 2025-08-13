@@ -159,7 +159,8 @@ if pyd:
 def define_struct_schema(sub_struct_type: type):
 
     return _meta.SchemaDefinition(
-        fields=[
+        schemaType=_meta.SchemaType.STRUCT_SCHEMA,
+        struct=_meta.StructSchema(fields=[
 
             _meta.FieldSchema(
                 fieldName="boolField", fieldOrder=0, fieldType=_meta.BasicType.BOOLEAN, notNull=True,
@@ -290,11 +291,12 @@ def define_struct_schema(sub_struct_type: type):
                         fieldType=_meta.BasicType.STRUCT,
                         label="",
                         notNull=False,
-                        namedType=f"{sub_struct_type.__module__}.{sub_struct_type.__name__}")])],
+                        namedType=f"{sub_struct_type.__module__}.{sub_struct_type.__name__}")])]),
 
         namedTypes={
             f"{sub_struct_type.__module__}.{sub_struct_type.__name__}": _meta.SchemaDefinition(
-                fields=[
+                schemaType=_meta.SchemaType.STRUCT_SCHEMA,
+                struct=_meta.StructSchema(fields=[
                     _meta.FieldSchema(
                         fieldName="field1", fieldOrder=0, fieldType=_meta.BasicType.STRING, notNull=True,
                         label="", defaultValue=None),
@@ -305,7 +307,7 @@ def define_struct_schema(sub_struct_type: type):
 
                     _meta.FieldSchema(
                         fieldName="enumField", fieldOrder=2, fieldType=_meta.BasicType.STRING, categorical=True, notNull=False,
-                        label="", namedEnum=f"{ExampleEnum.__module__}.{ExampleEnum.__name__}")])},
+                        label="", namedEnum=f"{ExampleEnum.__module__}.{ExampleEnum.__name__}")]))},
 
         namedEnums={
             f"{ExampleEnum.__module__}.{ExampleEnum.__name__}": _meta.EnumValues(
@@ -357,8 +359,8 @@ class StructProcessingTest(unittest.TestCase):
 
     def _assert_schema_equal(self, expected: _meta.SchemaDefinition, actual: _meta.SchemaDefinition):
 
-        actual_fields = {f.fieldName: f for f in actual.fields}
-        expected_fields = {f.fieldName: f for f in expected.fields}
+        actual_fields = {f.fieldName: f for f in actual.struct.fields}
+        expected_fields = {f.fieldName: f for f in expected.struct.fields}
 
         self.assertSetEqual(set(expected_fields.keys()), set(actual_fields.keys()))
 
