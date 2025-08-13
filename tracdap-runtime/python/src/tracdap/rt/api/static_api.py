@@ -306,7 +306,8 @@ def F(  # noqa
 
 def define_schema(
         *fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]],
-        schema_type: SchemaType = SchemaType.TABLE, dynamic: bool = False) \
+        schema_type: SchemaType = SchemaType.TABLE_SCHEMA,
+        dynamic: bool = False) \
         -> SchemaDefinition:
 
     """
@@ -316,13 +317,14 @@ def define_schema(
     This function takes a number of fields, either as individual arguments or as a list, and arranges
     them into a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`.
 
-    A schema type can be specified explicitly using the schema_type parameter, currently only
-    :py:attr:`TABLE <tracdap.rt.metadata.SchemaType.TABLE>` is supported and this
-    is also the default.
+    A schema type can be specified explicitly using the schema_type parameter,
+    if unspecified the default is :py:attr:`TABLE_SCHEMA <tracdap.rt.metadata.SchemaType.TABLE_SCHEMA>`.
 
-    .. note::
-       To define the inputs or outputs of a :py:class:`TracModel <tracdap.rt.api.TracModel>`,
-       use :py:func:`define_input_table` or :py:func:`define_output_table` instead.
+    If the schema is not known in advance, setting dynamic = True will create a schema that is resolved
+    at runtime. Dynamic schemas still have a :py:class:`SchemaType <tracdap.rt.metadata.SchemaType>`,
+    so e.g. :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>` and
+    :py:attr:`TABLE_SCHEMA <tracdap.rt.metadata.SchemaType.TABLE_SCHEMA>` and cannot be used
+    interchangeably at runtime. A schema marked as dynamic must not include any fields.
 
     :param fields: The list of fields to include in the schema
     :param schema_type: The type of schema to create (currently only TABLE schemas are supported)
@@ -340,8 +342,55 @@ def define_schema(
     return sa.define_schema(*fields, schema_type=schema_type, dynamic=dynamic)
 
 
+def define_table(*fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) -> SchemaDefinition:
+
+    """
+    Define a :py:attr:`TABLE_SCHEMA <tracdap.rt.metadata.SchemaType.TABLE_SCHEMA>`from a list of fields
+
+    Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
+    This function takes a number of fields, either as individual arguments or as a list, and arranges
+    them into a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`.
+
+    TRAC performs validation on the supplied fields and then creates a matching
+    :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`.
+    To create model inputs and outputs for this schema, use
+    :py:func:`define_input() <tracdap.rt.api.define_input>` and
+    :py:func:`define_output() <tracdap.rt.api.define_output>`.
+
+    :param fields: The list of fields to include in the schema
+    :return: A schema definition built from the supplied fields
+
+    :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
+                  List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
+    :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.define_schema(*fields, schema_type=SchemaType.TABLE_SCHEMA, dynamic=False)
+
+
 def define_struct(python_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
-    """Build schema definition for a STRUCT"""
+
+    """
+    Define a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>` from a Python
+    class, which can be either a *dataclass* or a Pydantic model.
+
+    TRAC performs validation on the supplied type and then creates a matching
+    :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`.
+    To create model inputs and outputs for this schema, use
+    :py:func:`define_input() <tracdap.rt.api.define_input>` and
+    :py:func:`define_output() <tracdap.rt.api.define_output>`.
+    To access these inputs and outputs at runtime, use
+    :py:meth:`get_struct() <tracdap.rt.api.TracContext.get_struct>` and
+    :py:meth:`put_struct() <tracdap.rt.api.TracContext.put_struct>`.
+
+    :param python_type: The dataclass or Pydantic model type to build a schema for
+    :return: A schema definition built from the supplied Python type
+
+    :type python_type: type
+    :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
+    """
+
     sa = _StaticApiHook.get_instance()
     return sa.define_struct(python_type)
 
@@ -349,7 +398,7 @@ def define_struct(python_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
 def define_file_type(extension: str, mime_type: str) -> FileType:
 
     """
-    Define a :py:class:`FileType <tracdap.rt.metadata.FileType>` for use as a model input or output
+    Define a :py:class:`FileType <tracdap.rt.metadata.FileType>` for a given extension and mime type.
 
     :type extension: str
     :type mime_type: str
@@ -409,7 +458,7 @@ def define_input_table(
         -> ModelInputSchema:
 
     """
-    Define a model input for a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
+    Define a model input for a :py:attr:`TABLE_SCHEMA <tracdap.rt.metadata.SchemaType.TABLE_SCHEMA>`.
 
     Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
     This function takes a number of fields, either as individual arguments or as a list, and uses them
@@ -427,12 +476,12 @@ def define_input_table(
     These properties are not used by the TRAC engine, but are stored in the model metadata for
     the input and can be used as needed in 3rd-party applications.
 
-    :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
-    :param label: An optional label (of type str) for a model input schema. Default value: None.
-    :param optional: Mark this input as an optional model input
-    :param dynamic: Mark this input as a dynamic model input (the list of fields must be empty)
-    :param input_props: Associate key-value properties with this input (not used by the TRAC engine)
-    :return: A model input schema, suitable for returning from :py:meth:`TracModel.define_inputs`
+    :param fields: A set of fields to make up a table schema
+    :param label: Human readable label for the model input
+    :param optional: Whether this model input is optional (default = False)
+    :param dynamic: Whether this model input has a dynamic schema (the list of fields must be empty)
+    :param input_props: An optional set of user-defined properties to set on the model input
+    :return: A valid output schema suitable to return from :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
@@ -451,6 +500,27 @@ def define_input_struct(
         python_type: _tp.Type[STRUCT_TYPE], *,
         label: _tp.Optional[str] = None, optional: bool = False,
         input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelInputSchema:
+
+    """
+    Define a model input for a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>`.
+    Validation is performed and the result is a :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    suitable to return from :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>`.
+
+    This method is equivalent to calling :py:func:`define_struct() <tracdap.rt.api.define_struct>`
+    and then :py:func:`define_input() <tracdap.rt.api.define_input>`.
+
+    :param python_type: The dataclass or Pydantic model type to build a struct schema for
+    :param label: Human readable label for the model input
+    :param optional: Whether this model input is optional (default = False)
+    :param input_props: An optional set of user-defined properties to set on the model input
+    :return: A valid input schema suitable to return from :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>`
+
+    :type python_type: type
+    :type label: str | None
+    :type optional: bool
+    :type input_props: dict[str, any] | None
+    :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
+    """
 
     schema = define_struct(python_type)
     return define_input(schema, label=label, optional=optional, input_props=input_props)
@@ -484,7 +554,7 @@ def define_output_table(
         -> ModelOutputSchema:
 
     """
-    Define a model output for a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
+    Define a model output for a :py:attr:`TABLE_SCHEMA <tracdap.rt.metadata.SchemaType.TABLE_SCHEMA>`.
 
     Individual fields can be defined using :py:func:`define_field` or the shorthand alias :py:func:`F`.
     This function takes a number of fields, either as individual arguments or as a list, and uses them
@@ -500,12 +570,12 @@ def define_output_table(
     These properties are not used by the TRAC engine, but are stored in the model metadata for
     the output and can be used as needed in 3rd-party applications.
 
-    :param fields: A set of fields to make up a :py:class:`TableSchema <tracdap.rt.metadata.TableSchema>`
-    :param label: An optional label (of type str) for a model output schema. Default value: None.
-    :param optional: Mark this output as an optional model output
-    :param dynamic: Mark this output as a dynamic model output (the list of fields must be empty)
-    :param output_props: Associate key-value properties with this output (not used by the TRAC engine)
-    :return: A model output schema, suitable for returning from :py:meth:`TracModel.define_outputs`
+    :param fields: A set of fields to make up a table schema
+    :param label: Human readable label for the model output
+    :param optional: Whether this model output is optional (default = False)
+    :param dynamic: Whether this model output has a dynamic schema (the list of fields must be empty)
+    :param output_props: An optional set of user-defined properties to set on the model output
+    :return: A valid output schema suitable to return from :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`
 
     :type fields: :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` |
                   List[:py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>`]
@@ -524,6 +594,27 @@ def define_output_struct(
         python_type: _tp.Type[STRUCT_TYPE], *,
         label: _tp.Optional[str] = None, optional: bool = False,
         output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelOutputSchema:
+
+    """
+    Define a model output for a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>`.
+    Validation is performed and the result is a :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
+    suitable to return from :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`.
+
+    This method is equivalent to calling :py:func:`define_struct() <tracdap.rt.api.define_struct>`
+    and then :py:func:`define_output() <tracdap.rt.api.define_output>`.
+
+    :param python_type: The dataclass or Pydantic model type to build a struct schema for
+    :param label: Human readable label for the model output
+    :param optional: Whether this model output is optional (default = False)
+    :param output_props: An optional set of user-defined properties to set on the model output
+    :return: A valid output schema suitable to return from :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`
+
+    :type python_type: type
+    :type label: str | None
+    :type optional: bool
+    :type output_props: dict[str, any] | None
+    :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
+    """
 
     schema = define_struct(python_type)
     return define_output(schema, label=label, optional=optional, output_props=output_props)
