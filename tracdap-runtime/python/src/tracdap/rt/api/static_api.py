@@ -369,7 +369,7 @@ def define_table(*fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) -> Sche
     return sa.define_schema(*fields, schema_type=SchemaType.TABLE_SCHEMA, dynamic=False)
 
 
-def define_struct(python_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
+def define_struct(struct_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
 
     """
     Define a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>` from a Python
@@ -384,15 +384,15 @@ def define_struct(python_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
     :py:meth:`get_struct() <tracdap.rt.api.TracContext.get_struct>` and
     :py:meth:`put_struct() <tracdap.rt.api.TracContext.put_struct>`.
 
-    :param python_type: The dataclass or Pydantic model type to build a schema for
+    :param struct_type: The dataclass or Pydantic model type to build a schema for
     :return: A schema definition built from the supplied Python type
 
-    :type python_type: type
+    :type struct_type: type
     :rtype: :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_struct(python_type)
+    return sa.define_struct(struct_type)
 
 
 def define_file_type(extension: str, mime_type: str) -> FileType:
@@ -497,7 +497,7 @@ def define_input_table(
 
 
 def define_input_struct(
-        python_type: _tp.Type[STRUCT_TYPE], *,
+        struct_type: _tp.Type[STRUCT_TYPE], *,
         label: _tp.Optional[str] = None, optional: bool = False,
         input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelInputSchema:
 
@@ -509,20 +509,20 @@ def define_input_struct(
     This method is equivalent to calling :py:func:`define_struct() <tracdap.rt.api.define_struct>`
     and then :py:func:`define_input() <tracdap.rt.api.define_input>`.
 
-    :param python_type: The dataclass or Pydantic model type to build a struct schema for
+    :param struct_type: The dataclass or Pydantic model type to build a struct schema for
     :param label: Human readable label for the model input
     :param optional: Whether this model input is optional (default = False)
     :param input_props: An optional set of user-defined properties to set on the model input
     :return: A valid input schema suitable to return from :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>`
 
-    :type python_type: type
+    :type struct_type: type
     :type label: str | None
     :type optional: bool
     :type input_props: dict[str, any] | None
     :rtype: :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`
     """
 
-    schema = define_struct(python_type)
+    schema = define_struct(struct_type)
     return define_input(schema, label=label, optional=optional, input_props=input_props)
 
 
@@ -591,7 +591,7 @@ def define_output_table(
 
 
 def define_output_struct(
-        python_type: _tp.Type[STRUCT_TYPE], *,
+        struct_type: _tp.Type[STRUCT_TYPE], *,
         label: _tp.Optional[str] = None, optional: bool = False,
         output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelOutputSchema:
 
@@ -603,20 +603,20 @@ def define_output_struct(
     This method is equivalent to calling :py:func:`define_struct() <tracdap.rt.api.define_struct>`
     and then :py:func:`define_output() <tracdap.rt.api.define_output>`.
 
-    :param python_type: The dataclass or Pydantic model type to build a struct schema for
+    :param struct_type: The dataclass or Pydantic model type to build a struct schema for
     :param label: Human readable label for the model output
     :param optional: Whether this model output is optional (default = False)
     :param output_props: An optional set of user-defined properties to set on the model output
     :return: A valid output schema suitable to return from :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`
 
-    :type python_type: type
+    :type struct_type: type
     :type label: str | None
     :type optional: bool
     :type output_props: dict[str, any] | None
     :rtype: :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`
     """
 
-    schema = define_struct(python_type)
+    schema = define_struct(struct_type)
     return define_output(schema, label=label, optional=optional, output_props=output_props)
 
 
