@@ -24,6 +24,7 @@ class CommonFileTypes:
     """
 
     TXT = tracdap.rt.metadata.FileType("txt", "text/plain")
+    MARKDOWN = tracdap.rt.metadata.FileType("md", "text/markdown")
 
     JPG = tracdap.rt.metadata.FileType("jpg", "image/jpeg")
     PNG = tracdap.rt.metadata.FileType("png", "image/png")
@@ -32,6 +33,8 @@ class CommonFileTypes:
     WORD = tracdap.rt.metadata.FileType("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
     EXCEL = tracdap.rt.metadata.FileType("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     POWERPOINT = tracdap.rt.metadata.FileType("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation")
+
+    PDF = tracdap.rt.metadata.FileType("pdf", "application/pdf")
 
 
 # Map basic types into the root of the API package
@@ -59,3 +62,4 @@ DATETIME = tracdap.rt.metadata.BasicType.DATETIME
 
 
 STRUCT_TYPE = _tp.TypeVar('STRUCT_TYPE')
+"""Template type for use with STRUCT data objects, which can be either Python dataclasses or Pydantic models"""
