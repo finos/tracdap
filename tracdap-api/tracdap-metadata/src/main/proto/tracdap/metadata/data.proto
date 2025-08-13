@@ -122,6 +122,8 @@ message SchemaDefinition {
         StructSchema struct = 8;
     }
 
+    // Existing convention using a subclass per schema type
+    // Top level property may be added in future as a convenience
     reserved "fields";
     reserved 5;
 
