@@ -495,7 +495,16 @@ class DevelopmentLayout(BaseLayout):
         storage_dir = self._dev_storage_dir(prior_copy)
         suffix = f"-{file_id.objectVersion}" if file_id.objectVersion > 1 else ""
 
-        return self.__FILE_STORAGE_PATH.format(storage_dir, file_def.name, suffix, file_def.extension.lower())
+        if prior_copy is not None:
+            prior_path = pathlib.Path(prior_copy.storagePath)
+            file_name = prior_path.stem
+            if file_id.objectVersion > 2 and "-" in file_name:
+                file_name = file_name[:file_name.rfind("-")]
+        else:
+            extension_sep = file_def.name.rfind(".")
+            file_name = file_def.name[:extension_sep]
+
+        return self.__FILE_STORAGE_PATH.format(storage_dir, file_name, suffix, file_def.extension.lower())
 
     def _dev_storage_dir(self, prior_copy: _meta.StorageCopy):
 
