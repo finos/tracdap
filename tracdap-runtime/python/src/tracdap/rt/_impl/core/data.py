@@ -342,7 +342,7 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
 
         storage_key = prior_copy.storageKey
         storage_format = file_def.mimeType
-        storage_path = self._file_storage_path(file_id, file_def, prior_copy=None)
+        storage_path = self._file_storage_path(file_id, file_def, prior_copy)
 
         storage_copy = _meta.StorageCopy(
             storageKey=storage_key,
