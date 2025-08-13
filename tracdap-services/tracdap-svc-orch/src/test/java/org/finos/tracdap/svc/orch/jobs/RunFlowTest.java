@@ -924,7 +924,7 @@ public class RunFlowTest {
 
         Assertions.assertEquals("run_flow:run_config", MetadataCodec.decodeStringValue(datasetAttr));
         Assertions.assertEquals(SchemaType.STRUCT_SCHEMA, datasetSchema.getSchemaType());
-        Assertions.assertEquals(4, datasetSchema.getFieldsCount());
+        Assertions.assertEquals(4, datasetSchema.getStruct().getFieldsCount());
 
         log.info("Struct input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
     }
