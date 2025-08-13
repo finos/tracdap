@@ -139,6 +139,7 @@ public class SampleData {
             = SchemaDefinition.newBuilder()
             .setSchemaType(SchemaType.STRUCT_SCHEMA)
             .setPartType(PartType.NOT_PARTITIONED)
+            .setStruct(StructSchema.newBuilder()
             .addFields(FieldSchema.newBuilder()
                     .setFieldName("boolField")
                     .setFieldType(BasicType.BOOLEAN)
@@ -232,10 +233,11 @@ public class SampleData {
                     .addChildren(FieldSchema.newBuilder()
                             .setFieldType(BasicType.STRUCT)
                             .setNamedType("DataClassSubStruct")
-                            .setNotNull(true)))
+                            .setNotNull(true))))
             .putNamedTypes("DataClassSubStruct", SchemaDefinition.newBuilder()
                     .setSchemaType(SchemaType.STRUCT_SCHEMA)
                     .setPartType(PartType.NOT_PARTITIONED)
+                    .setStruct(StructSchema.newBuilder()
                     .addFields(FieldSchema.newBuilder()
                             .setFieldName("field1")
                             .setFieldType(BasicType.STRING)
@@ -249,7 +251,7 @@ public class SampleData {
                             .setFieldType(BasicType.STRING)
                             .setCategorical(true)
                             .setNotNull(true)
-                            .setNamedEnum("ExampleEnum"))
+                            .setNamedEnum("ExampleEnum")))
                     .build())
             .putNamedEnums("ExampleEnum", EnumValues.newBuilder()
                     .addValues("RED")
@@ -336,7 +338,7 @@ public class SampleData {
         var nRows = schema.getSchemaType() == SchemaType.STRUCT_SCHEMA ? 1 : 10;
         var fields = schema.getSchemaType() == SchemaType.TABLE_SCHEMA
                 ? schema.getTable().getFieldsList()
-                : schema.getFieldsList();
+                : schema.getStruct().getFieldsList();
 
         var javaData = new ArrayList<Map<String, Object>>();
 
@@ -401,7 +403,7 @@ public class SampleData {
         if (field.getFieldType() == BasicType.STRUCT) {
 
             var structFields = field.hasNamedType()
-                    ? schema.getNamedTypesOrThrow(field.getNamedType()).getFieldsList()
+                    ? schema.getNamedTypesOrThrow(field.getNamedType()).getStruct().getFieldsList()
                     : field.getChildrenList();
 
             var struct = new HashMap<String, Object>(n);
