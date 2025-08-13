@@ -23,6 +23,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.config_parser as _cfg_p
+import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.storage as _storage
@@ -993,6 +994,16 @@ class DevModeTranslator:
 
             next_version = version + 1
             next_name = f"{orig_path.stem}-{next_version}{orig_path.suffix}"
+
+        if version == 0 and not "/" in storage_path and not "\\" in storage_path:
+            try:
+                default_storage_path = _data.DevelopmentLayout.DEFAULT_DEV_OUTPUT_DIR + "/" + storage_path
+                _path, _ver = self._find_latest_version(storage_key, default_storage_path)
+                if _ver > 1:
+                    storage_path = _path
+                    version = _ver
+            except:
+                pass
 
         return storage_path, version
 
