@@ -72,6 +72,10 @@ message FieldSchema {
     repeated FieldSchema children = 12;
 }
 
+
+/**
+ * Values for a named enum in a dataset
+ */
 message EnumValues {
 
     repeated string values = 1;
@@ -86,6 +90,13 @@ message TableSchema {
 }
 
 
+/**
+ * Schema for a structured object dataset
+ */
+message StructSchema {
+
+    repeated FieldSchema fields = 1;
+}
 
 
 /**
@@ -108,9 +119,11 @@ message SchemaDefinition {
     oneof schemaDetails {
 
         TableSchema table = 3;
+        StructSchema struct = 8;
     }
 
-    repeated FieldSchema fields = 5;
+    reserved "fields";
+    reserved 5;
 
     map<string, SchemaDefinition> namedTypes = 6;
 
