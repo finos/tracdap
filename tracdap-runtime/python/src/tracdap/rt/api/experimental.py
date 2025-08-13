@@ -70,8 +70,6 @@ PANDAS = DataFramework.pandas()
 POLARS = DataFramework.polars()
 """Data framework constant for the Polars data library"""
 
-STRUCT_TYPE = _tp.TypeVar('STRUCT_TYPE')
-
 
 class TracContext(TracContext):
 
@@ -82,14 +80,6 @@ class TracContext(TracContext):
 
     @_abc.abstractmethod
     def put_table(self, dataset_name: str, dataset: DATA_API):
-
-        pass
-
-    def get_struct(self, struct_name: str, python_class: _tp.Type[STRUCT_TYPE]) -> STRUCT_TYPE:
-
-        pass
-
-    def put_struct(self, struct_name: str, struct_data: STRUCT_TYPE):
 
         pass
 
@@ -116,28 +106,6 @@ def map_type(entry_type: BasicType) -> TypeDescriptor:
     """Build a type descriptor for a MAP type"""
     sa = _StaticApiHook.get_instance()
     return sa.map_type(entry_type)
-
-
-def define_struct(python_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
-    """Build schema definition for a STRUCT"""
-    sa = _StaticApiHook.get_instance()
-    return sa.define_struct(python_type)
-
-def define_input_struct(
-        python_type: _tp.Type[STRUCT_TYPE], *,
-        label: _tp.Optional[str] = None, optional: bool = False,
-        input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelInputSchema:
-
-    schema = define_struct(python_type)
-    return define_input(schema, label=label, optional=optional, input_props=input_props)
-
-def define_output_struct(
-        python_type: _tp.Type[STRUCT_TYPE], *,
-        label: _tp.Optional[str] = None, optional: bool = False,
-        output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelOutputSchema:
-
-    schema = define_struct(python_type)
-    return define_output(schema, label=label, optional=optional, output_props=output_props)
 
 
 class FileType(_enum.Enum):

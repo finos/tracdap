@@ -18,6 +18,8 @@ import dataclasses as _dc
 import typing as _tp
 import logging as _logging
 
+from .constants import STRUCT_TYPE  # DOCGEN_REMOVE
+
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
@@ -165,7 +167,7 @@ class TracContext(metaclass=_abc.ABCMeta):
             -> "pandas.DataFrame":
 
         """
-        Get the data for a model input or output as a Pandas dataframe.
+        Get the data for a model input as a Pandas dataframe.
 
         Model inputs can be accessed as Pandas dataframes using this method.
         The TRAC runtime will handle fetching data from storage and apply any necessary
@@ -187,7 +189,7 @@ class TracContext(metaclass=_abc.ABCMeta):
         exists in the job config and is used by other models. Attempting to retrieve
         an output before it has been saved will also cause a validation error.
 
-        :param dataset_name: The name of the model input or output to get data for
+        :param dataset_name: The name of the model input to get data for
         :param use_temporal_objects: Use Python objects for date/time fields instead of the NumPy *datetime64* type
         :return: A pandas dataframe containing the data for the named dataset
         :type dataset_name: str
@@ -200,15 +202,42 @@ class TracContext(metaclass=_abc.ABCMeta):
     def get_polars_table(self, dataset_name: str) -> "polars.DataFrame":
 
         """
-        Get the data for a model input or output as a Polars dataframe.
+        Get the data for a model input as a Polars dataframe.
 
         This method has equivalent semantics to :py:meth:`get_pandas_table`, but returns
         a Polars dataframe.
 
-        :param dataset_name: The name of the model input or output to get data for
+        :param dataset_name: The name of the model input to get data for
         :return: A polars dataframe containing the data for the named dataset
         :type dataset_name: str
         :rtype: :py:class:`polars.DataFrame`
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
+
+        pass
+
+    def get_struct(self, struct_name: str, struct_type: _tp.Type[STRUCT_TYPE]) -> STRUCT_TYPE:
+
+        """
+        Get the data for a model input as a dataclass or Pydantic model.
+
+        The input must be defined using a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>`
+        and the type supplied as ``struct_type`` must match that schema.
+        TRAC will return an object of the requested class.
+
+        .. note::
+            The type specified by ``struct_type`` does not need to be the same one used in
+            :py:func:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>`, so long
+            as the schema is compatible TRAC will perform the conversion. In practice,
+            models should normally use the same type in both places.
+
+        :param struct_name: The name of the model input to get data for
+        :param struct_type: A dataclass or Pydantic model type to use for the result
+        :return: A python object matching the type of ``struct_type``
+
+        :type struct_name: str
+        :type struct_type: Type[STRUCT_TYPE]
+        :rtype: STRUCT_TYPE
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
@@ -332,6 +361,29 @@ class TracContext(metaclass=_abc.ABCMeta):
         :type dataset: :py:class:`polars.DataFrame`
         :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`,
                  :py:class:`EDataConformance <tracdap.rt.exceptions.EDataConformance>`
+        """
+
+        pass
+
+    def put_struct(self, struct_name: str, struct_data: STRUCT_TYPE):
+
+        """
+        Save the data for a model output as a dataclass or Pydantic model.
+
+        The output must be defined using a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>`.
+        TRAC will validate the supplied object against the schema before saving.
+
+        .. note::
+            The object saved by this method can be loaded in other models as
+            the same ``STRUCT_TYPE`` or another compatible type. It is also
+            available through the platform as data in a variety of formats.
+
+        :param struct_name: The name of the model output to save data for
+        :param struct_data: A dataclass or Pydantic model to save as the output
+
+        :type struct_name: str
+        :type struct_data: STRUCT_TYPE
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
         """
 
         pass
