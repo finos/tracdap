@@ -127,9 +127,10 @@ public class SchemaMapping {
         if (tracSchema.getNamedEnumsCount() > 0)
             processNamedEnums(tracSchema, allocator);
 
-        var tracFields = tracSchema.getSchemaType() == SchemaType.TABLE_SCHEMA && tracSchema.getFieldsCount() == 0
-                ? tracSchema.getTable().getFieldsList()
-                : tracSchema.getFieldsList();
+        var tracFields =
+                tracSchema.getSchemaType() == SchemaType.TABLE_SCHEMA ? tracSchema.getTable().getFieldsList() :
+                tracSchema.getSchemaType() == SchemaType.STRUCT_SCHEMA ? tracSchema.getStruct().getFieldsList() :
+                List.<FieldSchema>of();
 
         if (tracFields.isEmpty()) {
             throw new EValidationGap("Schema contains no fields");
@@ -263,9 +264,9 @@ public class SchemaMapping {
             }
 
             var childSchema = topLevelSchema.getNamedTypesOrThrow(tracField.getNamedType());
-            var childFields = new ArrayList<Field>(childSchema.getFieldsCount());
+            var childFields = new ArrayList<Field>(childSchema.getStruct().getFieldsCount());
 
-            for (var tracChildField : childSchema.getFieldsList()) {
+            for (var tracChildField : childSchema.getStruct().getFieldsList()) {
                 var arrowChildField = tracToArrowField(tracChildField);
                 childFields.add(arrowChildField);
             }

@@ -34,7 +34,8 @@ import java.util.stream.Collectors;
 public class SchemaValidator {
 
     private static final Map<SchemaDefinition.SchemaDetailsCase, SchemaType> SCHEMA_TYPE_CASE_MAPPING = Map.ofEntries(
-            Map.entry(SchemaDefinition.SchemaDetailsCase.TABLE, SchemaType.TABLE_SCHEMA));
+            Map.entry(SchemaDefinition.SchemaDetailsCase.TABLE, SchemaType.TABLE_SCHEMA),
+            Map.entry(SchemaDefinition.SchemaDetailsCase.STRUCT, SchemaType.STRUCT_SCHEMA));
 
     private static final List<BasicType> ALLOWED_BUSINESS_KEY_TYPES = List.of(
             BasicType.STRING, BasicType.INTEGER, BasicType.DATE);
@@ -46,14 +47,17 @@ public class SchemaValidator {
 
     private static final Descriptors.Descriptor SCHEMA_DEFINITION;
     private static final Descriptors.FieldDescriptor SD_SCHEMA_TYPE;
-    private static final Descriptors.FieldDescriptor SD_FIELDS;
     private static final Descriptors.FieldDescriptor SD_NAMED_TYPES;
     private static final Descriptors.FieldDescriptor SD_NAMED_ENUMS;
     private static final Descriptors.OneofDescriptor SD_SCHEMA_DETAILS;
     private static final Descriptors.FieldDescriptor SD_TABLE;
+    private static final Descriptors.FieldDescriptor SD_STRUCT;
 
     private static final Descriptors.Descriptor TABLE_SCHEMA;
     private static final Descriptors.FieldDescriptor TS_FIELDS;
+
+    private static final Descriptors.Descriptor STRUCT_SCHEMA;
+    private static final Descriptors.FieldDescriptor SS_FIELDS;
 
     private static final Descriptors.Descriptor FIELD_SCHEMA;
     private static final Descriptors.FieldDescriptor FS_FIELD_NAME;
@@ -73,14 +77,17 @@ public class SchemaValidator {
 
         SCHEMA_DEFINITION = SchemaDefinition.getDescriptor();
         SD_SCHEMA_TYPE = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.SCHEMATYPE_FIELD_NUMBER);
-        SD_FIELDS = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.FIELDS_FIELD_NUMBER);
         SD_NAMED_TYPES = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.NAMEDTYPES_FIELD_NUMBER);
         SD_NAMED_ENUMS = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.NAMEDENUMS_FIELD_NUMBER);
         SD_TABLE = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.TABLE_FIELD_NUMBER);
+        SD_STRUCT = ValidatorUtils.field(SCHEMA_DEFINITION, SchemaDefinition.STRUCT_FIELD_NUMBER);
         SD_SCHEMA_DETAILS = SD_TABLE.getContainingOneof();
 
         TABLE_SCHEMA = TableSchema.getDescriptor();
         TS_FIELDS = ValidatorUtils.field(TABLE_SCHEMA, TableSchema.FIELDS_FIELD_NUMBER);
+
+        STRUCT_SCHEMA = StructSchema.getDescriptor();
+        SS_FIELDS = ValidatorUtils.field(STRUCT_SCHEMA, StructSchema.FIELDS_FIELD_NUMBER);
 
         FIELD_SCHEMA = FieldSchema.getDescriptor();
         FS_FIELD_NAME = ValidatorUtils.field(FIELD_SCHEMA, FieldSchema.FIELDNAME_FIELD_NUMBER);
@@ -106,10 +113,6 @@ public class SchemaValidator {
         // For dynamic schemas, schema details must not be included
 
         ctx = ctx.pushOneOf(SD_SCHEMA_DETAILS)
-                .apply(CommonValidators::omitted)
-                .pop();
-
-        ctx = ctx.pushRepeated(SD_FIELDS)
                 .apply(CommonValidators::omitted)
                 .pop();
 
@@ -167,25 +170,13 @@ public class SchemaValidator {
                     .pop();
         }
 
-        if (schema.getSchemaType() == SchemaType.TABLE_SCHEMA) {
-
-            // Otherwise apply the regular validator
-
-            ctx = ctx.pushOneOf(SD_SCHEMA_DETAILS)
-                    .apply(CommonValidators::required)
-                    .apply(SchemaValidator::schemaMatchesType)
-                    .apply(SchemaValidator::tableSchema, TableSchema.class, parentSchema)
-                    .applyRegistered()
-                    .pop();
-        }
-
-        else {
-
-            ctx = ctx.pushRepeated(SD_FIELDS)
-                    .apply(CommonValidators::listNotEmpty)
-                    .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class, parentSchema)
-                    .pop();
-        }
+        ctx = ctx.pushOneOf(SD_SCHEMA_DETAILS)
+                .apply(CommonValidators::required)
+                .apply(SchemaValidator::schemaMatchesType)
+                .applyRegistered()
+                .applyIf(schema.getSchemaType() == SchemaType.TABLE_SCHEMA, SchemaValidator::tableSchema, TableSchema.class, parentSchema)
+                .applyIf(schema.getSchemaType() == SchemaType.STRUCT_SCHEMA, SchemaValidator::structSchema, StructSchema.class, parentSchema)
+                .pop();
 
         return ctx;
     }
@@ -223,6 +214,27 @@ public class SchemaValidator {
     public static ValidationContext tableSchema(TableSchema table, SchemaDefinition root, ValidationContext ctx) {
 
         ctx = ctx.pushRepeated(TS_FIELDS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class, root)
+                .pop();
+
+        return fieldNamesAndOrdering(table.getFieldsList(), ctx);
+    }
+
+    @Validator
+    public static ValidationContext structSchema(StructSchema table, ValidationContext ctx) {
+
+        ctx = ctx.pushRepeated(SS_FIELDS)
+                .apply(CommonValidators::listNotEmpty)
+                .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class)
+                .pop();
+
+        return fieldNamesAndOrdering(table.getFieldsList(), ctx);
+    }
+
+    public static ValidationContext structSchema(StructSchema table, SchemaDefinition root, ValidationContext ctx) {
+
+        ctx = ctx.pushRepeated(SS_FIELDS)
                 .apply(CommonValidators::listNotEmpty)
                 .applyRepeated(SchemaValidator::fieldSchema, FieldSchema.class, root)
                 .pop();
