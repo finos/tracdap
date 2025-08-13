@@ -26,25 +26,25 @@ ext {
     license_check_plugin_version = "2.8"
 
     // Core platform technologies
-    netty_version = '4.1.118.Final'
+    netty_version = '4.1.123.Final'
     guava_version = '33.4.8-jre'
     gson_version = '2.13.1'
     proto_version = '4.31.1'
-    grpc_version = '1.70.0'
-    gapi_version = '2.51.0'
+    grpc_version = '1.74.0'
+    gapi_version = '2.60.0'
 
     // Data technologies
-    arrow_version = '18.1.0'
-    jackson_version = '2.18.2'
-    jackson_databind_version = '2.18.2'
+    arrow_version = '18.3.0'
+    jackson_version = '2.19.2'
+    jackson_databind_version = '2.19.2'
 
     // Util libraries
-    slf4j_version = '2.0.16'
-    log4j_version = '2.24.0'
+    slf4j_version = '2.0.17'
+    log4j_version = '2.25.1'
     commons_cli_version = "1.9.0"
 
     // SQL (JDBC) drivers
-    h2_version = '2.2.224'
+    h2_version = '2.3.232'
     h2_compat_version = '2.1.214'
     mysql_version = '8.4.0'
     mariadb_version = '3.4.0'
@@ -53,7 +53,7 @@ ext {
     oracle_version = '19.22.0.0'
 
     // JDBC Connection pool
-    hikari_cp_version = '5.1.0'
+    hikari_cp_version = '7.0.1'
 
     // Flyway (database deploy tool)
     // Flyway 10.x series no longer supports Java 11
