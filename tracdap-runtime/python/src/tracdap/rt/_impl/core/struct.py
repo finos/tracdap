@@ -155,11 +155,13 @@ class StructProcessor:
 
             if len(type_stack) == 1:
                 return _meta.SchemaDefinition(
-                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields,
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA,
+                    struct=_meta.StructSchema(fields=trac_fields),
                     namedTypes=named_types, namedEnums=named_enums)
             else:
                 return _meta.SchemaDefinition(
-                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA,
+                    struct=_meta.StructSchema(fields=trac_fields))
 
         finally:
 
@@ -196,11 +198,13 @@ class StructProcessor:
 
             if len(type_stack) == 1:
                 return _meta.SchemaDefinition(
-                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields,
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA,
+                    struct=_meta.StructSchema(fields=trac_fields),
                     namedTypes=named_types, namedEnums=named_enums)
             else:
                 return _meta.SchemaDefinition(
-                    schemaType=_meta.SchemaType.STRUCT_SCHEMA, fields=trac_fields)
+                    schemaType=_meta.SchemaType.STRUCT_SCHEMA,
+                    struct=_meta.StructSchema(fields=trac_fields))
 
         finally:
 
@@ -439,7 +443,7 @@ class StructConformance:
         conformance = StructConformance()
         root_location = ""
 
-        conformed_value = conformance._conform_struct_fields(root_location, raw_data, schema.fields, schema)
+        conformed_value = conformance._conform_struct_fields(root_location, raw_data, schema.struct.fields, schema)
 
         if any(conformance._errors):
 
@@ -579,7 +583,7 @@ class StructConformance:
             if trac_field.namedType not in trac_schema.namedTypes:
                 return self._error(location, f"Invalid schema (named type [{trac_field.namedType}] is not defined")
             struct_type = trac_schema.namedTypes[trac_field.namedType]
-            struct_fields = struct_type.fields
+            struct_fields = struct_type.struct.fields
         else:
             struct_fields = trac_field.children
 
