@@ -10,4 +10,4 @@ job:
       account_filter: "inputs/account_filter.csv"
 
     outputs:
-      data_report: "outputs/data_report.md"
+      data_report: "outputs/runtime_metadata/data_report.md"

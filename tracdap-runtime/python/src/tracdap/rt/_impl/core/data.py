@@ -342,7 +342,7 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
 
         storage_key = prior_copy.storageKey
         storage_format = file_def.mimeType
-        storage_path = self._file_storage_path(file_id, file_def, prior_copy=None)
+        storage_path = self._file_storage_path(file_id, file_def, prior_copy)
 
         storage_copy = _meta.StorageCopy(
             storageKey=storage_key,
@@ -464,7 +464,7 @@ class ObjectIdLayout(BaseLayout):
 
 class DevelopmentLayout(BaseLayout):
 
-    __DEFAULT_OUTPUT_DIR = "Dev Outputs"
+    DEFAULT_DEV_OUTPUT_DIR = "Dev Outputs"
 
     __DATA_STORAGE_PATH = "{}/{}{}.{}"
     __FILE_STORAGE_PATH = "{}/{}{}.{}"
@@ -495,19 +495,28 @@ class DevelopmentLayout(BaseLayout):
         storage_dir = self._dev_storage_dir(prior_copy)
         suffix = f"-{file_id.objectVersion}" if file_id.objectVersion > 1 else ""
 
-        return self.__FILE_STORAGE_PATH.format(storage_dir, file_def.name, suffix, file_def.extension.lower())
+        if prior_copy is not None:
+            prior_path = pathlib.Path(prior_copy.storagePath)
+            file_name = prior_path.stem
+            if file_id.objectVersion > 2 and "-" in file_name:
+                file_name = file_name[:file_name.rfind("-")]
+        else:
+            extension_sep = file_def.name.rfind(".")
+            file_name = file_def.name[:extension_sep]
+
+        return self.__FILE_STORAGE_PATH.format(storage_dir, file_name, suffix, file_def.extension.lower())
 
     def _dev_storage_dir(self, prior_copy: _meta.StorageCopy):
 
         if prior_copy is None:
-            return self.__DEFAULT_OUTPUT_DIR
+            return self.DEFAULT_DEV_OUTPUT_DIR
 
         prior_path = pathlib.Path(prior_copy.storagePath)
 
         if len(prior_path.parts) > 1:
             return prior_path.parent
         else:
-            return self.__DEFAULT_OUTPUT_DIR
+            return self.DEFAULT_DEV_OUTPUT_DIR
 
 
 def build_data_spec(
