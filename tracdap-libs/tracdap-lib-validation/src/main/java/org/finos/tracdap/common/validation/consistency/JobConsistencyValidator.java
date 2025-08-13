@@ -568,11 +568,11 @@ public class JobConsistencyValidator {
 
         var suppliedFields = requiredSchema.getSchemaType() == SchemaType.TABLE_SCHEMA
                 ? suppliedSchema.getTable().getFieldsList()
-                : suppliedSchema.getFieldsList();
+                : suppliedSchema.getStruct().getFieldsList();
 
         var requiredFields = suppliedSchema.getSchemaType() == SchemaType.TABLE_SCHEMA
                 ? requiredSchema.getTable().getFieldsList()
-                : requiredSchema.getFieldsList();
+                : requiredSchema.getStruct().getFieldsList();
 
         return checkFieldSchemas(
                 suppliedFields, suppliedSchema,
@@ -713,11 +713,11 @@ public class JobConsistencyValidator {
                 throw new EValidationGap(String.format("Job contains an invalid schema: Missing named type [%s]", requiredField.getNamedType()));
 
             var suppliedChildren = suppliedField.hasNamedType()
-                    ? suppliedRootSchema.getNamedTypesOrThrow(suppliedField.getNamedType()).getFieldsList()
+                    ? suppliedRootSchema.getNamedTypesOrThrow(suppliedField.getNamedType()).getStruct().getFieldsList()
                     : requiredField.getChildrenList();
 
             var requiredChildren =  requiredField.hasNamedType()
-                    ? requiredRootSchema.getNamedTypesOrThrow(requiredField.getNamedType()).getFieldsList()
+                    ? requiredRootSchema.getNamedTypesOrThrow(requiredField.getNamedType()).getStruct().getFieldsList()
                     : requiredField.getChildrenList();
 
             return checkFieldSchemas(

@@ -192,19 +192,18 @@ public class ObjectUpdateLogic {
                 .setValue(MetadataCodec.encodeValue(tracSchema.getSchemaType().name()))
                 .build());
 
-        if (tracSchema.getSchemaType() == SchemaType.TABLE_SCHEMA &&
-            tracSchema.getTable().getFieldsCount() > 0) {
+        if (tracSchema.getSchemaType() == SchemaType.TABLE_SCHEMA) {
 
             schemaAttrs.add(TagUpdate.newBuilder()
                     .setAttrName(MetadataConstants.TRAC_SCHEMA_FIELD_COUNT_ATTR)
                     .setValue(MetadataCodec.encodeValue(tracSchema.getTable().getFieldsCount()))
                     .build());
         }
-        else {
+        else if (tracSchema.getSchemaType() == SchemaType.STRUCT_SCHEMA) {
 
             schemaAttrs.add(TagUpdate.newBuilder()
                     .setAttrName(MetadataConstants.TRAC_SCHEMA_FIELD_COUNT_ATTR)
-                    .setValue(MetadataCodec.encodeValue(tracSchema.getFieldsCount()))
+                    .setValue(MetadataCodec.encodeValue(tracSchema.getStruct().getFieldsCount()))
                     .build());
         }
 
