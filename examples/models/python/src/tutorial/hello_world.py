@@ -23,8 +23,8 @@ class HelloWorldModel(trac.TracModel):
 
         return trac.define_parameters(
             trac.P(
-                "meaning_of_life", trac.INTEGER,
-                label="The answer to the ultimate question of life, the universe and everything"))
+                "input_number", trac.INTEGER,
+                label="An integer parameter supplied to the model"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
         return {}
@@ -36,8 +36,8 @@ class HelloWorldModel(trac.TracModel):
 
         ctx.log().info("Hello world model is running")
 
-        meaning_of_life = ctx.get_parameter("meaning_of_life")
-        ctx.log().info(f"The meaning of life is {meaning_of_life}")
+        input_number = ctx.get_parameter("input_number")
+        ctx.log().info(f"The input number is {input_number}")
 
 
 if __name__ == "__main__":

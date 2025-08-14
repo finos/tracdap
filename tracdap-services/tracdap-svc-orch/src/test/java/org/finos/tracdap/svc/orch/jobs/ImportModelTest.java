@@ -90,7 +90,7 @@ public abstract class ImportModelTest {
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.schema_files.SchemaFilesModel")
+                .setEntryPoint("tutorial.schema_files.PnlAggregationSchemas")
                 .setVersion(modelVersion)
                 .build();
 
@@ -110,18 +110,10 @@ public abstract class ImportModelTest {
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
         Assertions.assertEquals("import_model:schema_files", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("tutorial.schema_files.SchemaFilesModel", modelDef.getEntryPoint());
+        Assertions.assertEquals("tutorial.schema_files.PnlAggregationSchemas", modelDef.getEntryPoint());
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
-
-        var descriptionAttr = modelTag.getAttrsOrThrow("model_description");
-        var segmentAttr = modelTag.getAttrsOrThrow("business_segment");
-        var classifiersAttr = modelTag.getAttrsOrThrow("classifiers");
-
-        Assertions.assertInstanceOf(String.class, MetadataCodec.decodeValue(descriptionAttr));
-        Assertions.assertEquals("retail_products", MetadataCodec.decodeValue(segmentAttr));
-        Assertions.assertEquals(List.of("loans", "uk", "examples"), MetadataCodec.decodeArrayValue(classifiersAttr));
     }
 
     // Let other tests in this suite use this to import models

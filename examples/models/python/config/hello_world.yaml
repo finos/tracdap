@@ -3,4 +3,4 @@ job:
   runModel:
 
     parameters:
-      meaning_of_life: 42
+      input_number: 42

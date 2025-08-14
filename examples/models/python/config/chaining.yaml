@@ -5,17 +5,17 @@ job:
     flow: ./chaining_flow.yaml
 
     parameters:
-      param_1: 42
-      param_2: "2015-01-01"
-      param_3: 1.5
+      eur_usd_rate: 1.2071
+      default_weighting: 1.5
+      filter_defaults: false
+      filter_region: munster
 
     inputs:
       customer_loans: "inputs/loan_final313_100.csv"
-      currency_data: "inputs/currency_data_sample.csv"
 
     outputs:
       profit_by_region: "outputs/chaining/profit_by_region.csv"
 
     models:
-      model_1: tutorial.model_1.FirstModel
-      model_2: tutorial.model_2.SecondModel
+      customer_data_filter: tutorial.chaining.CustomerDataFilter
+      pnl_aggregation: tutorial.using_data.PnlAggregation

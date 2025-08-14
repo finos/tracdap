@@ -4,18 +4,21 @@ nodes:
   customer_loans:
     nodeType: "INPUT_NODE"
 
-  currency_data:
-    nodeType: "INPUT_NODE"
-
-  model_1:
+  customer_data_filter:
     nodeType: "MODEL_NODE"
-    inputs: [customer_loans, currency_data]
-    outputs: [preprocessed_data]
+    inputs: [customer_loans]
+    outputs: [filtered_loans]
 
-  model_2:
+  pnl_aggregation:
     nodeType: "MODEL_NODE"
-    inputs: [preprocessed_data]
+    inputs: [customer_loans]
     outputs: [profit_by_region]
 
   profit_by_region:
     nodeType: "OUTPUT_NODE"
+
+
+edges:
+
+  - source: { node: customer_data_filter, socket: filtered_loans }
+    target: { node: pnl_aggregation, socket: customer_loans }

@@ -13,45 +13,43 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import datetime as dt
-import decimal
+import tracdap.rt.api as trac
 import typing as tp
 
-import pandas as pd
-
-import tracdap.rt.api as trac
+import tutorial.schemas as schemas
 
 
-class SecondModel(trac.TracModel):
+class CustomerDataFilter(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
         return trac.define_parameters(
-            trac.P("param_2", trac.DATE, "A data parameter", default_value=dt.date(2000, 1, 1)),
-            trac.P("param_3", trac.FLOAT, "A float parameter"))
+            trac.P("filter_region", trac.STRING, label="Filter region"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        preprocessed = trac.define_input_table(
-            trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
-            trac.F("some_quantity_x", trac.FLOAT, label="Some quantity X"))
+        customer_loans_schema = trac.load_schema(schemas, "customer_loans.csv")
+        customer_loans = trac.define_input(customer_loans_schema, label="Unfiltered loans data")
 
-        return {"preprocessed_data": preprocessed}
+        return { "customer_loans": customer_loans }
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        profit_by_region = trac.define_output_table(
-            trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.FLOAT, label="Total gross profit"))
+        customer_loans_schema = trac.load_schema(schemas, "customer_loans.csv")
+        filtered_loans = trac.define_output(customer_loans_schema, label="Filtered loans data")
 
-        return {"profit_by_region": profit_by_region}
+        return { "filtered_loans": filtered_loans }
 
     def run_model(self, ctx: trac.TracContext):
 
-        preproc = ctx.get_pandas_table("preprocessed_data")
+        customer_loans = ctx.get_pandas_table("customer_loans")
+        filter_region = ctx.get_parameter("filter_region")
 
-        profit_by_region = pd.DataFrame(data={
-            "region": ["uk", "us"],
-            "gross_profit": [24000000.0, 13000000.0]})
+        filtered_loans = customer_loans[customer_loans["region"] != filter_region]
 
-        ctx.put_pandas_table("profit_by_region", profit_by_region)
+        ctx.put_pandas_table("filtered_loans", filtered_loans)
+
+
+if __name__ == "__main__":
+    import tracdap.rt.launch as launch
+    launch.launch_job("config/chaining.yaml", "config/sys_config.yaml")

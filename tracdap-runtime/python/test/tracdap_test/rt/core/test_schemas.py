@@ -34,7 +34,7 @@ class RunModelGuard(trac.TracModel):
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
         return trac.define_parameters(
-            trac.P("meaning_of_life", trac.FLOAT, "Sample parameter from hello world model"))
+            trac.P("input_number", trac.FLOAT, "Sample parameter from hello world model"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
         return {}

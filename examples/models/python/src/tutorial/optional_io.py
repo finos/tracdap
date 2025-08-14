@@ -44,8 +44,8 @@ class OptionalIOModel(trac.TracModel):
         account_filter = trac.load_schema(schemas, "account_filter.csv")
 
         return {
-            "customer_loans": trac.ModelInputSchema(customer_loans),
-            "account_filter": trac.ModelInputSchema(account_filter, optional=True)
+            "customer_loans": trac.define_input(customer_loans),
+            "account_filter": trac.define_input(account_filter, optional=True)
         }
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:

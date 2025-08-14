@@ -20,15 +20,7 @@ import tutorial.using_data as using_data
 import tutorial.schemas as schemas
 
 
-class SchemaFilesModel(trac.TracModel):
-
-    def define_attributes(self) -> tp.List[trac.TagUpdate]:
-
-        return trac.define_attributes(
-            trac.A("model_description", "A example model, for testing purposes"),
-            trac.A("business_segment", "retail_products", categorical=True),
-            trac.A("classifiers", ["loans", "uk", "examples"], attr_type=trac.STRING)
-        )
+class PnlAggregationSchemas(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -46,15 +38,17 @@ class SchemaFilesModel(trac.TracModel):
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
 
-        customer_loans = trac.load_schema(schemas, "customer_loans.csv")
+        customer_loans_schema = trac.load_schema(schemas, "customer_loans.csv")
+        customer_loans = trac.define_input(customer_loans_schema, label="Customer loans data")
 
-        return {"customer_loans": trac.ModelInputSchema(customer_loans)}
+        return {"customer_loans": customer_loans}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
-        profit_by_region = trac.load_schema(schemas, "profit_by_region.csv")
+        profit_by_region_schema = trac.load_schema(schemas, "profit_by_region.csv")
+        profit_by_region = trac.define_output(profit_by_region_schema, label="Profit by region")
 
-        return {"profit_by_region": trac.ModelOutputSchema(profit_by_region)}
+        return {"profit_by_region": profit_by_region}
 
     def run_model(self, ctx: trac.TracContext):
 
@@ -73,4 +67,4 @@ class SchemaFilesModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(SchemaFilesModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(PnlAggregationSchemas, "config/using_data.yaml", "config/sys_config.yaml")

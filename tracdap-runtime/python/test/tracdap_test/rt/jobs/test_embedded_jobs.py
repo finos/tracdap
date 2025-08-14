@@ -56,7 +56,7 @@ class EmbeddedJobsTest(unittest.TestCase):
                 jobType=meta.JobType.IMPORT_MODEL,
                 importModel=meta.ImportModelJob(
                     language="python", repository="tutorials", path="src",
-                    entryPoint="tutorial.using_data.UsingDataModel", version="N/A")))
+                    entryPoint="tutorial.using_data.PnlAggregation", version="N/A")))
 
         with embed.create_runtime(sys_config) as rt:
 

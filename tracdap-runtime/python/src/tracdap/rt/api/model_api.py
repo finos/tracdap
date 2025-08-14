@@ -245,9 +245,42 @@ class TracContext(metaclass=_abc.ABCMeta):
 
     def get_file(self, file_name: str) -> bytes:
 
+        """
+        Get the data for a file input as bytes.
+
+        A file input can be defined using :py:func:define_input_file() <tracdap.rt.api.define_input_file>,
+        specifying a mime type and file extension. TRAC guarantees that the recorded mime type and extension
+        of the supplied file match this requirement, but does not guarantee anything about the content of the file.
+
+        :param file_name: The name of the model input to get
+        :return: The bytes for the given file input
+
+        :type file_name: str
+        :rtype: bytes
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
+
         pass
 
     def get_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
+
+        """
+        Get the data for a file input from a readable binary stream.
+
+        A file input can be defined using :py:func:define_input_file() <tracdap.rt.api.define_input_file>,
+        specifying a mime type and file extension. TRAC guarantees that the recorded mime type and extension
+        of the supplied file match this requirement, but does not guarantee anything about the content of the file.
+
+        The stream must be used in a ``with`` block, other patterns are not supported and may
+        result in a runtime validation error.
+
+        :param file_name: The name of the model input to get
+        :return: A readable binary stream for the given file input
+
+        :type file_name: str
+        :rtype: ContextManager[BinaryIO]
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
 
         pass
 
@@ -390,9 +423,42 @@ class TracContext(metaclass=_abc.ABCMeta):
 
     def put_file(self, file_name: str, file_content: _tp.Union[bytes, bytearray]):
 
+        """
+        Save the data for a file output as bytes.
+
+        A file output can be defined using :py:func:define_output_file() <tracdap.rt.api.define_output_file>,
+        specifying a mime type and file extension. TRAC will associate the mime type and extension with
+        the newly created file object, but does not guarantee anything about the content of the file.
+
+        :param file_name: The name of the model output to save
+        :param file_content: The bytes for the given file output
+
+        :type file_name: str
+        :type file_content: bytes
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
+
         pass
 
     def put_file_stream(self, file_name: str) -> _tp.ContextManager[_tp.BinaryIO]:
+
+        """
+        Save the data for a file output to a writable binary stream.
+
+        A file output can be defined using :py:func:define_output_file() <tracdap.rt.api.define_output_file>,
+        specifying a mime type and file extension. TRAC will associate the mime type and extension with
+        the newly created file object, but does not guarantee anything about the content of the file.
+
+        The stream must be used in a ``with`` block, other patterns are not supported and may
+        result in a runtime validation error.
+
+        :param file_name: The name of the model output to save
+        :return: A writable binary stream for the given file output
+
+        :type file_name: str
+        :rtype: ContextManager[BinaryIO]
+        :raises: :py:class:`ERuntimeValidation <tracdap.rt.exceptions.ERuntimeValidation>`
+        """
 
         pass
 

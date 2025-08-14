@@ -49,7 +49,7 @@ def calculate_profit_by_region(
     return profit_by_region
 
 
-class UsingDataModel(trac.TracModel):
+class PnlAggregation(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -72,7 +72,8 @@ class UsingDataModel(trac.TracModel):
             trac.F("loan_amount", trac.DECIMAL, label="Principal loan amount"),
             trac.F("total_pymnt", trac.DECIMAL, label="Total amount repaid"),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"))
+            trac.F("loan_condition_cat", trac.INTEGER, label="Loan condition category"),
+            label="Customer loans data")
 
         return {"customer_loans": customer_loans}
 
@@ -80,7 +81,8 @@ class UsingDataModel(trac.TracModel):
 
         profit_by_region = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit"))
+            trac.F("gross_profit", trac.DECIMAL, label="Total gross profit"),
+            label="Profit by region")
 
         return {"profit_by_region": profit_by_region}
 
@@ -101,4 +103,4 @@ class UsingDataModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(UsingDataModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(PnlAggregation, "config/using_data.yaml", "config/sys_config.yaml")

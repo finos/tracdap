@@ -176,7 +176,7 @@ public class RunModelTest {
                 .setLanguage("python")
                 .setRepository(useTracRepo())
                 .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.using_data.UsingDataModel")
+                .setEntryPoint("tutorial.using_data.PnlAggregation")
                 .setVersion(modelVersion)
                 .build();
 
@@ -196,7 +196,7 @@ public class RunModelTest {
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
         Assertions.assertEquals("run_model:using_data", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("tutorial.using_data.UsingDataModel", modelDef.getEntryPoint());
+        Assertions.assertEquals("tutorial.using_data.PnlAggregation", modelDef.getEntryPoint());
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));

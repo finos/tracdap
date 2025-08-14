@@ -61,7 +61,6 @@ public class RunFlowTest {
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
 
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
-    private static final String CURRENCY_INPUT_PATH = "examples/models/python/data/inputs/currency_data_sample.csv";
     private static final String ACCOUNT_FILTER_INPUT_PATH = "examples/models/python/data/inputs/account_filter.csv";
     private static final String STRUCT_INPUT_PATH = "examples/models/python/data/inputs/structured_run_config.json";
     public static final String ANALYSIS_TYPE = "analysis_type";
@@ -90,10 +89,8 @@ public class RunFlowTest {
     static TagHeader flowId;
     static TagHeader loansSchemaId;
     static TagHeader loansDataId;
-    static TagHeader currencySchemaId;
-    static TagHeader currencyDataId;
-    static TagHeader model1Id;
-    static TagHeader model2Id;
+    static TagHeader filterModelId;
+    static TagHeader aggregationModelId;
     static TagHeader jobId;
     static TagHeader outputDataId;
 
@@ -127,16 +124,14 @@ public class RunFlowTest {
 
         var flowDef = FlowDefinition.newBuilder()
                 .putNodes("customer_loans", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNodes("currency_data", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNodes("model_1", FlowNode.newBuilder()
+                .putNodes("customer_data_filter", FlowNode.newBuilder()
                         .setNodeType(FlowNodeType.MODEL_NODE)
                         .addInputs("customer_loans")
-                        .addInputs("currency_data")
-                        .addOutputs("preprocessed_data")
+                        .addOutputs("filtered_loans")
                         .build())
-                .putNodes("model_2", FlowNode.newBuilder()
+                .putNodes("pnl_aggregation", FlowNode.newBuilder()
                         .setNodeType(FlowNodeType.MODEL_NODE)
-                        .addInputs("preprocessed_data")
+                        .addInputs("customer_loans")
                         .addOutputs("profit_by_region")
                         .build())
                 .putNodes("profit_by_region", FlowNode.newBuilder()
@@ -148,24 +143,15 @@ public class RunFlowTest {
                                         .build()
                         ))
                         .build())
-                .putNodes("preprocessed_data", FlowNode.newBuilder()
-                        .setNodeType(FlowNodeType.OUTPUT_NODE)
-                        .build())
                 .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("customer_loans"))
-                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("customer_loans")))
+                        .setTarget(FlowSocket.newBuilder().setNode("customer_data_filter").setSocket("customer_loans")))
                 .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("currency_data"))
-                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("currency_data")))
+                        .setSource(FlowSocket.newBuilder().setNode("customer_data_filter").setSocket("filtered_loans"))
+                        .setTarget(FlowSocket.newBuilder().setNode("pnl_aggregation").setSocket("customer_loans")))
                 .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("preprocessed_data"))
-                        .setTarget(FlowSocket.newBuilder().setNode("model_2").setSocket("preprocessed_data")))
-                .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("model_2").setSocket("profit_by_region"))
+                        .setSource(FlowSocket.newBuilder().setNode("pnl_aggregation").setSocket("profit_by_region"))
                         .setTarget(FlowSocket.newBuilder().setNode("profit_by_region")))
-                .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("preprocessed_data"))
-                        .setTarget(FlowSocket.newBuilder().setNode("preprocessed_data")))
                 .build();
 
         var createReq = MetadataWriteRequest.newBuilder()
@@ -192,7 +178,7 @@ public class RunFlowTest {
                                 .setLabel("Customer Id"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("loan_amount")
-                                .setFieldType(BasicType.FLOAT)
+                                .setFieldType(BasicType.DECIMAL)
                                 .setLabel("Loan amount"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("loan_condition_cat")
@@ -200,7 +186,7 @@ public class RunFlowTest {
                                 .setLabel("Loan condition category code"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("total_pymnt")
-                                .setFieldType(BasicType.FLOAT)
+                                .setFieldType(BasicType.DECIMAL)
                                 .setLabel("Total payment received to date"))
                         .addFields(FieldSchema.newBuilder()
                                 .setFieldName("region")
@@ -209,35 +195,12 @@ public class RunFlowTest {
                                 .setLabel("Customer region"))))
                 .build();
 
-        var currencySchema = ObjectDefinition.newBuilder()
-                .setObjectType(ObjectType.SCHEMA)
-                .setSchema(SchemaDefinition.newBuilder()
-                .setSchemaType(SchemaType.TABLE)
-                .setTable(TableSchema.newBuilder()
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("ccy_code")
-                                .setFieldType(BasicType.STRING)
-                                .setCategorical(true))
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("spot_date")
-                                .setFieldType(BasicType.DATE))
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("dollar_rate")
-                                .setFieldType(BasicType.FLOAT))))
-                .build();
-
         var loansSchemaAttrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_schema")
                 .setValue(MetadataCodec.encodeValue("run_flow:customer_loans"))
                 .build());
 
-        var currencySchemaAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_schema")
-                .setValue(MetadataCodec.encodeValue("run_flow:currency_data"))
-                .build());
-
         loansSchemaId = createSchema(loansSchema, loansSchemaAttrs);
-        currencySchemaId = createSchema(currencySchema, currencySchemaAttrs);
     }
 
     TagHeader createSchema(ObjectDefinition schema, List<TagUpdate> attrs) {
@@ -264,13 +227,7 @@ public class RunFlowTest {
                 .setValue(MetadataCodec.encodeValue("run_flow:customer_loans"))
                 .build());
 
-        var currencyAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_dataset")
-                .setValue(MetadataCodec.encodeValue("run_flow:currency_data"))
-                .build());
-
         loansDataId = loadDataset(loansSchemaId, LOANS_INPUT_PATH, loansAttrs);
-        currencyDataId = loadDataset(currencySchemaId, CURRENCY_INPUT_PATH, currencyAttrs);
     }
 
     TagHeader loadDataset(TagHeader schemaId, String dataPath, List<TagUpdate> attrs) throws Exception {
@@ -299,7 +256,7 @@ public class RunFlowTest {
         var modelsPath = "examples/models/python/src";
         var modelsVersion = "main";
 
-        var model1EntryPoint = "tutorial.model_1.FirstModel";
+        var model1EntryPoint = "tutorial.using_data.PnlAggregation";
         var model1Attrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_model")
                 .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_1"))
@@ -309,7 +266,7 @@ public class RunFlowTest {
                 .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_1"))
                 .build());
 
-        var model2EntryPoint = "tutorial.model_2.SecondModel";
+        var model2EntryPoint = "tutorial.chaining.CustomerDataFilter";
         var model2Attrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_model")
                 .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_2"))
@@ -319,11 +276,11 @@ public class RunFlowTest {
                 .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_2"))
                 .build());
 
-        model1Id = importModel(
+        aggregationModelId = importModel(
                 modelsPath, model1EntryPoint, modelsVersion,
                 model1Attrs, model1JobAttrs);
 
-        model2Id = importModel(
+        filterModelId = importModel(
                 modelsPath, model2EntryPoint, modelsVersion,
                 model2Attrs, model2JobAttrs);
     }
@@ -384,13 +341,13 @@ public class RunFlowTest {
 
         var runFlow = RunFlowJob.newBuilder()
                 .setFlow(MetadataUtil.selectorFor(flowId))
-                .putParameters("param_1", MetadataCodec.encodeValue(2))
-                .putParameters("param_2", MetadataCodec.encodeValue(LocalDate.now()))
-                .putParameters("param_3", MetadataCodec.encodeValue(1.2345))
+                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.2071))
+                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
+                .putParameters("filter_defaults", MetadataCodec.encodeValue(false))
+                .putParameters("filter_region", MetadataCodec.encodeValue("munster"))
                 .putInputs("customer_loans", MetadataUtil.selectorFor(loansDataId))
-                .putInputs("currency_data", MetadataUtil.selectorFor(currencyDataId))
-                .putModels("model_1", MetadataUtil.selectorFor(model1Id))
-                .putModels("model_2", MetadataUtil.selectorFor(model2Id))
+                .putModels("customer_data_filter", MetadataUtil.selectorFor(filterModelId))
+                .putModels("pnl_aggregation", MetadataUtil.selectorFor(aggregationModelId))
                 .addOutputAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_data")
                         .setValue(MetadataCodec.encodeValue("run_flow:data_output")))
@@ -426,7 +383,7 @@ public class RunFlowTest {
 
         var dataSearchResult = metaClient.search(dataSearch);
 
-        Assertions.assertEquals(2, dataSearchResult.getSearchResultCount());
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
 
         var indexedResult = dataSearchResult.getSearchResultList().stream()
                 .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
@@ -435,11 +392,6 @@ public class RunFlowTest {
                 .getAttrsOrThrow(ANALYSIS_TYPE)
                 .getFloatValue();
         Assertions.assertEquals(3.14, profitByRegionAnalysisType);
-
-        Assertions.assertFalse(
-            indexedResult.get("preprocessed_data")
-                    .getAttrsMap().containsKey(ANALYSIS_TYPE)
-        );
 
         var searchResult = indexedResult.get("profit_by_region");
         var dataReq = MetadataReadRequest.newBuilder()
@@ -523,7 +475,7 @@ public class RunFlowTest {
 
         var dataClient = platform.dataClientBlocking();
 
-        var EXPECTED_REGIONS = 2;  // based on the chaining example models
+        var EXPECTED_REGIONS = 5;  // based on the chaining example models
 
         var readRequest = DataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)

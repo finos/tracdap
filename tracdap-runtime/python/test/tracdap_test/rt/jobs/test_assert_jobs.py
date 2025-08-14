@@ -87,7 +87,7 @@ class LoadResourcesTest(api.TracModel):
     def define_parameters(self) -> _tp.Dict[str, api.ModelParameter]:
 
         return api.define_parameters(
-            api.P("meaning_of_life", api.INTEGER, "Let this test work with hello_world.yaml job config")
+            api.P("input_number", api.INTEGER, "Let this test work with hello_world.yaml job config")
         )
 
     def define_inputs(self) -> _tp.Dict[str, api.ModelInputSchema]:
