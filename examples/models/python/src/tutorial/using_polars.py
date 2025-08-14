@@ -49,7 +49,7 @@ def calculate_profit_by_region_polars(
     return profit_by_region.collect()
 
 
-class UsingPolarsModel(trac.TracModel):
+class PnlAggregationPolars(trac.TracModel):
 
     def define_attributes(self) -> tp.List[trac.TagUpdate]:
 
@@ -102,4 +102,4 @@ class UsingPolarsModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(UsingPolarsModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(PnlAggregationPolars, "config/using_data.yaml", "config/sys_config.yaml")

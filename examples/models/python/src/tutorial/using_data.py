@@ -49,7 +49,7 @@ def calculate_profit_by_region(
     return profit_by_region
 
 
-class UsingDataModel(trac.TracModel):
+class PnlAggregation(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -103,4 +103,4 @@ class UsingDataModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(UsingDataModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(PnlAggregation, "config/using_data.yaml", "config/sys_config.yaml")

@@ -20,7 +20,7 @@ import tutorial.using_data as using_data
 import tutorial.schemas as schemas
 
 
-class SchemaFilesModel(trac.TracModel):
+class PnlAggregationSchemas(trac.TracModel):
 
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
@@ -67,4 +67,4 @@ class SchemaFilesModel(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(SchemaFilesModel, "config/using_data.yaml", "config/sys_config.yaml")
+    launch.launch_model(PnlAggregationSchemas, "config/using_data.yaml", "config/sys_config.yaml")
