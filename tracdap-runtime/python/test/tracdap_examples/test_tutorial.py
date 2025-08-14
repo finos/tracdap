@@ -65,21 +65,21 @@ class TutorialModelsTest(unittest.TestCase):
 
     def test_using_data(self):
 
-        from tutorial.using_data import UsingDataModel  # noqa
+        from tutorial.using_data import PnlAggregation  # noqa
 
         job_config = self.examples_root.joinpath("config/using_data.yaml")
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
-        launch.launch_model(UsingDataModel, job_config, sys_config)
+        launch.launch_model(PnlAggregation, job_config, sys_config)
 
     def test_schema_files(self):
 
-        from tutorial.schema_files import SchemaFilesModel  # noqa
+        from tutorial.schema_files import PnlAggregationSchemas  # noqa
 
         job_config = self.examples_root.joinpath("config/using_data.yaml")
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
-        launch.launch_model(SchemaFilesModel, job_config, sys_config)
+        launch.launch_model(PnlAggregationSchemas, job_config, sys_config)
 
     def test_optional_io(self):
 
@@ -173,12 +173,12 @@ class TutorialModelsTest(unittest.TestCase):
 
     def test_using_polars(self):
 
-        from tutorial.using_polars import UsingPolarsModel  # noqa
+        from tutorial.using_polars import PnlAggregationPolars  # noqa
 
         job_config = self.examples_root.joinpath("config/using_data.yaml")
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
-        launch.launch_model(UsingPolarsModel, job_config, sys_config, dev_mode=True)
+        launch.launch_model(PnlAggregationPolars, job_config, sys_config, dev_mode=True)
 
     def test_group_import_process_export(self):
 

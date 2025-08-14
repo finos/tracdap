@@ -21,7 +21,7 @@ job:
 
         - runModel:
 
-            model: tutorial.using_data.UsingDataModel
+            model: tutorial.using_data.PnlAggregation
 
             parameters:
               eur_usd_rate: 1.2071
