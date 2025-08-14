@@ -65,6 +65,7 @@ def _resolve_config_file(
     if cwd_config_path.exists():
         return cwd_config_path
 
+    # In dev mode, try to find the config files in some likely locations
     if dev_mode:
 
         parent_config_path = _search_parent_paths(cwd, config_path)
