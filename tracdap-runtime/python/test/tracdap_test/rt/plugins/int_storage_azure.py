@@ -24,8 +24,76 @@ import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
 
+import pyarrow.fs as pa_fs
+
 log.configure_logging()
 plugins.PluginManager.register_core_plugins()
+
+try:
+    __arrow_available = pa_fs.AzureFileSystem is not None
+except ImportError:
+    __arrow_available = False
+
+
+@unittest.skipIf(not __arrow_available, "Arrow BLOB file system is not available on this platform")
+class BlobArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
+
+    suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
+    suite_storage: storage.IFileStorage
+
+    @classmethod
+    def setUpClass(cls) -> None:
+
+        suite_properties = cls._properties_from_env()
+        suite_storage_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="BLOB", properties=suite_properties)
+
+        cls.suite_storage = cls._storage_from_config(suite_storage_config, "tracdap_ci_storage_setup")
+        cls.suite_storage.mkdir(cls.suite_storage_prefix)
+
+        test_properties = cls._properties_from_env()
+        test_properties["prefix"] = cls.suite_storage_prefix
+        test_storage_config = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.INTERNAL_STORAGE,
+            protocol="BLOB", properties=test_properties)
+
+        cls.storage = cls._storage_from_config(test_storage_config, "tracdap_ci_storage")
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+
+        cls.suite_storage.rmdir(cls.suite_storage_prefix)
+
+    @staticmethod
+    def _properties_from_env():
+
+        properties = dict()
+        properties["runtimeFs"] = "arrow"
+        properties["storageAccount"] = os.getenv("TRAC_AZURE_STORAGE_ACCOUNT")
+        properties["container"] = os.getenv("TRAC_AZURE_CONTAINER")
+
+        credentials = os.getenv("TRAC_AZURE_CREDENTIALS")
+
+        if credentials:
+            properties["credentials"] = credentials
+
+        if credentials == "access_key":
+            properties["accessKey"] = os.getenv("TRAC_AZURE_ACCESS_KEY")
+
+        return properties
+
+    @staticmethod
+    def _storage_from_config(storage_config: meta.ResourceDefinition, storage_key: str):
+
+        sys_config = cfg.RuntimeConfig()
+        sys_config.properties["storage.default.location"] = storage_key
+        sys_config.resources[storage_key] = storage_config
+
+        manager = storage.StorageManager(sys_config)
+
+        return manager.get_file_storage(storage_key)
+
 
 
 class BlobFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
@@ -61,6 +129,7 @@ class BlobFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileRead
     def _properties_from_env():
 
         properties = dict()
+        properties["runtimeFs"] = "fsspec"
         properties["storageAccount"] = os.getenv("TRAC_AZURE_STORAGE_ACCOUNT")
         properties["container"] = os.getenv("TRAC_AZURE_CONTAINER")
 
