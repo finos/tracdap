@@ -26,6 +26,12 @@ import pyarrow.fs as afs
 # Set of common helpers across the core plugins (do not reference rt._impl)
 from . import _helpers
 
+def _azure_arrow_available():
+    try:
+        # Shipped as part of PyArrow, but may not be available on all platforms
+        return afs.AzureFileSystem is not None
+    except ImportError:
+        return False
 
 def _azure_fsspec_available():
     try:
@@ -58,6 +64,7 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     RUNTIME_FS_PROPERTY = "runtimeFs"
     RUNTIME_FS_AUTO = "auto"
+    RUNTIME_FS_ARROW = "arrow"
     RUNTIME_FS_FSSPEC = "fsspec"
     RUNTIME_FS_DEFAULT = RUNTIME_FS_AUTO
 
@@ -80,7 +87,11 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     def get_arrow_native(self) -> afs.SubTreeFileSystem:
 
-        if self._runtime_fs == self.RUNTIME_FS_AUTO or self._runtime_fs == self.RUNTIME_FS_FSSPEC:
+        if self._runtime_fs == self.RUNTIME_FS_AUTO:
+            azure_fs = self.create_arrow() if _azure_arrow_available() else self.create_fsspec()
+        elif self._runtime_fs == self.RUNTIME_FS_ARROW:
+            azure_fs = self.create_arrow()
+        elif self._runtime_fs == self.RUNTIME_FS_FSSPEC:
             azure_fs = self.create_fsspec()
         else:
             message = f"Requested runtime FS [{self._runtime_fs}] is not available for Azure storage"
@@ -98,6 +109,15 @@ class AzureBlobStorageProvider(IStorageProvider):
         root_path = f"{container}/{prefix}" if prefix else container
 
         return afs.SubTreeFileSystem(root_path, azure_fs)
+
+    def create_arrow(self) -> afs.FileSystem:
+
+        if not _azure_arrow_available():
+            raise ex.EStorage(f"BLOB storage setup failed: Plugin for [{self.RUNTIME_FS_ARROW}] is not available")
+
+        azure_arrow_args = self.setup_client_args()
+
+        return afs.AzureFileSystem(**azure_arrow_args)
 
     def create_fsspec(self) -> afs.FileSystem:
 
@@ -157,6 +177,5 @@ class AzureBlobStorageProvider(IStorageProvider):
         raise ex.EStartup(message)
 
 
-# Only register the plugin if the [azure] feature is available
-if _azure_fsspec_available():
+if _azure_arrow_available() or _azure_fsspec_available():
     plugins.PluginManager.register_plugin(IStorageProvider, AzureBlobStorageProvider, ["BLOB"])
