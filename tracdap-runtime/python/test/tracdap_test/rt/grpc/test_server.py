@@ -87,7 +87,7 @@ class RuntimeApiServerTest(unittest.TestCase):
                 repository="unit_test_repo",
                 package="trac-example-models",
                 version=commit_hash,
-                entryPoint="tutorial.using_data.UsingDataModel",
+                entryPoint="tutorial.using_data.PnlAggregation",
                 path="examples/models/python/src"))
 
         job_config = config.JobConfig(job_id, job_def)
@@ -134,7 +134,7 @@ class RuntimeApiServerTest(unittest.TestCase):
                 repository="unit_test_repo",
                 package="trac-example-models",
                 version=commit_hash,
-                entryPoint="tutorial.using_data.UsingDataModel",
+                entryPoint="tutorial.using_data.PnlAggregation",
                 path="examples/models/python/src"))
 
         job_config = config.JobConfig(job_id, job_def)

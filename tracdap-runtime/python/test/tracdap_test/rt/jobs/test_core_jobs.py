@@ -71,7 +71,7 @@ class CoreJobsTest(unittest.TestCase):
                 repository="unit_test_repo",
                 package="trac-example-models",
                 version=self.commit_hash,
-                entryPoint="tutorial.using_data.UsingDataModel",
+                entryPoint="tutorial.using_data.PnlAggregation",
                 path="examples/models/python/src"))
 
         job_config = cfg.JobConfig(job_id, job_def)
@@ -163,7 +163,7 @@ class CoreJobsTest(unittest.TestCase):
                 repository="unit_test_repo",
                 package="trac-example-models",
                 version=self.commit_hash,
-                entryPoint="tutorial.using_data.UsingDataModel",
+                entryPoint="tutorial.using_data.PnlAggregation",
                 path="examples/models/python/src",
                 parameters={
                     "eur_usd_rate": meta.ModelParameter(paramType=types.TypeMapping.python_to_trac(float)),
