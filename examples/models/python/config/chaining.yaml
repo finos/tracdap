@@ -11,7 +11,7 @@ job:
       filter_region: munster
 
     inputs:
-      unfiltered_loans: "inputs/loan_final313_100.csv"
+      customer_loans: "inputs/loan_final313_100.csv"
 
     outputs:
       profit_by_region: "outputs/chaining/profit_by_region.csv"

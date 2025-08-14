@@ -1,13 +1,13 @@
 
 nodes:
 
-  unfiltered_loans:
+  customer_loans:
     nodeType: "INPUT_NODE"
 
   customer_data_filter:
     nodeType: "MODEL_NODE"
-    inputs: [unfiltered_loans]
-    outputs: [customer_loans]
+    inputs: [customer_loans]
+    outputs: [filtered_loans]
 
   pnl_aggregation:
     nodeType: "MODEL_NODE"
@@ -16,3 +16,9 @@ nodes:
 
   profit_by_region:
     nodeType: "OUTPUT_NODE"
+
+
+edges:
+
+  - source: { node: customer_data_filter, socket: filtered_loans }
+    target: { node: pnl_aggregation, socket: customer_loans }

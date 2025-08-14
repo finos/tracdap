@@ -2,7 +2,7 @@
 job:
   runFlow:
 
-    flow: ./chaining_flow_2.yaml
+    flow: ./dynamic_chaining_flow.yaml
 
     models:
       dynamic_filter: tutorial.dynamic_io.DynamicDataFilter
