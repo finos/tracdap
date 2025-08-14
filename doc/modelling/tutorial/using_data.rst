@@ -79,7 +79,7 @@ lenient type handling for input files.
     :name: using_data_py_part_3
     :language: python
     :class: container
-    :lines: 68 - 77
+    :lines: 68 - 78
     :linenos:
     :lineno-start: 68
 
@@ -94,9 +94,9 @@ Models are free to define multiple outputs if required, but this example only ha
     :name: using_data_py_part_4
     :language: python
     :class: container
-    :lines: 79 - 85
+    :lines: 80 - 87
     :linenos:
-    :lineno-start: 79
+    :lineno-start: 80
 
 Now the parameters, inputs and outputs of the model are defined, we can implement the
 :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>` method.
@@ -117,9 +117,9 @@ schema for this input.
     :name: using_data_py_part_5
     :language: python
     :class: container
-    :lines: 87 - 93
+    :lines: 89 - 95
     :linenos:
-    :lineno-start: 87
+    :lineno-start: 89
 
 Once all the inputs and parameters are available, we can call the model function. Since all the inputs
 and parameters are supplied using the correct native types there is no further conversion necessary,
@@ -129,9 +129,9 @@ they can be passed straight into the model code.
     :name: using_data_py_part_6
     :language: python
     :class: container
-    :lines: 95 - 97
+    :lines: 97 - 99
     :linenos:
-    :lineno-start: 95
+    :lineno-start: 97
 
 The model code has produced a Pandas dataframe that we want to record as an output. To do this, we can use
 :py:meth:`put_pandas_table() <tracdap.rt.api.TracContext.put_pandas_table>`. The dataframe should match
@@ -151,9 +151,9 @@ columns will be dropped.
     :name: using_data_py_part_7
     :language: python
     :class: container
-    :lines: 99
+    :lines: 101
     :linenos:
-    :lineno-start: 99
+    :lineno-start: 101
 
 The model can be launched locally using :py:func:`launch_model() <tracdap.rt.launch.launch_model()>`.
 
@@ -161,31 +161,32 @@ The model can be launched locally using :py:func:`launch_model() <tracdap.rt.lau
     :name: using_data_py_part_8
     :language: python
     :class: container
-    :lines: 102-104
+    :lines: 104-106
     :linenos:
-    :lineno-start: 102
+    :lineno-start: 104
 
 Configure local data
 --------------------
 
 To pass data into the local model, a little bit more config is needed in the *sys_config* file
-to define a storage bucket. In TRAC storage buckets can be any storage location that can hold
-files. This would be bucket storage on a cloud platform, but you can also use local disks or other
-storage protocols such as network storage or HDFS, so long as the right storage plugins are available.
+to define a storage location. For development this can be a local folder, although in production
+deployments storage locations can be cloud buckets or use other protocols such as network storage
+or HDFS, so long as the right storage plugins are available.
 
-This example sets up one storage bucket called *example_data*. Since we are going to use a local disk,
+This example sets up one storage location called *example_data*. Since we are going to use a local disk,
 the storage protocol is *LOCAL*. The *rootPath* property says where this storage bucket will be on disk -
 a relative path is taken relative to the *sys_config* file by default, or you can specify an absolute path
 here to avoid confusion.
 
-The default bucket is also where output data will be saved. In this example we have only one storage
-bucket configured, which is used for both inputs and outputs, so we mark that as the default.
+The example config also sets the default storage location and format, which controls where
+output data will be saved. In this example we have only one storage
+location configured, which is used for both inputs and outputs, so we mark that as the default.
 
 .. literalinclude:: ../../../examples/models/python/config/sys_config.yaml
     :caption: config/sys_config.yaml
     :name: sys_config.yaml
     :language: yaml
-    :lines: 2-12
+    :lines: 2-15
 
 In the *job_config* file we need to specify what data to use for the model inputs and outputs. Each
 input named in the model must have an entry in the inputs section, and each output in the outputs
@@ -277,7 +278,7 @@ Now we can re-write our model to use the new schema files. First we need to impo
     :linenos:
     :lineno-start: 20
 
-Then we can load schemas from the schemas package in the
+Then we can load schemas from the schemas package in the model's
 :py:meth:`define_inputs() <tracdap.rt.api.TracModel.define_inputs>` and
 :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>` methods:
 
@@ -285,14 +286,15 @@ Then we can load schemas from the schemas package in the
     :name: using_data_part_10
     :language: python
     :class: container
-    :lines: 47 - 57
+    :lines: 39 - 51
     :linenos:
-    :lineno-start: 47
+    :lineno-start: 39
 
-Notice that the :py:func:`load_schema() <tracdap.rt.api.load_schema>` method is the same
-for input and output schemas, so we need to use
-:py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>` and
-:py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>` explicitly.
+Notice that the :py:func:`load_schema() <tracdap.rt.api.load_schema>` method only creates
+the `SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`, to use this schema for
+model inputs and outputs we need to call
+:py:func:`define_input() <tracdap.rt.api.define_input>` and
+:py:func:`define_output() <tracdap.rt.api.define_output>` explicitly.
 
 .. seealso::
     Full source code is available for the
