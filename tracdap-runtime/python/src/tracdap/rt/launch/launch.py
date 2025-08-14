@@ -66,14 +66,15 @@ def _resolve_config_file(
         return cwd_config_path
 
     if dev_mode:
+
         parent_config_path = _search_parent_paths(cwd, config_path)
         if parent_config_path is not None:
             return parent_config_path
 
-    if model_dir is not None:
-        model_config_path = _search_parent_paths(cwd, config_path)
-        if model_config_path is not None:
-            return model_config_path
+        if model_dir is not None:
+            model_config_path = _search_parent_paths(cwd, config_path)
+            if model_config_path is not None:
+                return model_config_path
 
     if isinstance(config_path, _pathlib.Path):
         return config_path
