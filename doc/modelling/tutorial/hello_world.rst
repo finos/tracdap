@@ -275,9 +275,11 @@ this, but the model will fail to deploy)!
 
 Paths for the system and job config files are resolved in the following order:
 
-    1. If absolute paths are supplied, these take top priority
+    1. If an absolute path is supplied, this takes priority
     2. Resolve relative to the current working directory
-    3. Resolve relative to the directory containing the Python module of the model
+    3. Search relative to parents of the current directory
+    4. Resolve relative to the directory containing the model
+    5. Search relative to parents of the directory containing the model
 
 Now you should be able to run your model script and see the model output in the logs:
 
