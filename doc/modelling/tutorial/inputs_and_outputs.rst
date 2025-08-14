@@ -1,6 +1,6 @@
 
 ****************************
-Chapter 3 - Inputs & Outputs
+Chapter 4 - Inputs & Outputs
 ****************************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
