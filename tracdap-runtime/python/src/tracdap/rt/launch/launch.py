@@ -27,9 +27,25 @@ import tracdap.rt._impl.runtime as _runtime  # noqa
 from .cli import _cli_args
 
 
+def _search_parent_paths(
+        path: _pathlib.Path,
+        config_path: _tp.Union[str, _pathlib.Path]):
+
+    resolved_path = path.joinpath(config_path).resolve()
+
+    if resolved_path.exists():
+        return resolved_path
+
+    if path.parent is not None and not path.joinpath(".git").exists():
+        return _search_parent_paths(path.parent, config_path)
+
+    return None
+
+
 def _resolve_config_file(
         config_path: _tp.Union[str, _pathlib.Path],
-        model_dir: _tp.Optional[_pathlib.Path] = None) \
+        model_dir: _tp.Optional[_pathlib.Path] = None,
+        dev_mode: bool = False) \
         -> _tp.Union[_pathlib.Path, str]:
 
     # If the config path is a URL, do not convert it into a path
@@ -49,12 +65,17 @@ def _resolve_config_file(
     if cwd_config_path.exists():
         return cwd_config_path
 
-    if model_dir is not None:
+    # In dev mode, try to find the config files in some likely locations
+    if dev_mode:
 
-        model_config_path = model_dir.joinpath(config_path).resolve()
+        parent_config_path = _search_parent_paths(cwd, config_path)
+        if parent_config_path is not None:
+            return parent_config_path
 
-        if model_config_path.exists():
-            return model_config_path
+        if model_dir is not None:
+            model_config_path = _search_parent_paths(cwd, config_path)
+            if model_config_path is not None:
+                return model_config_path
 
     if isinstance(config_path, _pathlib.Path):
         return config_path
@@ -77,18 +98,26 @@ def launch_model(
     Launch an individual model using its Python class
 
     This function launches the supplied model class directly, it must be called
-    from the Python codebase containing the model class. The TRAC runtime will launch
-    in dev mode and execute the model inside the current Python process, a minimal
-    job definition and set of local resources will be configured automatically.
-    This method is useful for launching models during local development
-    for debugging and testing.
+    from the Python codebase containing the model class. A minimal job config is
+    required to specify the parameters, inputs and outputs of the model. TRAC will
+    set up the rest of the job configuration automatically.
+
+    This method is intended for launching models during local development
+    for debugging and testing, dev_mode = True is set by default. To test a model
+    without using dev mode, pass dev_mode = False as a keyword parameter.
 
     To resolve the paths of the job and system config files, paths are tried in the
     following order:
 
     1. If an absolute path is supplied, this takes priority
     2. Resolve relative to the current working directory
-    3. Resolve relative to the directory containing the Python module of the model
+    3. Search relative to parents of the current directory
+    4. Resolve relative to the directory containing the model
+    5. Search relative to parents of the directory containing the model
+
+    For code cloned from a Git repository, searches will not look outside the repository.
+    Setting dev_mode = False will disable this search behavior,
+    config file paths must be specified exactly when dev_mode = False.
 
     :param model_class: The model class that will be launched
     :param job_config: Path to the job configuration file
@@ -100,16 +129,19 @@ def launch_model(
     :type sys_config: :py:class:`pathlib.Path` | str
     """
 
+    # Default to dev_mode = True for launch_model()
+    dev_mode = launch_args["dev_mode"] if "dev_mode" in launch_args else True
+
     model_file = _inspect.getfile(model_class)
     model_dir = _pathlib.Path(model_file).parent
 
-    _sys_config = _resolve_config_file(sys_config, model_dir)
-    _job_config = _resolve_config_file(job_config, model_dir)
+    _sys_config = _resolve_config_file(sys_config, model_dir, dev_mode)
+    _job_config = _resolve_config_file(job_config, model_dir, dev_mode)
 
     plugin_package = _optional_arg(launch_args, 'plugin_package')
     plugin_packages = [plugin_package] if plugin_package else None
 
-    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True, plugin_packages=plugin_packages)
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode, plugin_packages=plugin_packages)
     runtime_instance.pre_start()
 
     with runtime_instance as rt:
@@ -123,7 +155,6 @@ def launch_model(
 def launch_job(
         job_config: _tp.Union[_pathlib.Path, str],
         sys_config: _tp.Union[_pathlib.Path, str],
-        dev_mode: bool = False,
         **launch_args):
 
     """
@@ -132,28 +163,39 @@ def launch_job(
     This function launches the job definition supplied in the job_config file,
     which must contain enough information to describe the job along with any
     models and other resources that it needs. It allows for running more complex
-    job types such as :py:class:`JobType.RUN_FLOW <tracdap.rt.metadata.JobType>`
-    and can be used for local development by setting dev_mode = True. If the job
-    depends on external resources, those must be specified in the sys_config file.
+    job types such as :py:class:`JobType.RUN_FLOW <tracdap.rt.metadata.JobType>`.
+    If the job depends on external resources, those must be specified in the sys_config file.
+
+    This method is intended for launching jobs during local development
+    for debugging and testing, dev_mode = True is set by default. To test a job
+    without using dev mode, pass dev_mode = False as a keyword parameter.
 
     To resolve the paths of the job and system config files, paths are tried in the
     following order:
 
     1. If an absolute path is supplied, this takes priority
     2. Resolve relative to the current working directory
+    3. Search relative to parents of the current directory
+    4. Resolve relative to the directory containing the model
+    5. Search relative to parents of the directory containing the model
+
+    For code cloned from a Git repository, searches will not look outside the repository.
+    Setting dev_mode = False will disable this search behavior,
+    config file paths must be specified exactly when dev_mode = False.
 
     :param job_config: Path to the job configuration file
     :param sys_config: Path to the system configuration file
-    :param dev_mode: Whether to launch in dev mode (applies dev mode translation to the job inputs)
     :param launch_args: Additional arguments to control behavior of the TRAC runtime (not normally required)
 
     :type job_config: :py:class:`pathlib.Path` | str
     :type sys_config: :py:class:`pathlib.Path` | str
-    :type dev_mode: bool
     """
 
-    _sys_config = _resolve_config_file(sys_config, None)
-    _job_config = _resolve_config_file(job_config, None)
+    # Default to dev_mode = True for launch_job()
+    dev_mode = launch_args["dev_mode"] if "dev_mode" in launch_args else True
+
+    _sys_config = _resolve_config_file(sys_config, None, dev_mode)
+    _job_config = _resolve_config_file(job_config, None, dev_mode)
 
     plugin_package = _optional_arg(launch_args, 'plugin_package')
     plugin_packages = [plugin_package] if plugin_package else None
