@@ -1,20 +1,17 @@
 
 nodes:
 
-  customer_loans:
+  unfiltered_loans:
     nodeType: "INPUT_NODE"
 
-  currency_data:
-    nodeType: "INPUT_NODE"
-
-  model_1:
+  customer_data_filter:
     nodeType: "MODEL_NODE"
-    inputs: [customer_loans, currency_data]
-    outputs: [preprocessed_data]
+    inputs: [unfiltered_loans]
+    outputs: [customer_loans]
 
-  model_2:
+  pnl_aggregation:
     nodeType: "MODEL_NODE"
-    inputs: [preprocessed_data]
+    inputs: [customer_loans]
     outputs: [profit_by_region]
 
   profit_by_region:
