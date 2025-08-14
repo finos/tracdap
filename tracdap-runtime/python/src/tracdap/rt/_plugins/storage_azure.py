@@ -144,12 +144,12 @@ class AzureBlobStorageProvider(IStorageProvider):
 
         client_args["account_name"] = storage_account
 
-        credentials = self.setup_credentials()
+        credentials = self.setup_credentials(fsspec=True)
         client_args.update(credentials)
 
         return client_args
 
-    def setup_credentials(self):
+    def setup_credentials(self, fsspec: bool = False):
 
         # Only default (Google ADC) mechanism is supported
         # Arrow GCP FS does also support access tokens, but ADC is probably all we ever need
@@ -158,7 +158,7 @@ class AzureBlobStorageProvider(IStorageProvider):
 
         if mechanism is None or len(mechanism) == 0 or mechanism.lower() == self.CREDENTIALS_DEFAULT:
             self._log.info(f"Using [{self.CREDENTIALS_DEFAULT}] credentials mechanism")
-            return {"anon": False}
+            return {"anon": False} if fsspec else {}
 
         if mechanism == self.CREDENTIALS_ACCESS_KEY:
 
