@@ -85,17 +85,19 @@ class DynamicGenerator(trac.TracModel):
         sample_columns = ctx.get_pandas_table("sample_columns")
         number_of_rows = ctx.get_parameter("number_of_rows")
 
-        sample_schema = trac.SchemaDefinition(trac.SchemaType.TABLE, table=trac.TableSchema())
+        sample_fields = []
         sample_data = dict()
 
         for column_index, column_name in enumerate(sample_columns["column_name"]):
 
-            field_schema = trac.F(column_name, trac.INTEGER, label=f"Generated column {column_name}")
-            sample_schema.table.fields.append(field_schema)
+            field_schema = trac.define_field(column_name, trac.INTEGER, label=f"Generated column {column_name}")
+            sample_fields.append(field_schema)
 
             offset = column_index * number_of_rows
             column_values = range(offset, offset + number_of_rows)
             sample_data[column_name] = column_values
+
+        sample_schema = trac.define_schema(sample_fields, schema_type=trac.SchemaType.TABLE_SCHEMA)
 
         ctx.put_schema("dynamic_data_sample", sample_schema)
         ctx.put_pandas_table("dynamic_data_sample", pd.DataFrame(sample_data))
