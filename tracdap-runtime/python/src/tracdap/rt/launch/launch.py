@@ -31,7 +31,7 @@ def _search_parent_paths(
         path: _pathlib.Path,
         config_path: _tp.Union[str, _pathlib.Path]):
 
-    resolved_path = path.joinpath(config_path)
+    resolved_path = path.joinpath(config_path).resolve()
 
     if resolved_path.exists():
         return resolved_path
@@ -60,7 +60,7 @@ def _resolve_config_file(
         return config_path
 
     cwd = _pathlib.Path.cwd()
-    cwd_config_path = cwd.joinpath(config_path)
+    cwd_config_path = cwd.joinpath(config_path).resolve()
 
     if cwd_config_path.exists():
         return cwd_config_path
