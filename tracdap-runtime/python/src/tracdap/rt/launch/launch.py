@@ -29,18 +29,17 @@ from .cli import _cli_args
 
 def _search_parent_paths(
         path: _pathlib.Path,
-        config_path: _tp.Union[str, _pathlib.Path],
-        dev_mode: bool):
+        config_path: _tp.Union[str, _pathlib.Path]):
 
     resolved_path = path.joinpath(config_path)
 
     if resolved_path.exists():
-        return path, resolved_path
+        return resolved_path
 
-    if dev_mode and path.parent is not None and not path.joinpath(".git").exists():
-        return _search_parent_paths(path.parent, config_path, dev_mode)
+    if path.parent is not None and not path.joinpath(".git").exists():
+        return _search_parent_paths(path.parent, config_path)
 
-    return None, None
+    return None
 
 
 def _resolve_config_file(
@@ -60,15 +59,19 @@ def _resolve_config_file(
     if _pathlib.Path(config_path).is_absolute():
         return config_path
 
-    cwd, cwd_config_path = _search_parent_paths(_pathlib.Path.cwd(), config_path, dev_mode)
+    cwd = _pathlib.Path.cwd()
+    cwd_config_path = cwd.joinpath(config_path)
 
-    if cwd_config_path is not None:
+    if cwd_config_path.exists():
         return cwd_config_path
 
+    if dev_mode:
+        parent_config_path = _search_parent_paths(cwd, config_path)
+        if parent_config_path is not None:
+            return parent_config_path
+
     if model_dir is not None:
-
-        cwd, model_config_path = _search_parent_paths(model_dir, config_path, dev_mode)
-
+        model_config_path = _search_parent_paths(cwd, config_path)
         if model_config_path is not None:
             return model_config_path
 
