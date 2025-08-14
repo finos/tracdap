@@ -27,9 +27,26 @@ import tracdap.rt._impl.runtime as _runtime  # noqa
 from .cli import _cli_args
 
 
+def _search_parent_paths(
+        path: _pathlib.Path,
+        config_path: _tp.Union[str, _pathlib.Path],
+        dev_mode: bool):
+
+    resolved_path = path.joinpath(config_path)
+
+    if resolved_path.exists():
+        return path, resolved_path
+
+    if dev_mode and path.parent is not None and not path.joinpath(".git").exists():
+        return _search_parent_paths(path.parent, config_path, dev_mode)
+
+    return None, None
+
+
 def _resolve_config_file(
         config_path: _tp.Union[str, _pathlib.Path],
-        model_dir: _tp.Optional[_pathlib.Path] = None) \
+        model_dir: _tp.Optional[_pathlib.Path] = None,
+        dev_mode: bool = False) \
         -> _tp.Union[_pathlib.Path, str]:
 
     # If the config path is a URL, do not convert it into a path
@@ -43,17 +60,16 @@ def _resolve_config_file(
     if _pathlib.Path(config_path).is_absolute():
         return config_path
 
-    cwd = _pathlib.Path.cwd()
-    cwd_config_path = cwd.joinpath(config_path).resolve()
+    cwd, cwd_config_path = _search_parent_paths(_pathlib.Path.cwd(), config_path, dev_mode)
 
-    if cwd_config_path.exists():
+    if cwd_config_path is not None:
         return cwd_config_path
 
     if model_dir is not None:
 
-        model_config_path = model_dir.joinpath(config_path).resolve()
+        cwd, model_config_path = _search_parent_paths(model_dir, config_path, dev_mode)
 
-        if model_config_path.exists():
+        if model_config_path is not None:
             return model_config_path
 
     if isinstance(config_path, _pathlib.Path):
@@ -100,16 +116,19 @@ def launch_model(
     :type sys_config: :py:class:`pathlib.Path` | str
     """
 
+    # Default to dev_mode = True for launch_model()
+    dev_mode = launch_args["dev_mode"] if "dev_mode" in launch_args else True
+
     model_file = _inspect.getfile(model_class)
     model_dir = _pathlib.Path(model_file).parent
 
-    _sys_config = _resolve_config_file(sys_config, model_dir)
-    _job_config = _resolve_config_file(job_config, model_dir)
+    _sys_config = _resolve_config_file(sys_config, model_dir, dev_mode)
+    _job_config = _resolve_config_file(job_config, model_dir, dev_mode)
 
     plugin_package = _optional_arg(launch_args, 'plugin_package')
     plugin_packages = [plugin_package] if plugin_package else None
 
-    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=True, plugin_packages=plugin_packages)
+    runtime_instance = _runtime.TracRuntime(_sys_config, dev_mode=dev_mode, plugin_packages=plugin_packages)
     runtime_instance.pre_start()
 
     with runtime_instance as rt:
@@ -123,7 +142,6 @@ def launch_model(
 def launch_job(
         job_config: _tp.Union[_pathlib.Path, str],
         sys_config: _tp.Union[_pathlib.Path, str],
-        dev_mode: bool = False,
         **launch_args):
 
     """
@@ -144,16 +162,18 @@ def launch_job(
 
     :param job_config: Path to the job configuration file
     :param sys_config: Path to the system configuration file
-    :param dev_mode: Whether to launch in dev mode (applies dev mode translation to the job inputs)
+    :param dev_mode: Whether to launch in dev mode (default = True, applies dev mode translation to the job inputs)
     :param launch_args: Additional arguments to control behavior of the TRAC runtime (not normally required)
 
     :type job_config: :py:class:`pathlib.Path` | str
     :type sys_config: :py:class:`pathlib.Path` | str
-    :type dev_mode: bool
     """
 
-    _sys_config = _resolve_config_file(sys_config, None)
-    _job_config = _resolve_config_file(job_config, None)
+    # Default to dev_mode = True for launch_job()
+    dev_mode = launch_args["dev_mode"] if "dev_mode" in launch_args else True
+
+    _sys_config = _resolve_config_file(sys_config, None, dev_mode)
+    _job_config = _resolve_config_file(job_config, None, dev_mode)
 
     plugin_package = _optional_arg(launch_args, 'plugin_package')
     plugin_packages = [plugin_package] if plugin_package else None
