@@ -23,6 +23,8 @@ import org.apache.arrow.vector.util.TransferPair;
 import org.finos.tracdap.common.data.ArrowVsrContext;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 
@@ -35,6 +37,7 @@ public class RangeSelector
         DataPipeline.DataConsumer<DataPipeline.ArrowApi>,
         DataPipeline.DataProducer<DataPipeline.ArrowApi> {
 
+    private static final Logger log = LoggerFactory.getLogger(RangeSelector.class);
     private final long offset;
     private final long limit;
     private long currentRow;
@@ -123,11 +126,10 @@ public class RangeSelector
 
             sliceRoot.setRowCount(batchSize);
             sliceRoot.setLoaded();
-            consumer().onBatch();
         }
         else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
 
-            var sliceStart = (int) (offset - batchStartRow);
+            var sliceStart = (int) Math.max(offset - batchStartRow, 0);
             var sliceEnd = (int) Math.min(offset + limit - batchStartRow, batchSize);
             var sliceLength = sliceEnd - sliceStart;
 
@@ -135,12 +137,14 @@ public class RangeSelector
 
             sliceRoot.setRowCount(sliceLength);
             sliceRoot.setLoaded();
-            consumer().onBatch();
         }
 
         // Always consume the incoming data
         incomingRoot.setUnloaded();
         currentRow += batchSize;
+
+        if (sliceRoot.readyToUnload())
+            consumer().onBatch();
     }
 
     @Override

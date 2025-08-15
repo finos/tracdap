@@ -46,11 +46,6 @@ public abstract class StreamingEncoder
 
     @Override
     public void pump() {
-
-        if (context == null)
-            return;
-
-        if (context.readyToUnload() && consumerReady())
-            onBatch();
+        // No-op, streaming encoder pushes batches through directly
     }
 }
