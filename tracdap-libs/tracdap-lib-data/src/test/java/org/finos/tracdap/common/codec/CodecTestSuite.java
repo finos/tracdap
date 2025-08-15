@@ -114,9 +114,17 @@ public abstract class CodecTestSuite {
 
         var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator);
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
+    }
+
+    @Test
+    void roundTrip_basicMultiBatch() {
+
+        var allocator = new RootAllocator();
+        var inputData = generateBasicData(allocator, 5000);
+
+        roundTrip_impl(inputData, allocator, true);
     }
 
     @Test
@@ -127,11 +135,11 @@ public abstract class CodecTestSuite {
 
         // With the basic test data, we'll get one null value for each data type
 
-        var limit = Math.min(inputData.getBackBuffer().getRowCount(), inputData.getBackBuffer().getFieldVectors().size());
+        var limit = Math.min(inputData.getVsr().getRowCount(), inputData.getVsr().getFieldVectors().size());
 
         for (var i = 0; i < limit; i++) {
 
-            var vector = inputData.getBackBuffer().getVector(i);
+            var vector = inputData.getVsr().getVector(i);
 
             if (BaseFixedWidthVector.class.isAssignableFrom(vector.getClass())) {
 
@@ -147,8 +155,6 @@ public abstract class CodecTestSuite {
             }
         }
 
-        inputData.flip();
-
         roundTrip_impl(inputData, allocator);
     }
 
@@ -158,7 +164,6 @@ public abstract class CodecTestSuite {
 
         var allocator = new RootAllocator();
         var inputData = generateStructData(allocator);
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -184,7 +189,6 @@ public abstract class CodecTestSuite {
         var inputData = ArrowVsrContext.forSource(root, null, allocator);
         inputData.setRowCount(4);
         inputData.setLoaded();
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -218,7 +222,6 @@ public abstract class CodecTestSuite {
         var inputData = ArrowVsrContext.forSource(root, null, allocator);
         inputData.setRowCount(9);
         inputData.setLoaded();
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -252,7 +255,6 @@ public abstract class CodecTestSuite {
         var inputData = ArrowVsrContext.forSource(root, null, allocator);
         inputData.setRowCount(6);
         inputData.setLoaded();
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -284,7 +286,6 @@ public abstract class CodecTestSuite {
         var inputData = ArrowVsrContext.forSource(root, null, allocator);
         inputData.setRowCount(10);
         inputData.setLoaded();
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -319,7 +320,6 @@ public abstract class CodecTestSuite {
         var inputData = ArrowVsrContext.forSource(root, null, allocator);
         inputData.setRowCount(6);
         inputData.setLoaded();
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -359,7 +359,6 @@ public abstract class CodecTestSuite {
         var inputData = ArrowVsrContext.forSource(root, null, allocator);
         inputData.setRowCount(8);
         inputData.setLoaded();
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }
@@ -384,6 +383,11 @@ public abstract class CodecTestSuite {
 
     void roundTrip_impl(ArrowVsrContext inputData, RootAllocator allocator) {
 
+            roundTrip_impl(inputData, allocator, false);
+    }
+
+    void roundTrip_impl(ArrowVsrContext inputData, RootAllocator allocator, boolean multiBatch) {
+
         var ctx = new DataContext(new DefaultEventExecutor(), allocator);
 
         var dataSrc = new SingleBatchDataSource(inputData);
@@ -392,7 +396,8 @@ public abstract class CodecTestSuite {
         pipeline.addStage(codec.getEncoder(allocator, Map.of()));
         pipeline.addStage(codec.getDecoder(inputData.getSchema(), allocator, Map.of()));
 
-        var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(inputData, batch));
+        var dataSink = new SingleBatchDataSink(pipeline, (batch, offset) ->
+                DataComparison.compareBatches(inputData, batch, offset, false));
         pipeline.addSink(dataSink);
 
         var exec = pipeline.execute();
@@ -414,8 +419,10 @@ public abstract class CodecTestSuite {
 
         DataComparison.compareSchemas(inputData.getSchema(), rtSchema);
 
-        Assertions.assertEquals(1, dataSink.getBatchCount());
-        Assertions.assertEquals(inputData.getFrontBuffer().getRowCount(), rtRowCount);
+        Assertions.assertEquals(inputData.getVsr().getRowCount(), rtRowCount);
+
+        if (!multiBatch)
+            Assertions.assertEquals(1, dataSink.getBatchCount());
 
         inputData.close();
     }
@@ -450,7 +457,7 @@ public abstract class CodecTestSuite {
         DataComparison.compareSchemas(inputData.getSchema(), rtSchema);
 
         Assertions.assertEquals(1, dataSink.getBatchCount());
-        Assertions.assertEquals(inputData.getFrontBuffer().getRowCount(), rtRowCount);
+        Assertions.assertEquals(inputData.getVsr().getRowCount(), rtRowCount);
 
         inputData.close();
     }

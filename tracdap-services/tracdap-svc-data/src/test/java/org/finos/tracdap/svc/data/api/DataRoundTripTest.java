@@ -165,7 +165,7 @@ abstract class DataRoundTripTest {
 
         // Keep the writer open until after the test is complete
         // Closing the writer will close the VSR, which releases the underlying memory
-        try (var writer = new ArrowStreamWriter(root.getFrontBuffer(), root.getDictionaries(), writeChannel)) {
+        try (var writer = new ArrowStreamWriter(root.getVsr(), root.getDictionaries(), writeChannel)) {
 
             writer.start();
             writer.writeBatch();
@@ -191,7 +191,7 @@ abstract class DataRoundTripTest {
 
         // Keep the writer open until after the test is complete
         // Closing the writer will close the VSR, which releases the underlying memory
-        try (var writer = new ArrowFileWriter(root.getFrontBuffer(), root.getDictionaries(), writeChannel)) {
+        try (var writer = new ArrowFileWriter(root.getVsr(), root.getDictionaries(), writeChannel)) {
 
             writer.start();
             writer.writeBatch();

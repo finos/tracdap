@@ -95,15 +95,21 @@ public class DataComparison {
 
     public static void compareBatches(ArrowVsrContext originalContext, ArrowVsrContext roundTripContext) {
 
+        compareBatches(originalContext, roundTripContext, 0, true);
+    }
+
+    public static void compareBatches(ArrowVsrContext originalContext, ArrowVsrContext roundTripContext, long offset, boolean compareSize) {
+
         // Compare front (presenting) buffers of original and RT data
 
-        var original = originalContext.getFrontBuffer();
-        var roundTrip = roundTripContext.getFrontBuffer();
+        var original = originalContext.getVsr();
+        var roundTrip = roundTripContext.getVsr();
 
         // Data pipeline cleans up round trip root after the pipeline completes
         // To do this comparison, SingleBatchDataSink should convert root -> java array / maps
 
-        Assertions.assertEquals(original.getRowCount(), roundTrip.getRowCount());
+        if (compareSize && offset == 0)
+            Assertions.assertEquals(original.getRowCount(), roundTrip.getRowCount());
 
         for (var j = 0; j < original.getFieldVectors().size(); j++) {
 
@@ -113,11 +119,17 @@ public class DataComparison {
 
             if (field.getDictionary() == null) {
 
+                // Slice the original vector if need be
+                var transferPair = originalVec.getTransferPair(originalVec.getAllocator());
+                var transferSize = Math.min(rtVec.getValueCount(), originalVec.getValueCount() - offset);
+                var originalSlice = transferPair.getTo();
+                transferPair.splitAndTransfer((int) offset, (int) transferSize);
+
                 // Use Arrow visitor to do the comparison (this is strict, e.g. map order matters)
-                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalVec, rtVec);
+                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalSlice, rtVec);
 
                 Assertions.assertTrue(
-                        visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
+                        visitor.rangeEquals(new Range(0, 0, originalSlice.getValueCount())),
                         "Vectors not equal for field " + field.getName());
             }
             else {
@@ -128,18 +140,25 @@ public class DataComparison {
                 var originalDict = originalContext.getDictionaries().lookup(originalVec.getField().getDictionary().getId());
                 var originalDecoded =  DictionaryEncoder.decode(originalVec, originalDict);
 
+                // Slice the original vector if need be
+                var transferPair = originalDecoded.getTransferPair(originalDecoded.getAllocator());
+                var transferSize = Math.min(rtVec.getValueCount(), originalVec.getValueCount() - offset);
+                var originalSlice = transferPair.getTo();
+                transferPair.splitAndTransfer((int) offset, (int) transferSize);
+
                 var rtDict = roundTripContext.getDictionaries().lookup(rtVec.getField().getDictionary().getId());
                 var rtDecoded = DictionaryEncoder.decode(rtVec, rtDict);
 
                 // Null out the type compartor
                 // Field names for dict encoded fields get mangled by Arrow and will not match reliably
-                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalDecoded, rtDecoded, null);
+                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalSlice, rtDecoded, null);
 
                 Assertions.assertTrue(
-                        visitor.rangeEquals(new Range(0, 0, originalDecoded.getValueCount())),
+                        visitor.rangeEquals(new Range(0, 0, originalSlice.getValueCount())),
                         "Vectors not equal for field " + field.getName());
 
                 originalDecoded.close();
+                originalSlice.close();
                 rtDecoded.close();
             }
         }

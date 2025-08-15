@@ -129,26 +129,17 @@ public abstract class ArrowDecoder extends BufferDecoder implements DataPipeline
         // Data arrives in one big buffer, so don't send it all at once
         // PUsh what the consumer requests, then wait for another call to pump()
 
-        while (context.readyToFlip() || context.readyToLoad()) {
+        while (consumerReady()) {
 
-            if (context.readyToFlip())
-                context.flip();
+            var batchAvailable = reader.loadNextBatch();
 
-            if (context.readyToLoad()) {
-
-                var batchAvailable = reader.loadNextBatch();
-
-                if (!batchAvailable)
-                    return true;
-
+            if (batchAvailable) {
                 context.setLoaded();
-
-                if (context.readyToFlip())
-                    context.flip();
-            }
-
-            if (context.readyToUnload() && consumerReady())
                 consumer().onBatch();
+            }
+            else {
+                return true;
+            }
         }
 
         return false;

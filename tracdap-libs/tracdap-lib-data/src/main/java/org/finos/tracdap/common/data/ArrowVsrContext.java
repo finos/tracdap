@@ -30,15 +30,12 @@ public class ArrowVsrContext {
     private final ArrowVsrSchema schema;
 
     private final BufferAllocator allocator;
-    private final VectorSchemaRoot front;
-    private final VectorSchemaRoot back;
+    private final VectorSchemaRoot vsr;
     private final DictionaryProvider dictionaries;
 
     private final boolean ownership;
 
-    private boolean backBufferLoaded;
-    private boolean frontBufferAvailable;
-    private boolean frontBufferUnloaded;
+    private boolean loaded;
 
     public static ArrowVsrContext forSource(VectorSchemaRoot source, DictionaryProvider dictionaries, BufferAllocator allocator) {
 
@@ -56,8 +53,7 @@ public class ArrowVsrContext {
         this.schema = new ArrowVsrSchema(source.getSchema(), dictionaries);
 
         this.allocator = allocator;
-        this.back = source;
-        this.front = back;  // No double buffering yet
+        this.vsr = source;
         this.dictionaries = dictionaries;
 
         this.ownership = takeOwnership;
@@ -84,8 +80,7 @@ public class ArrowVsrContext {
         var root = new VectorSchemaRoot(fields, vectors);
         root.allocateNew();
 
-        this.back = root;
-        this.front = root;  // No double buffering yet
+        this.vsr = root;
 
         // Use pre-defined dictionaries from the schema (if there are any)
         this.dictionaries = schema.dictionaries();
@@ -102,55 +97,39 @@ public class ArrowVsrContext {
         return allocator;
     }
 
-    public VectorSchemaRoot getBackBuffer() {
-        return back;
-    }
-
-    public VectorSchemaRoot getFrontBuffer() {
-        return front;
+    public VectorSchemaRoot getVsr() {
+        return vsr;
     }
 
     public DictionaryProvider getDictionaries() {
         return dictionaries;
     }
-
-    public boolean readyToLoad() {
-        return ! backBufferLoaded;
-    }
-
     public void setRowCount(int nRows) {
 
-        back.setRowCount(nRows);
+        vsr.setRowCount(nRows);
     }
 
     public void setLoaded() {
-        backBufferLoaded = true;
-    }
-
-    public boolean readyToFlip() {
-        return backBufferLoaded && (frontBufferUnloaded || !frontBufferAvailable);
-    }
-
-    public void flip() {
-        frontBufferAvailable = true;
-        frontBufferUnloaded = false;
-    }
-
-    public boolean readyToUnload() {
-        return frontBufferAvailable && !frontBufferUnloaded;
+        loaded = true;
     }
 
     public void setUnloaded() {
-        frontBufferUnloaded = true;
-        frontBufferAvailable = false;
-        backBufferLoaded = false;
+        loaded = false;
+    }
+
+    public boolean readyToLoad() {
+        return !loaded;
+    }
+
+    public boolean readyToUnload() {
+        return loaded;
     }
 
     public void close() {
 
         if (ownership) {
 
-            back.close();
+            vsr.close();
 
             if (dictionaries != null) {
                 for (var dictionaryId : dictionaries.getDictionaryIds()) {

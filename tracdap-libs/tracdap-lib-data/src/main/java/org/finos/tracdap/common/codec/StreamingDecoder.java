@@ -43,24 +43,12 @@ public abstract class StreamingDecoder
     @Override
     public boolean isReady() {
 
-        if (context != null)
-            return context.readyToFlip() || context.readyToLoad();
-        else
-            return consumerReady();
+        return consumerReady();
     }
 
     @Override
     public void pump() {
 
-        if (context == null)
-            return;
-
-        if (context.readyToFlip())
-            context.flip();
-
-        if (context.readyToUnload() && consumerReady()) {
-            consumer().onBatch();
-            context.setUnloaded();
-        }
+        // No-op
     }
 }

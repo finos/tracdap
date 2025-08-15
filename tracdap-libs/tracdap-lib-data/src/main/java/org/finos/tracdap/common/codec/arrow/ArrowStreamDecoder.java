@@ -124,7 +124,7 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
 
     private void sendBatches() throws IOException {
 
-        if (isDone())
+        if (!consumerReady() || isDone())
             return;
 
         if (context == null) {
@@ -143,37 +143,22 @@ public class ArrowStreamDecoder extends StreamingDecoder implements DataPipeline
             }
         }
 
-        if (context.readyToFlip())
-            context.flip();
-
-        if (context.readyToLoad()) {
-
-            if (messageReader.hasMessage(MessageHeader.RecordBatch)) {
-
-                arrowReader.loadNextBatch();
-                context.setLoaded();
-
-                if (context.readyToFlip())
-                    context.flip();
-            }
-            else if (messageReader.hasEos()) {
-
-                if (messageReader.hasMessage()) {
-                    var error = new EDataCorruption("Arrow decoding failed, unexpected messages after EOS marker");
-                    onError(error);
-                    return;
-                }
-
-                if (!isDone())
-                    markAsDone();
-            }
+        while (consumerReady() && messageReader.hasMessage(MessageHeader.RecordBatch)) {
+            arrowReader.loadNextBatch();
+            consumer().onBatch();
         }
 
-        if (context.readyToUnload() && consumerReady())
-            consumer().onBatch();
+        if (consumerReady() && messageReader.hasEos()) {
 
-        if (isDone() && !context.readyToUnload())
+            if (messageReader.hasMessage()) {
+                var error = new EDataCorruption("Arrow decoding failed, unexpected messages after EOS marker");
+                onError(error);
+                return;
+            }
+
+            markAsDone();
             consumer().onComplete();
+        }
     }
 
     @Override

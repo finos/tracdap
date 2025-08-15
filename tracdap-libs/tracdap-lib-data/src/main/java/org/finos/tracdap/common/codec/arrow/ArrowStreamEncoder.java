@@ -34,6 +34,6 @@ public class ArrowStreamEncoder extends ArrowEncoder {
     @Override
     protected ArrowWriter createWriter(ArrowVsrContext context, BufferAllocator allocator) {
         var out = new ByteOutputChannel(context.getAllocator(), consumer()::onNext);
-        return new ArrowStreamWriter(context.getFrontBuffer(), context.getDictionaries(), out);
+        return new ArrowStreamWriter(context.getVsr(), context.getDictionaries(), out);
     }
 }
