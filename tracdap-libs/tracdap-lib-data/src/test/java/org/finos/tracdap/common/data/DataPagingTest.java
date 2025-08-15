@@ -46,7 +46,6 @@ public class DataPagingTest {
 
         var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator, 10000);
-        inputData.flip();
 
         roundTrip_impl(inputData, allocator);
     }

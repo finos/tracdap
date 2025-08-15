@@ -73,7 +73,7 @@ public class BaseTextEncoder extends StreamingEncoder implements AutoCloseable {
             this.out = new ByteOutputStream(allocator, consumer()::onNext);
 
             this.writer = new TextFileWriter(
-                    context.getFrontBuffer(),
+                    context.getVsr(),
                     context.getDictionaries(),
                     this.out,
                     configForSchema(this.config, context.getSchema()));
@@ -112,7 +112,7 @@ public class BaseTextEncoder extends StreamingEncoder implements AutoCloseable {
             if (log.isTraceEnabled())
                 log.trace("JSON ENCODER: onNext()");
 
-            var batch = context.getFrontBuffer();
+            var batch = context.getVsr();
 
             writer.resetBatch(batch);
             writer.writeBatch();

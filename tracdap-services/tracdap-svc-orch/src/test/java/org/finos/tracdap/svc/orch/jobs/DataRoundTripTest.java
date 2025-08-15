@@ -216,9 +216,9 @@ public abstract class DataRoundTripTest {
 
         // This is a quick way of nulling a value in an Arrow vector
         // Unsetting the first bit of the validity buffer makes the first value null
-        for (var col = 0; col < data.getBackBuffer().getSchema().getFields().size(); ++col) {
+        for (var col = 0; col < data.getVsr().getSchema().getFields().size(); ++col) {
 
-            var vector = data.getBackBuffer().getVector(col);
+            var vector = data.getVsr().getVector(col);
             var validityMask0 = vector.getValidityBuffer().getByte(0);
             validityMask0 = (byte) (validityMask0 & (byte) 0xfe);
 
@@ -236,9 +236,9 @@ public abstract class DataRoundTripTest {
         var data = SampleData.generateBasicData(ALLOCATOR);
 
         // This is a quick way of nulling an entire vector, by setting the validity buffer to zero
-        for (var col = 0; col < data.getBackBuffer().getSchema().getFields().size(); ++col) {
+        for (var col = 0; col < data.getVsr().getSchema().getFields().size(); ++col) {
 
-            var vector = data.getBackBuffer().getVector(0);
+            var vector = data.getVsr().getVector(0);
             vector.getValidityBuffer().setZero(0, vector.getValidityBuffer().capacity());
             Assertions.assertEquals(vector.getValueCount(), vector.getNullCount());
         }
@@ -402,7 +402,7 @@ public abstract class DataRoundTripTest {
         var buf = new ArrayList<ArrowBuf>();
 
         try (var channel = new ByteOutputChannel(ALLOCATOR, buf::add);
-             var writer = new ArrowFileWriter(inputData.getFrontBuffer(), inputData.getDictionaries(), channel)) {
+             var writer = new ArrowFileWriter(inputData.getVsr(), inputData.getDictionaries(), channel)) {
 
             writer.start();
             writer.writeBatch();

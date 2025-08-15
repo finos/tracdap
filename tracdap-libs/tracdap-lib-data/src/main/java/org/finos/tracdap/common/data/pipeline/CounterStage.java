@@ -53,7 +53,7 @@ public class CounterStage
     @Override
     public void onBatch() {
         batchCount++;
-        rowCount += batch.getFrontBuffer().getRowCount();
+        rowCount += batch.getVsr().getRowCount();
         consumer().onBatch();
     }
 

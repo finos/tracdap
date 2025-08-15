@@ -34,6 +34,6 @@ public class ArrowFileEncoder extends ArrowEncoder {
     @Override
     protected ArrowWriter createWriter(ArrowVsrContext context, BufferAllocator allocator) {
         var out = new ByteOutputChannel(context.getAllocator(), consumer()::onNext);
-        return new ArrowFileWriterExt(context.getFrontBuffer(), context.getDictionaries(), out);
+        return new ArrowFileWriterExt(context.getVsr(), context.getDictionaries(), out);
     }
 }

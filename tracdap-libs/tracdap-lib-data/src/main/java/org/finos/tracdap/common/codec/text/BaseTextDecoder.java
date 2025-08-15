@@ -205,11 +205,9 @@ public class BaseTextDecoder extends StreamingDecoder {
         while (reader.readBatch()) {
 
             context.setLoaded();
-            context.flip();
             consumer().onBatch();
-            context.setUnloaded();
 
-            reader.resetBatch(context.getBackBuffer());
+            reader.resetBatch(context.getVsr());
         }
 
         return reader.endOfStream();

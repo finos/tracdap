@@ -84,7 +84,7 @@ public class RangeSelector
         var sliceTransfers = new ArrayList<TransferPair>();
         var sliceVectors = new ArrayList<FieldVector>();
 
-        for (var vector : context.getFrontBuffer().getFieldVectors()) {
+        for (var vector : context.getVsr().getFieldVectors()) {
 
             var transfer = vector.getTransferPair(vector.getAllocator());
             var sliceVector = (FieldVector) transfer.getTo();
@@ -113,7 +113,7 @@ public class RangeSelector
         if (incomingRoot == null)
             throw new EUnexpected();
 
-        var batchSize = incomingRoot.getFrontBuffer().getRowCount();
+        var batchSize = incomingRoot.getVsr().getRowCount();
         var batchStartRow = currentRow;
         var batchEndRow = currentRow + batchSize;
 
@@ -123,7 +123,7 @@ public class RangeSelector
 
             sliceRoot.setRowCount(batchSize);
             sliceRoot.setLoaded();
-            sliceRoot.flip();
+            consumer().onBatch();
         }
         else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
 
@@ -135,16 +135,12 @@ public class RangeSelector
 
             sliceRoot.setRowCount(sliceLength);
             sliceRoot.setLoaded();
-            sliceRoot.flip();
+            consumer().onBatch();
         }
 
         // Always consume the incoming data
         incomingRoot.setUnloaded();
         currentRow += batchSize;
-
-        if (sliceRoot.readyToUnload()) {
-            consumer().onBatch();
-        }
     }
 
     @Override

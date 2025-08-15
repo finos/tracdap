@@ -19,8 +19,6 @@ package org.finos.tracdap.test.data;
 
 import org.apache.arrow.vector.BaseIntVector;
 import org.apache.arrow.vector.FieldVector;
-import org.apache.arrow.vector.IntVector;
-import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.compare.Range;
 import org.apache.arrow.vector.compare.RangeEqualsVisitor;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
@@ -104,8 +102,8 @@ public class DataComparison {
 
         // Compare front (presenting) buffers of original and RT data
 
-        var original = originalContext.getFrontBuffer();
-        var roundTrip = roundTripContext.getFrontBuffer();
+        var original = originalContext.getVsr();
+        var roundTrip = roundTripContext.getVsr();
 
         // Data pipeline cleans up round trip root after the pipeline completes
         // To do this comparison, SingleBatchDataSink should convert root -> java array / maps
