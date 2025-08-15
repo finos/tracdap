@@ -55,23 +55,13 @@ public class RangeSelector
     @Override
     public boolean isReady() {
 
-        if (sliceRoot != null)
-            return sliceRoot.readyToFlip() || sliceRoot.readyToLoad();
-        else
-            return consumerReady();
+        return consumerReady();
     }
 
     @Override
     public void pump() {
 
-        if (incomingRoot == null)
-            return;
-
-        if (incomingRoot.readyToUnload())
-            flipBatch();
-
-        if (consumerReady() && sliceRoot.readyToUnload())
-            consumer().onBatch();
+        // No-op - Batches are processed immediately in onBatch()
     }
 
     @Override
@@ -118,56 +108,43 @@ public class RangeSelector
     @Override
     public void onBatch() {
 
+        // Process batches directly when they arrive
+
         if (incomingRoot == null)
             throw new EUnexpected();
 
-        flipBatch();
+        var batchSize = incomingRoot.getFrontBuffer().getRowCount();
+        var batchStartRow = currentRow;
+        var batchEndRow = currentRow + batchSize;
 
-        if (consumerReady() && sliceRoot.readyToUnload())
-            consumer().onBatch();
-    }
+        if (batchStartRow >= offset && (batchEndRow < offset + limit || limit == 0)) {
 
-    private void flipBatch() {
+            sliceTransfers.forEach(TransferPair::transfer);
 
-        if (sliceRoot.readyToFlip())
+            sliceRoot.setRowCount(batchSize);
+            sliceRoot.setLoaded();
             sliceRoot.flip();
+        }
+        else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
 
-        if (sliceRoot.readyToLoad()) {
+            var sliceStart = (int) (offset - batchStartRow);
+            var sliceEnd = (int) Math.min(offset + limit - batchStartRow, batchSize);
+            var sliceLength = sliceEnd - sliceStart;
 
-            var batchSize = incomingRoot.getFrontBuffer().getRowCount();
-            var batchStartRow = currentRow;
-            var batchEndRow = currentRow + batchSize;
+            sliceTransfers.forEach(slice -> slice.splitAndTransfer(sliceStart, sliceLength));
 
-            if (batchStartRow >= offset && (batchEndRow < offset + limit || limit == 0)) {
-
-                sliceTransfers.forEach(TransferPair::transfer);
-
-                sliceRoot.setRowCount(batchSize);
-                sliceRoot.setLoaded();
-            }
-            else if (batchEndRow >= offset && (batchStartRow < offset + limit || limit == 0)) {
-
-                var sliceStart = (int) (offset - batchStartRow);
-                var sliceEnd = (int) Math.min(offset + limit - batchStartRow, batchSize);
-                var sliceLength = sliceEnd - sliceStart;
-
-                sliceTransfers.forEach(slice -> slice.splitAndTransfer(sliceStart, sliceLength));
-
-                sliceRoot.setRowCount(sliceLength);
-                sliceRoot.setLoaded();
-            }
-
-            incomingRoot.setUnloaded();
-            currentRow += batchSize;
+            sliceRoot.setRowCount(sliceLength);
+            sliceRoot.setLoaded();
+            sliceRoot.flip();
         }
 
-        if (sliceRoot.readyToFlip())
-            sliceRoot.flip();
+        // Always consume the incoming data
+        incomingRoot.setUnloaded();
+        currentRow += batchSize;
 
-
-        // TODO: if (batchStartRow >= offset + limit && limit != 0) {
-        //      pipeline.cancel()
-        // }
+        if (sliceRoot.readyToUnload()) {
+            consumer().onBatch();
+        }
     }
 
     @Override
