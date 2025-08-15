@@ -22,6 +22,7 @@ import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.DataPipeline;
 import org.finos.tracdap.common.data.pipeline.BaseDataSink;
 
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 
@@ -29,7 +30,7 @@ public class SingleBatchDataSink
         extends BaseDataSink <DataPipeline.ArrowApi>
         implements DataPipeline.ArrowApi {
 
-    private final Consumer<ArrowVsrContext> callback;
+    private final BiConsumer<ArrowVsrContext, Long> callback;
 
     private ArrowVsrContext root;
     private ArrowVsrSchema schema;
@@ -37,14 +38,22 @@ public class SingleBatchDataSink
     private int batchCount;
 
     public SingleBatchDataSink(DataPipeline pipeline) {
-        this(pipeline, batch -> {});
+        this(pipeline, (batch, offset) -> {});
+    }
+
+    public SingleBatchDataSink(DataPipeline pipeline, BiConsumer<ArrowVsrContext, Long> callback) {
+
+        super(pipeline);
+
+        this.callback = callback;
+        this.batchCount = 0;
     }
 
     public SingleBatchDataSink(DataPipeline pipeline, Consumer<ArrowVsrContext> callback) {
 
         super(pipeline);
 
-        this.callback = callback;
+        this.callback = (batch, offset) -> callback.accept(batch);
         this.batchCount = 0;
     }
 
@@ -93,12 +102,12 @@ public class SingleBatchDataSink
     @Override
     public void onBatch() {
 
-        batchCount += 1;
-        rowCount += root.getFrontBuffer().getRowCount();
-
         try {
-            callback.accept(root);
+            callback.accept(root, rowCount);
             root.setUnloaded();
+
+            batchCount += 1;
+            rowCount += root.getFrontBuffer().getRowCount();
         }
         catch (Throwable t) {
             markAsDone();

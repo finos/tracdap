@@ -323,19 +323,23 @@ public class SampleData {
 
     public static ArrowVsrContext generateBasicData(BufferAllocator arrowAllocator) {
 
-        return generateTestData(BASIC_TABLE_SCHEMA, arrowAllocator, 0);
+        return generateBasicData(arrowAllocator, 10);
+    }
+
+    public static ArrowVsrContext generateBasicData(BufferAllocator arrowAllocator, int nRows) {
+
+        return generateTestData(BASIC_TABLE_SCHEMA, arrowAllocator, 0, nRows);
     }
 
     public static ArrowVsrContext generateStructData(BufferAllocator arrowAllocator) {
 
-        return generateTestData(BASIC_STRUCT_SCHEMA, arrowAllocator, 2);
+        return generateTestData(BASIC_STRUCT_SCHEMA, arrowAllocator, 2, 1);
     }
 
-    public static ArrowVsrContext generateTestData(SchemaDefinition schema, BufferAllocator arrowAllocator, int offset) {
+    public static ArrowVsrContext generateTestData(SchemaDefinition schema, BufferAllocator arrowAllocator, int offset, int nRows) {
 
         var arrowSchema = SchemaMapping.tracToArrow(schema, arrowAllocator);
 
-        var nRows = schema.getSchemaType() == SchemaType.STRUCT_SCHEMA ? 1 : 10;
         var fields = schema.getSchemaType() == SchemaType.TABLE_SCHEMA
                 ? schema.getTable().getFieldsList()
                 : schema.getStruct().getFieldsList();
@@ -554,15 +558,15 @@ public class SampleData {
 
             case Bool:
                 var booleanVec = (BitVector) vector;
-                return (i, o) -> booleanVec.set(i, (Boolean) o ? 1 : 0);
+                return (i, o) -> booleanVec.setSafe(i, (Boolean) o ? 1 : 0);
 
             case Int:
                 var intVec = (BigIntVector) vector;
                 return  (i, o) -> {
                     if (o instanceof Integer)
-                        intVec.set(i, (Integer) o);
+                        intVec.setSafe(i, (Integer) o);
                     else if (o instanceof Long)
-                        intVec.set(i, (Long) o);
+                        intVec.setSafe(i, (Long) o);
                     else
                         throw new EUnexpected();
                 };
@@ -571,16 +575,16 @@ public class SampleData {
                 var floatVec = (Float8Vector) vector;
                 return (i, o) -> {
                     if (o instanceof Float)
-                        floatVec.set(i, (Float) o);
+                        floatVec.setSafe(i, (Float) o);
                     else if (o instanceof Double)
-                        floatVec.set(i, (Double) o);
+                        floatVec.setSafe(i, (Double) o);
                     else
                         throw new EUnexpected();
                 };
 
             case Decimal:
                 var decimalVec = (DecimalVector) vector;
-                return (i, o) -> decimalVec.set(i, (BigDecimal) o);
+                return (i, o) -> decimalVec.setSafe(i, (BigDecimal) o);
 
             case Utf8:
                 var stringVec = (VarCharVector) vector;
@@ -591,7 +595,7 @@ public class SampleData {
 
             case Date:
                 var dateVec = (DateDayVector) vector;
-                return (i, o) -> dateVec.set(i, (int) ((LocalDate) o).toEpochDay());
+                return (i, o) -> dateVec.setSafe(i, (int) ((LocalDate) o).toEpochDay());
 
             case Timestamp:
                 var timestampVec = (TimeStampMilliVector) vector;
@@ -600,7 +604,7 @@ public class SampleData {
                     long unixEpochMillis =
                             (datetimeNoZone.toEpochSecond(ZoneOffset.UTC) * 1000) +
                             (datetimeNoZone.getNano() / 1000000);
-                    timestampVec.set(i, unixEpochMillis);
+                    timestampVec.setSafe(i, unixEpochMillis);
                 };
 
             case List:
