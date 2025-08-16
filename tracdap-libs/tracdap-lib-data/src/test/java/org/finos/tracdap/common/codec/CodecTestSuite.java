@@ -58,7 +58,7 @@ import static org.finos.tracdap.test.data.SampleData.generateStructData;
 
 public abstract class CodecTestSuite {
 
-    private static final boolean DEBUG_ALLOCATION_LOGGING = false;
+    private static final boolean DEBUG_ALLOCATION_LOGGING = true;
 
     // Concrete test cases for codecs included in CORE_DATA
 
@@ -204,11 +204,13 @@ public abstract class CodecTestSuite {
         intVec.set(2, Long.MAX_VALUE);
         intVec.set(3, Long.MIN_VALUE);
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(intVec), 4);
+        var root = new VectorSchemaRoot(List.of(field), List.of(intVec));
 
         try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
+            inputData.setRowCount(4);
             inputData.setLoaded();
+
             roundTrip_impl(inputData, allocator);
         }
     }
@@ -235,11 +237,13 @@ public abstract class CodecTestSuite {
         floatVec.set(7, Double.NEGATIVE_INFINITY);
         floatVec.set(8, Double.NaN);
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(floatVec), 9);
+        var root = new VectorSchemaRoot(List.of(field), List.of(floatVec));
 
         try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
+            inputData.setRowCount(9);
             inputData.setLoaded();
+
             roundTrip_impl(inputData, allocator);
         }
     }
@@ -266,11 +270,13 @@ public abstract class CodecTestSuite {
         decimalVec.set(4, d3);
         decimalVec.set(5, d4);
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(decimalVec), 6);
+        var root = new VectorSchemaRoot(List.of(field), List.of(decimalVec));
 
         try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
+            inputData.setRowCount(6);
             inputData.setLoaded();
+
             roundTrip_impl(inputData, allocator);
         }
     }
@@ -295,11 +301,13 @@ public abstract class CodecTestSuite {
         stringVec.set(8, "مرحبا بالعالم".getBytes(StandardCharsets.UTF_8));
         stringVec.set(9, "\0".getBytes(StandardCharsets.UTF_8));
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(stringVec), 10);
+        var root = new VectorSchemaRoot(List.of(field), List.of(stringVec));
 
         try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
+            inputData.setRowCount(10);
             inputData.setLoaded();
+
             roundTrip_impl(inputData, allocator);
         }
     }
@@ -327,11 +335,13 @@ public abstract class CodecTestSuite {
         Assertions.assertEquals(minDate, LocalDate.ofEpochDay(dateVec.get(4)));
         Assertions.assertEquals(maxDate, LocalDate.ofEpochDay(dateVec.get(5)));
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(dateVec), 6);
+        var root = new VectorSchemaRoot(List.of(field), List.of(dateVec));
 
         try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
+            inputData.setRowCount(6);
             inputData.setLoaded();
+
             roundTrip_impl(inputData, allocator);
         }
     }
@@ -368,7 +378,9 @@ public abstract class CodecTestSuite {
 
         try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
+            inputData.setRowCount(8);
             inputData.setLoaded();
+
             roundTrip_impl(inputData, allocator);
         }
     }

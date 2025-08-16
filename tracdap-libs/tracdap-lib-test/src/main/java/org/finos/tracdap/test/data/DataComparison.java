@@ -147,7 +147,7 @@ public class DataComparison {
             RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalVec, rtVec);
 
             Assertions.assertTrue(
-                    visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
+                    visitor.rangeEquals(new Range(0, 0, rtVec.getValueCount())),
                     "Vectors not equal for field " + field.getName());
         }
         else {
@@ -167,7 +167,7 @@ public class DataComparison {
                 RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalDecoded, rtDecoded, null);
 
                 Assertions.assertTrue(
-                        visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
+                        visitor.rangeEquals(new Range(0, 0, rtVec.getValueCount())),
                         "Vectors not equal for field " + field.getName());
             }
         }
