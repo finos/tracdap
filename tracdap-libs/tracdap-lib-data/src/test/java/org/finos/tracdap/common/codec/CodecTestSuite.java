@@ -26,14 +26,10 @@ import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.exception.EDataCorruption;
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.test.data.DataComparison;
-import org.finos.tracdap.test.data.SampleData;
-import org.finos.tracdap.test.data.SingleBatchDataSink;
-import org.finos.tracdap.test.data.SingleBatchDataSource;
+import org.finos.tracdap.test.data.*;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
 import org.apache.arrow.memory.BufferAllocator;
-import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.FieldType;
@@ -51,6 +47,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
 import io.netty.util.concurrent.DefaultEventExecutor;
+
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
@@ -60,6 +57,8 @@ import static org.finos.tracdap.test.data.SampleData.generateStructData;
 
 
 public abstract class CodecTestSuite {
+
+    private static final boolean DEBUG_ALLOCATION_LOGGING = false;
 
     // Concrete test cases for codecs included in CORE_DATA
 
@@ -113,8 +112,8 @@ public abstract class CodecTestSuite {
 
     @BeforeEach
     void setupAllocator() {
-        // Use a separate allocator for each test case
-        allocator = new RootAllocator();
+        // Use a separate allocator for each test case so errors can be identified
+        allocator = MemoryTestHelpers.testAllocator(DEBUG_ALLOCATION_LOGGING);
     }
 
     @AfterEach
@@ -125,58 +124,70 @@ public abstract class CodecTestSuite {
     }
 
     @Test
+    void testTheTestFramework() {
+        // If this test fails, there is a problem in generateBasicData()
+        try (var inputData = generateBasicData(allocator)) {
+            Assertions.assertNotNull(inputData);
+        }
+    }
+
+    @Test
     void roundTrip_basic() {
 
-        var inputData = generateBasicData(allocator);
+        try (var inputData = generateBasicData(allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
     void roundTrip_basicMultiBatch() {
 
-        var inputData = generateBasicData(allocator, 5000);
+        try (var inputData = generateBasicData(allocator, 5000)) {
 
-        roundTrip_impl(inputData, allocator, true);
+            roundTrip_impl(inputData, allocator, true);
+        }
     }
 
     @Test
     void roundTrip_nulls() {
 
-        var inputData = generateBasicData(allocator);
+        try (var inputData = generateBasicData(allocator)) {
 
-        // With the basic test data, we'll get one null value for each data type
+            // With the basic test data, we'll get one null value for each data type
 
-        var limit = Math.min(inputData.getVsr().getRowCount(), inputData.getVsr().getFieldVectors().size());
+            var limit = Math.min(inputData.getVsr().getRowCount(), inputData.getVsr().getFieldVectors().size());
 
-        for (var i = 0; i < limit; i++) {
+            for (var i = 0; i < limit; i++) {
 
-            var vector = inputData.getVsr().getVector(i);
+                var vector = inputData.getVsr().getVector(i);
 
-            if (BaseFixedWidthVector.class.isAssignableFrom(vector.getClass())) {
+                if (BaseFixedWidthVector.class.isAssignableFrom(vector.getClass())) {
 
-                var fixedVector = (BaseFixedWidthVector) vector;
-                fixedVector.setNull(i);
-            } else if (BaseVariableWidthVector.class.isAssignableFrom(vector.getClass())) {
+                    var fixedVector = (BaseFixedWidthVector) vector;
+                    fixedVector.setNull(i);
+                } else if (BaseVariableWidthVector.class.isAssignableFrom(vector.getClass())) {
 
-                var variableVector = (BaseVariableWidthVector) vector;
-                variableVector.setNull(i);
-            } else {
+                    var variableVector = (BaseVariableWidthVector) vector;
+                    variableVector.setNull(i);
+                } else {
 
-                throw new EUnexpected();
+                    throw new EUnexpected();
+                }
             }
-        }
 
-        roundTrip_impl(inputData, allocator);
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
     @EnabledIf(value = "structSupported", disabledReason = "This codec does not support STRUCT data")
     void roundTrip_struct() {
 
-        var inputData = generateStructData(allocator);
+        try (var inputData = generateStructData(allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
@@ -193,13 +204,13 @@ public abstract class CodecTestSuite {
         intVec.set(2, Long.MAX_VALUE);
         intVec.set(3, Long.MIN_VALUE);
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(intVec));
+        var root = new VectorSchemaRoot(List.of(field), List.of(intVec), 4);
 
-        var inputData = ArrowVsrContext.forSource(root, null, allocator);
-        inputData.setRowCount(4);
-        inputData.setLoaded();
+        try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            inputData.setLoaded();
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
@@ -224,13 +235,13 @@ public abstract class CodecTestSuite {
         floatVec.set(7, Double.NEGATIVE_INFINITY);
         floatVec.set(8, Double.NaN);
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(floatVec));
+        var root = new VectorSchemaRoot(List.of(field), List.of(floatVec), 9);
 
-        var inputData = ArrowVsrContext.forSource(root, null, allocator);
-        inputData.setRowCount(9);
-        inputData.setLoaded();
+        try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            inputData.setLoaded();
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
@@ -255,13 +266,13 @@ public abstract class CodecTestSuite {
         decimalVec.set(4, d3);
         decimalVec.set(5, d4);
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(decimalVec));
+        var root = new VectorSchemaRoot(List.of(field), List.of(decimalVec), 6);
 
-        var inputData = ArrowVsrContext.forSource(root, null, allocator);
-        inputData.setRowCount(6);
-        inputData.setLoaded();
+        try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            inputData.setLoaded();
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
@@ -284,13 +295,13 @@ public abstract class CodecTestSuite {
         stringVec.set(8, "مرحبا بالعالم".getBytes(StandardCharsets.UTF_8));
         stringVec.set(9, "\0".getBytes(StandardCharsets.UTF_8));
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(stringVec));
+        var root = new VectorSchemaRoot(List.of(field), List.of(stringVec), 10);
 
-        var inputData = ArrowVsrContext.forSource(root, null, allocator);
-        inputData.setRowCount(10);
-        inputData.setLoaded();
+        try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            inputData.setLoaded();
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
@@ -316,13 +327,13 @@ public abstract class CodecTestSuite {
         Assertions.assertEquals(minDate, LocalDate.ofEpochDay(dateVec.get(4)));
         Assertions.assertEquals(maxDate, LocalDate.ofEpochDay(dateVec.get(5)));
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(dateVec));
+        var root = new VectorSchemaRoot(List.of(field), List.of(dateVec), 6);
 
-        var inputData = ArrowVsrContext.forSource(root, null, allocator);
-        inputData.setRowCount(6);
-        inputData.setLoaded();
+        try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            inputData.setLoaded();
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     @Test
@@ -353,13 +364,13 @@ public abstract class CodecTestSuite {
         Assertions.assertEquals(minDatetime, fromEpochMillis(datetimeVec.get(6)));
         Assertions.assertEquals(maxDatetime, fromEpochMillis(datetimeVec.get(7)));
 
-        var root = new VectorSchemaRoot(List.of(field), List.of(datetimeVec));
+        var root = new VectorSchemaRoot(List.of(field), List.of(datetimeVec), 8);
 
-        var inputData = ArrowVsrContext.forSource(root, null, allocator);
-        inputData.setRowCount(8);
-        inputData.setLoaded();
+        try (var inputData = ArrowVsrContext.forSource(root, true, null, false, allocator)) {
 
-        roundTrip_impl(inputData, allocator);
+            inputData.setLoaded();
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
     private long toEpochMillis(LocalDateTime localDateTime) {
@@ -423,41 +434,41 @@ public abstract class CodecTestSuite {
         if (!multiBatch)
             Assertions.assertEquals(1, dataSink.getBatchCount());
 
-        inputData.close();
+        System.out.println("Received " + rtRowCount + " rows in  " + dataSink.getBatchCount() + " batches");
     }
 
     @Test
     @EnabledIf(value = "basicDataAvailable", disabledReason = "Pre-saved test data not available for this format")
     void decode_basic() throws Exception {
 
-        var inputData = generateBasicData(allocator);
+        // Comparison data is not fed through the pipeline, but still needs to be released
+        try (var comparisonData = generateBasicData(allocator)) {
 
-        var testData = ResourceHelpers.loadResourceAsBytes(basicData);
-        var testDataBuf = Bytes.copyToBuffer(testData, allocator);
-        var testDataStream = Flows.publish(List.of(testDataBuf));
+            var testData = ResourceHelpers.loadResourceAsBytes(basicData);
+            var testDataBuf = Bytes.copyToBuffer(testData, allocator);
+            var testDataStream = Flows.publish(List.of(testDataBuf));
 
-        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
-        var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
+            var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+            var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        var decoder = codec.getDecoder(inputData.getSchema(), allocator, Map.of());
-        pipeline.addStage(decoder);
+            var decoder = codec.getDecoder(comparisonData.getSchema(), allocator, Map.of());
+            pipeline.addStage(decoder);
 
-        var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(inputData, batch));
-        pipeline.addSink(dataSink);
+            var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(comparisonData, batch));
+            pipeline.addSink(dataSink);
 
-        var exec = pipeline.execute();
-        waitFor(TEST_TIMEOUT, exec);
-        getResultOf(exec);
+            var exec = pipeline.execute();
+            waitFor(TEST_TIMEOUT, exec);
+            getResultOf(exec);
 
-        var rtSchema = dataSink.getSchema();
-        var rtRowCount = dataSink.getRowCount();
+            var rtSchema = dataSink.getSchema();
+            var rtRowCount = dataSink.getRowCount();
 
-        DataComparison.compareSchemas(inputData.getSchema(), rtSchema);
+            DataComparison.compareSchemas(comparisonData.getSchema(), rtSchema);
 
-        Assertions.assertEquals(1, dataSink.getBatchCount());
-        Assertions.assertEquals(inputData.getVsr().getRowCount(), rtRowCount);
-
-        inputData.close();
+            Assertions.assertEquals(1, dataSink.getBatchCount());
+            Assertions.assertEquals(comparisonData.getVsr().getRowCount(), rtRowCount);
+        }
     }
 
     @Test
@@ -465,32 +476,35 @@ public abstract class CodecTestSuite {
     void decode_struct() throws Exception {
 
         var structSchema = SchemaMapping.tracToArrow(SampleData.BASIC_STRUCT_SCHEMA, allocator);
-        var structExpectedResult = generateStructData(allocator);
 
-        var testData = ResourceHelpers.loadResourceAsBytes(structData);
-        var testDataBuf = Bytes.copyToBuffer(testData, allocator);
-        var testDataStream = Flows.publish(List.of(testDataBuf));
+        // Comparison data is not fed through the pipeline, but still needs to be released
+        try (var structComparisonData = generateStructData(allocator)) {
 
-        var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
-        var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
+            var testData = ResourceHelpers.loadResourceAsBytes(structData);
+            var testDataBuf = Bytes.copyToBuffer(testData, allocator);
+            var testDataStream = Flows.publish(List.of(testDataBuf));
 
-        var decoder = codec.getDecoder(structSchema, allocator, Map.of());
-        pipeline.addStage(decoder);
+            var dataCtx = new DataContext(new DefaultEventExecutor(), allocator);
+            var pipeline = DataPipeline.forSource(testDataStream, dataCtx);
 
-        var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(structExpectedResult, batch));
-        pipeline.addSink(dataSink);
+            var decoder = codec.getDecoder(structSchema, allocator, Map.of());
+            pipeline.addStage(decoder);
 
-        var exec = pipeline.execute();
-        waitFor(TEST_TIMEOUT, exec);
-        getResultOf(exec);
+            var dataSink = new SingleBatchDataSink(pipeline, batch -> DataComparison.compareBatches(structComparisonData, batch));
+            pipeline.addSink(dataSink);
 
-        var rtSchema = dataSink.getSchema();
-        var rtRowCount = dataSink.getRowCount();
+            var exec = pipeline.execute();
+            waitFor(TEST_TIMEOUT, exec);
+            getResultOf(exec);
 
-        DataComparison.compareSchemas(structSchema, rtSchema);
+            var rtSchema = dataSink.getSchema();
+            var rtRowCount = dataSink.getRowCount();
 
-        Assertions.assertEquals(1, dataSink.getBatchCount());
-        Assertions.assertEquals(1, rtRowCount);
+            DataComparison.compareSchemas(structSchema, rtSchema);
+
+            Assertions.assertEquals(1, dataSink.getBatchCount());
+            Assertions.assertEquals(1, rtRowCount);
+        }
     }
 
     @Test
@@ -540,7 +554,7 @@ public abstract class CodecTestSuite {
     }
 
     @Test
-    void decode_garbled() throws Exception {
+    void decode_garbled() {
 
         // Send a stream of random bytes - 3 chunks worth
 
