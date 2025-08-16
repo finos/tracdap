@@ -492,7 +492,7 @@ public abstract class DataRoundTripTest {
         var reader = new ArrowFileReader(new ByteSeekableChannel(List.of(arrowBuf)), allocator);
         reader.loadNextBatch();
 
-        var root = ArrowVsrContext.forSource(reader.getVectorSchemaRoot(), reader, allocator, List.of(reader));
+        var root = ArrowVsrContext.forSource(reader.getVectorSchemaRoot(), reader, allocator, reader);
         var arrowSchema = SchemaMapping.tracToArrow(dataResponse.getSchema());
 
         DataComparison.compareSchemas(arrowSchema, root.getSchema());
