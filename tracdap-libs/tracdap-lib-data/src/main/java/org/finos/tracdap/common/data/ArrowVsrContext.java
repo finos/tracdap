@@ -20,12 +20,13 @@ package org.finos.tracdap.common.data;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.vector.*;
 import org.apache.arrow.vector.dictionary.DictionaryProvider;
+import org.finos.tracdap.common.exception.EUnexpected;
 
 import java.util.*;
 
 
 /// A working context for Arrow data being processed through the VSR framework in a data pipeline
-public class ArrowVsrContext {
+public class ArrowVsrContext implements AutoCloseable {
 
     private final ArrowVsrSchema schema;
 
@@ -35,13 +36,14 @@ public class ArrowVsrContext {
 
     private final boolean vsrOwnership;
     private final boolean dictionariesOwnership;
+    private final List<AutoCloseable> resources;
 
     private boolean loaded;
 
     public static ArrowVsrContext forSource(VectorSchemaRoot source, DictionaryProvider dictionaries, BufferAllocator allocator) {
 
         // Do not take ownership of external sources by default
-        return new ArrowVsrContext(source, false, dictionaries, false, allocator);
+        return new ArrowVsrContext(source, false, dictionaries, false, allocator, null);
     }
 
     public static ArrowVsrContext forSource(
@@ -49,13 +51,20 @@ public class ArrowVsrContext {
             DictionaryProvider dictionaries, boolean dictionariesOwnership,
             BufferAllocator allocator) {
 
-        return new ArrowVsrContext(source, sourceOwnership, dictionaries, dictionariesOwnership, allocator);
+        return new ArrowVsrContext(source, sourceOwnership, dictionaries, dictionariesOwnership, allocator, null);
+    }
+
+    public static ArrowVsrContext forSource(
+            VectorSchemaRoot source, DictionaryProvider dictionaries,
+            BufferAllocator allocator, List<AutoCloseable> resources) {
+
+        return new ArrowVsrContext(source, false, dictionaries, false, allocator, resources);
     }
 
     private ArrowVsrContext(
             VectorSchemaRoot source, boolean sourceOwnership,
             DictionaryProvider dictionaries, boolean dictionariesOwnership,
-            BufferAllocator allocator) {
+            BufferAllocator allocator, List<AutoCloseable> resources) {
 
         this.schema = new ArrowVsrSchema(source.getSchema(), dictionaries);
 
@@ -65,6 +74,7 @@ public class ArrowVsrContext {
 
         this.vsrOwnership = sourceOwnership;
         this.dictionariesOwnership = dictionariesOwnership;
+        this.resources = resources;
     }
 
     public static ArrowVsrContext forSchema(ArrowVsrSchema schema, BufferAllocator allocator) {
@@ -96,6 +106,7 @@ public class ArrowVsrContext {
         // VSR is constructed internally, dictionaries are owned by the schema
         this.vsrOwnership = true;
         this.dictionariesOwnership = false;
+        this.resources = null;
     }
 
     public ArrowVsrSchema getSchema() {
@@ -134,6 +145,7 @@ public class ArrowVsrContext {
         return loaded;
     }
 
+    @Override
     public void close() {
 
         if (vsrOwnership)
@@ -144,6 +156,17 @@ public class ArrowVsrContext {
                 for (var dictionaryId : dictionaries.getDictionaryIds()) {
                     var dictionary = dictionaries.lookup(dictionaryId);
                     dictionary.getVector().close();
+                }
+            }
+        }
+
+        if (resources != null) {
+            for (var resource : resources) {
+                try {
+                    resource.close();
+                }
+                catch (Throwable error) {
+                    throw new EUnexpected(error);
                 }
             }
         }
