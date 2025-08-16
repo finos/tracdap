@@ -21,7 +21,7 @@ and is available to download and use for free under the
 
 A community edition of TRAC, which is based on the TRAC D.A.P. framework, is available for free
 under an Apache + Commons Clause license. You can
-[download the community edition from Docker Hub](https://hub.docker.com/r/fintrac/trac-sandbox).
+[download the community edition from Docker Hub](https://hub.docker.com/r/fintrac/trac-desktop).
 
 ## Documentation and Packages
 
@@ -31,7 +31,7 @@ The following packages are available:
 
 | Package                                                                  | Description                                                                                           |
 |--------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
-| [Model runtime for Python](https://pypi.org/project/tracdap-runtime/)    | Build models and test them in a sandbox, ready to deploy to the platform                              |
+| [Model runtime for Python](https://pypi.org/project/tracdap-runtime/)    | Build models and test them on your desktop, ready to deploy to the platform                           |
 | [Web API package](https://www.npmjs.com/package/@finos/tracdap-web-api)  | Build client apps in JavaScript or TypeScript using the TRAC platform APIs                            |
 | [Platform releases](https://github.com/finos/tracdap/releases)           | Packages for the platform services and a standalone sandbox are published with each release on GitHub |
 
@@ -51,11 +51,11 @@ https://github.com/finos/tracdap/actions/workflows/packaging.yml)
 https://tracdap.finos.org/en/stable/?badge=stable)
 
 
-The current release series (0.8) contains the core capabilities needed to build and run models,
+The current release series (0.9) contains the core capabilities needed to build and run models,
 both for local development and in a hosted environment. It also contains the platform services
 and APIs needed to build client applications and system-to-system integrations.
 
-Metadata compatibility is guaranteed within each release series (e.g. 0.8.x). Minor changes may
+Metadata compatibility is guaranteed within each release series (e.g. 0.9.x). Minor changes may
 occur between release series, mostly for internal structures and removal of deprecated APIs.
 The metadata model will be frozen at version 1.0 after which it may be added to but no fields
 will be removed or change. Configuration formats are subject to change between versions and
