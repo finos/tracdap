@@ -33,22 +33,29 @@ public class ArrowVsrContext {
     private final VectorSchemaRoot vsr;
     private final DictionaryProvider dictionaries;
 
-    private final boolean ownership;
+    private final boolean vsrOwnership;
+    private final boolean dictionariesOwnership;
 
     private boolean loaded;
 
     public static ArrowVsrContext forSource(VectorSchemaRoot source, DictionaryProvider dictionaries, BufferAllocator allocator) {
 
         // Do not take ownership of external sources by default
-        return new ArrowVsrContext(source, dictionaries, allocator, false);
+        return new ArrowVsrContext(source, false, dictionaries, false, allocator);
     }
 
-    public static ArrowVsrContext forSource(VectorSchemaRoot source, DictionaryProvider dictionaries, BufferAllocator allocator, boolean takeOwnership) {
+    public static ArrowVsrContext forSource(
+            VectorSchemaRoot source, boolean sourceOwnership,
+            DictionaryProvider dictionaries, boolean dictionariesOwnership,
+            BufferAllocator allocator) {
 
-        return new ArrowVsrContext(source, dictionaries, allocator, takeOwnership);
+        return new ArrowVsrContext(source, sourceOwnership, dictionaries, dictionariesOwnership, allocator);
     }
 
-    private ArrowVsrContext(VectorSchemaRoot source, DictionaryProvider dictionaries, BufferAllocator allocator, boolean takeOwnership) {
+    private ArrowVsrContext(
+            VectorSchemaRoot source, boolean sourceOwnership,
+            DictionaryProvider dictionaries, boolean dictionariesOwnership,
+            BufferAllocator allocator) {
 
         this.schema = new ArrowVsrSchema(source.getSchema(), dictionaries);
 
@@ -56,7 +63,8 @@ public class ArrowVsrContext {
         this.vsr = source;
         this.dictionaries = dictionaries;
 
-        this.ownership = takeOwnership;
+        this.vsrOwnership = sourceOwnership;
+        this.dictionariesOwnership = dictionariesOwnership;
     }
 
     public static ArrowVsrContext forSchema(ArrowVsrSchema schema, BufferAllocator allocator) {
@@ -85,8 +93,9 @@ public class ArrowVsrContext {
         // Use pre-defined dictionaries from the schema (if there are any)
         this.dictionaries = schema.dictionaries();
 
-        // Always take ownership if the VSR has been constructed internally
-        this.ownership = true;
+        // VSR is constructed internally, dictionaries are owned by the schema
+        this.vsrOwnership = true;
+        this.dictionariesOwnership = false;
     }
 
     public ArrowVsrSchema getSchema() {
@@ -127,10 +136,10 @@ public class ArrowVsrContext {
 
     public void close() {
 
-        if (ownership) {
-
+        if (vsrOwnership)
             vsr.close();
 
+        if (dictionariesOwnership) {
             if (dictionaries != null) {
                 for (var dictionaryId : dictionaries.getDictionaryIds()) {
                     var dictionary = dictionaries.lookup(dictionaryId);
