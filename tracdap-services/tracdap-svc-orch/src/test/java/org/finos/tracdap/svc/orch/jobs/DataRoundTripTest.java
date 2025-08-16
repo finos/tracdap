@@ -36,6 +36,7 @@ import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
 import org.finos.tracdap.test.data.DataComparison;
+import org.finos.tracdap.test.data.MemoryTestHelpers;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -130,20 +131,14 @@ public abstract class DataRoundTripTest {
     @BeforeAll
     static void setUp() {
 
-        ALLOCATOR = new RootAllocator();
+        ALLOCATOR = MemoryTestHelpers.testAllocator(false);
     }
 
     @AfterAll
     static void cleanUp() {
 
-        try {
-            ALLOCATOR.close();
-        }
-        catch (Exception e) {
-            // Only fail for leaks inside the data service
-            // Do not fail if data in the test framework is not cleaned up
-            log.warn("Test data was not cleaned up");
-        }
+        // Any release / double free bugs in the test code will be reported as failures
+        ALLOCATOR.close();
     }
 
     @Test @Order(1)
@@ -497,10 +492,7 @@ public abstract class DataRoundTripTest {
         var reader = new ArrowFileReader(new ByteSeekableChannel(List.of(arrowBuf)), allocator);
         reader.loadNextBatch();
 
-        var root = ArrowVsrContext.forSource(
-                reader.getVectorSchemaRoot(),
-                reader, allocator, /* takeOwnership = */ true);
-
+        var root = ArrowVsrContext.forSource(reader.getVectorSchemaRoot(), reader, allocator, reader);
         var arrowSchema = SchemaMapping.tracToArrow(dataResponse.getSchema());
 
         DataComparison.compareSchemas(arrowSchema, root.getSchema());
