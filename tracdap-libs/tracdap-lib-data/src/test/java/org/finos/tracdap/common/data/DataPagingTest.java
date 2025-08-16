@@ -18,14 +18,17 @@
 package org.finos.tracdap.common.data;
 
 import io.netty.util.concurrent.DefaultEventExecutor;
-import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.memory.BufferAllocator;
 import org.finos.tracdap.common.codec.ICodec;
 import org.finos.tracdap.common.codec.csv.CsvCodec;
 import org.finos.tracdap.common.data.pipeline.RangeSelector;
 import org.finos.tracdap.test.data.DataComparison;
+import org.finos.tracdap.test.data.MemoryTestHelpers;
 import org.finos.tracdap.test.data.SingleBatchDataSink;
 import org.finos.tracdap.test.data.SingleBatchDataSource;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -37,26 +40,42 @@ import static org.finos.tracdap.test.data.SampleData.generateBasicData;
 
 public class DataPagingTest {
 
-    private final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
+    private static final boolean DEBUG_ALLOCATION_LOGGING = false;
 
+    private final Duration TEST_TIMEOUT = Duration.ofSeconds(10);
     private final ICodec codec = new CsvCodec();
+
+    private BufferAllocator allocator;
+
+    @BeforeEach
+    void setupAllocator() {
+        // Use a separate allocator for each test case so errors can be identified
+        allocator = MemoryTestHelpers.testAllocator(DEBUG_ALLOCATION_LOGGING);
+    }
+
+    @AfterEach
+    void closeAllocator() {
+        // Test for leaks on each individual test case
+        // BufferAllocator will throw if memory is not released
+        allocator.close();
+    }
 
     @Test
     void roundTrip_basic() {
 
-        var allocator = new RootAllocator();
-        var inputData = generateBasicData(allocator, 10000);
+        try (var inputData = generateBasicData(allocator, 10000)) {
 
-        roundTrip_impl(inputData, allocator);
+            roundTrip_impl(inputData, allocator);
+        }
     }
 
-    void roundTrip_impl(ArrowVsrContext inputData, RootAllocator allocator) {
+    void roundTrip_impl(ArrowVsrContext inputData, BufferAllocator allocator) {
 
         var ctx = new DataContext(new DefaultEventExecutor(), allocator);
 
         var dataSrc = new SingleBatchDataSource(inputData);
         var pipeline = DataPipeline.forSource(dataSrc, ctx);
-        pipeline.addStage(codec.getEncoder(allocator, Map.of()));;
+        pipeline.addStage(codec.getEncoder(allocator, Map.of()));
         pipeline.addStage(codec.getDecoder(inputData.getSchema(), allocator, Map.of()));
         pipeline.addStage(new RangeSelector(1347, 228));
 
@@ -85,7 +104,5 @@ public class DataPagingTest {
 
         Assertions.assertEquals(228, rtRowCount);
         Assertions.assertEquals(1, dataSink.getBatchCount());
-
-        inputData.close();
     }
 }
