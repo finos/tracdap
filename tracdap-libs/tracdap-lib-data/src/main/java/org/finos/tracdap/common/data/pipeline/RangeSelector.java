@@ -100,10 +100,9 @@ public class RangeSelector
 
         this.sliceTransfers = sliceTransfers;
         this.sliceRoot = ArrowVsrContext.forSource(
-                new VectorSchemaRoot(sliceVectors),
-                context.getDictionaries(),
-                context.getAllocator(),
-                /* takeOwnership = */ true);
+                new VectorSchemaRoot(sliceVectors), /* vsr ownership */ true,
+                context.getDictionaries(), /* dictionaries ownership */ false,
+                context.getAllocator());
 
         consumer().onStart(sliceRoot);
     }
