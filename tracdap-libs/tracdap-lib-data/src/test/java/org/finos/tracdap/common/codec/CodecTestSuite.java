@@ -32,7 +32,7 @@ import org.finos.tracdap.test.data.SingleBatchDataSink;
 import org.finos.tracdap.test.data.SingleBatchDataSource;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
-import io.netty.util.concurrent.DefaultEventExecutor;
+import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
 import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.types.pojo.Field;
@@ -50,6 +50,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import io.netty.util.concurrent.DefaultEventExecutor;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.getResultOf;
@@ -92,6 +93,7 @@ public abstract class CodecTestSuite {
 
     private static final Duration TEST_TIMEOUT = Duration.ofSeconds(20);
 
+    BufferAllocator allocator;
     static ICodec codec;
     static String basicData;
     static String structData;
@@ -109,10 +111,22 @@ public abstract class CodecTestSuite {
         return structSupport;
     }
 
+    @BeforeEach
+    void setupAllocator() {
+        // Use a separate allocator for each test case
+        allocator = new RootAllocator();
+    }
+
+    @AfterEach
+    void closeAllocator() {
+        // Test for leaks on each individual test case
+        // BufferAllocator will throw if memory is not released
+        allocator.close();
+    }
+
     @Test
     void roundTrip_basic() {
 
-        var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator);
 
         roundTrip_impl(inputData, allocator);
@@ -121,7 +135,6 @@ public abstract class CodecTestSuite {
     @Test
     void roundTrip_basicMultiBatch() {
 
-        var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator, 5000);
 
         roundTrip_impl(inputData, allocator, true);
@@ -130,7 +143,6 @@ public abstract class CodecTestSuite {
     @Test
     void roundTrip_nulls() {
 
-        var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator);
 
         // With the basic test data, we'll get one null value for each data type
@@ -162,7 +174,6 @@ public abstract class CodecTestSuite {
     @EnabledIf(value = "structSupported", disabledReason = "This codec does not support STRUCT data")
     void roundTrip_struct() {
 
-        var allocator = new RootAllocator();
         var inputData = generateStructData(allocator);
 
         roundTrip_impl(inputData, allocator);
@@ -170,8 +181,6 @@ public abstract class CodecTestSuite {
 
     @Test
     void edgeCaseIntegers() {
-
-        var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, SchemaMapping.ARROW_BASIC_INTEGER, null);
         var field = new Field("integer_field", fieldType, null);
@@ -195,8 +204,6 @@ public abstract class CodecTestSuite {
 
     @Test
     void edgeCaseFloats() {
-
-        var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, SchemaMapping.ARROW_BASIC_FLOAT, null);
         var field = new Field("float_field", fieldType, null);
@@ -229,8 +236,6 @@ public abstract class CodecTestSuite {
     @Test
     void edgeCaseDecimals() {
 
-        var allocator = new RootAllocator();
-
         var fieldType = new FieldType(true, SchemaMapping.ARROW_BASIC_DECIMAL, null);
         var field = new Field("decimal_field", fieldType, null);
 
@@ -262,8 +267,6 @@ public abstract class CodecTestSuite {
     @Test
     void edgeCaseStrings() {
 
-        var allocator = new RootAllocator();
-
         var fieldType = new FieldType(true, SchemaMapping.ARROW_BASIC_STRING, null);
         var field = new Field("string_field", fieldType, null);
 
@@ -292,8 +295,6 @@ public abstract class CodecTestSuite {
 
     @Test
     void edgeCaseDates() {
-
-        var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, SchemaMapping.ARROW_BASIC_DATE, null);
         var field = new Field("date_field", fieldType, null);
@@ -326,8 +327,6 @@ public abstract class CodecTestSuite {
 
     @Test
     void edgeCaseDateTimes() {
-
-        var allocator = new RootAllocator();
 
         var fieldType = new FieldType(true, SchemaMapping.ARROW_BASIC_DATETIME, null);
         var field = new Field("datetime_field", fieldType, null);
@@ -381,12 +380,12 @@ public abstract class CodecTestSuite {
         return LocalDateTime.ofEpochSecond(epochSeconds, (int) nanos, ZoneOffset.UTC);
     }
 
-    void roundTrip_impl(ArrowVsrContext inputData, RootAllocator allocator) {
+    void roundTrip_impl(ArrowVsrContext inputData, BufferAllocator allocator) {
 
             roundTrip_impl(inputData, allocator, false);
     }
 
-    void roundTrip_impl(ArrowVsrContext inputData, RootAllocator allocator, boolean multiBatch) {
+    void roundTrip_impl(ArrowVsrContext inputData, BufferAllocator allocator, boolean multiBatch) {
 
         var ctx = new DataContext(new DefaultEventExecutor(), allocator);
 
@@ -431,7 +430,6 @@ public abstract class CodecTestSuite {
     @EnabledIf(value = "basicDataAvailable", disabledReason = "Pre-saved test data not available for this format")
     void decode_basic() throws Exception {
 
-        var allocator = new RootAllocator();
         var inputData = generateBasicData(allocator);
 
         var testData = ResourceHelpers.loadResourceAsBytes(basicData);
@@ -466,7 +464,6 @@ public abstract class CodecTestSuite {
     @EnabledIf(value = "structDataAvailable", disabledReason = "Pre-saved struct data not available for this format")
     void decode_struct() throws Exception {
 
-        var allocator = new RootAllocator();
         var structSchema = SchemaMapping.tracToArrow(SampleData.BASIC_STRUCT_SCHEMA, allocator);
         var structExpectedResult = generateStructData(allocator);
 
@@ -498,8 +495,6 @@ public abstract class CodecTestSuite {
 
     @Test
     void decode_empty() {
-
-        var allocator = new RootAllocator();
 
         // An empty stream (i.e. with no buffers)
 
@@ -559,7 +554,6 @@ public abstract class CodecTestSuite {
         var random = new Random();
         testData.forEach(random::nextBytes);
 
-        var allocator = new RootAllocator();
         var testDataBuf = testData.stream()
                 .map(bytes -> Bytes.copyToBuffer(bytes, allocator))
                 .collect(Collectors.toList());
@@ -601,7 +595,6 @@ public abstract class CodecTestSuite {
 
         var testData = List.of(testDataHeader, testDataMessage);
 
-        var allocator = new RootAllocator();
         var testDataBuf = testData.stream()
                 .map(bytes -> Bytes.copyToBuffer(bytes, allocator))
                 .collect(Collectors.toList());
