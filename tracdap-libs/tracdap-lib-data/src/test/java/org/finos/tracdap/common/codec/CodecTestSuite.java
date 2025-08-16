@@ -58,7 +58,7 @@ import static org.finos.tracdap.test.data.SampleData.generateStructData;
 
 public abstract class CodecTestSuite {
 
-    private static final boolean DEBUG_ALLOCATION_LOGGING = true;
+    private static final boolean DEBUG_ALLOCATION_LOGGING = false;
 
     // Concrete test cases for codecs included in CORE_DATA
 
