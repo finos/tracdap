@@ -135,73 +135,114 @@ public class DataPipelineImpl implements DataPipeline {
 
     void requestCancel() {
 
-        log.warn("Request to cancel the data operation");
-        var error = new ETracPublic("Request to cancel the data operation");
+        try {
 
-        completion.completeExceptionally(error);
+            log.warn("Request to cancel the data operation");
+            var error = new ETracPublic("Request to cancel the data operation");
 
-        if (sourceStage.isDone()) {
-            sourceStage.cancel();
+            if (sourceStage.isDone()) {
+                sourceStage.cancel();
+            }
+
+            if (!sinkStage.isDone()) {
+                sinkStage.terminate(error);
+            }
+
+            closeAllStages();
+
+            completion.completeExceptionally(error);
         }
+        catch (Throwable shutdownError) {
 
-        if (!sinkStage.isDone()) {
-            sinkStage.terminate(error);
+            log.info("Data pipeline did not shut down cleanly: {}", shutdownError.getMessage(), shutdownError);
+            completion.completeExceptionally(shutdownError);
         }
-
-        closeAllStages();
     }
 
     void reportComplete() {
 
-        // Expect all the stages have gone down cleanly
+        try {
 
-        log.info("Data pipeline complete");
-        completion.complete(null);
+            // Expect all the stages have gone down cleanly
+            // This is a failsafe check, normally source and sink should be already stopped when close() is called
+            // But just in case, double check and shut them down with a warning if they are still running
 
-        // This is a failsafe check, normally source and sink should be already stopped when close() is called
-        // But just in case, double check and shut them down with a warning if they are still running
+            if (!sourceStage.isDone()) {
+                log.warn("Source stage still running after data pipeline completed");
+                sourceStage.cancel();
+            }
 
-        if (!sourceStage.isDone()) {
-            log.warn("Source stage still running after data pipeline completed");
-            sourceStage.cancel();
+            if (!sinkStage.isDone()) {
+                log.warn("Sink stage still running after data pipeline completed");
+                var error = new ETracInternal("Sink stage still running after data pipeline completed\"");
+                sinkStage.terminate(error);
+            }
+
+            closeAllStages();
+
+            // Only signal completion after successful shutdown
+
+            log.info("Data pipeline complete");
+            completion.complete(null);
         }
+        catch (Throwable shutdownError) {
 
-        if (!sinkStage.isDone()) {
-            log.warn("Sink stage still running after data pipeline completed");
-            var error = new ETracInternal("Sink stage still running after data pipeline completed\"");
-            sinkStage.terminate(error);
+            log.info("Data pipeline did not shut down cleanly: {}", shutdownError.getMessage(), shutdownError);
+            completion.completeExceptionally(shutdownError);
         }
-
-        closeAllStages();
     }
 
     void reportRegularError(Throwable error) {
 
-        // Expect all the stages have gone down cleanly
+        try {
 
-        log.error("Data pipeline failed: {}", error.getMessage(), error);
-        completion.completeExceptionally(error);
+            // Expect all the stages have gone down cleanly
 
-        sourceStage.cancel();
-        sinkStage.terminate(error);
-        sinkStage.terminate(error);
+            log.error("Data pipeline failed: {}", error.getMessage(), error);
 
-        closeAllStages();
+            sourceStage.cancel();
+            sinkStage.terminate(error);
+            sinkStage.terminate(error);
+
+            closeAllStages();
+
+            completion.completeExceptionally(error);
+        }
+        catch (Throwable shutdownError) {
+
+            // A secondary error during shut down
+            // Log the new error, but signal the original
+
+            log.error("Data pipeline did not shut down cleanly: {}", shutdownError.getMessage(), shutdownError);
+            completion.completeExceptionally(error);
+        }
     }
 
     void reportUnhandledError(Throwable error) {
 
-        // Expect the stages are in an inconsistent state
-        // Force shutdown for the source and sink
+        try {
 
-        var unhandled = new ETracInternal("Data pipeline failed with an unhandled error: " + error.getMessage(), error);
-        log.error(unhandled.getMessage(), unhandled);
-        completion.completeExceptionally(unhandled);
+            // Expect the stages are in an inconsistent state
+            // Force shutdown for the source and sink
 
-        sourceStage.cancel();
-        sinkStage.terminate(unhandled);
+            var unhandled = new ETracInternal("Data pipeline failed with an unhandled error: " + error.getMessage(), error);
+            log.error(unhandled.getMessage(), unhandled);
 
-        closeAllStages();
+            sourceStage.cancel();
+            sinkStage.terminate(unhandled);
+
+            closeAllStages();
+
+            completion.completeExceptionally(unhandled);
+        }
+        catch (Throwable shutdownError) {
+
+            // A secondary error during shut down
+            // Log the new error, but signal the original
+
+            log.error("Data pipeline did not shut down cleanly: {}", shutdownError.getMessage(), shutdownError);
+            completion.completeExceptionally(error);
+        }
     }
 
     private void closeAllStages() {
