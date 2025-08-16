@@ -19,6 +19,7 @@ package org.finos.tracdap.test.data;
 
 import org.apache.arrow.vector.BaseIntVector;
 import org.apache.arrow.vector.FieldVector;
+import org.apache.arrow.vector.ValueVector;
 import org.apache.arrow.vector.compare.Range;
 import org.apache.arrow.vector.compare.RangeEqualsVisitor;
 import org.apache.arrow.vector.dictionary.DictionaryEncoder;
@@ -113,53 +114,61 @@ public class DataComparison {
 
         for (var j = 0; j < original.getFieldVectors().size(); j++) {
 
-            var field = original.getVector(j).getField();
             var originalVec = original.getVector(j);
             var rtVec = roundTrip.getVector(j);
 
-            if (field.getDictionary() == null) {
+            if (offset > 0) {
 
                 // Slice the original vector if need be
                 var transferPair = originalVec.getTransferPair(originalVec.getAllocator());
-                var transferSize = Math.min(rtVec.getValueCount(), originalVec.getValueCount() - offset);
-                var originalSlice = transferPair.getTo();
-                transferPair.splitAndTransfer((int) offset, (int) transferSize);
 
-                // Use Arrow visitor to do the comparison (this is strict, e.g. map order matters)
-                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalSlice, rtVec);
-
-                Assertions.assertTrue(
-                        visitor.rangeEquals(new Range(0, 0, originalSlice.getValueCount())),
-                        "Vectors not equal for field " + field.getName());
+                // Slice is created locally, make sure to release it
+                try (var originalSlice = transferPair.getTo()) {
+                    var transferSize = Math.min(rtVec.getValueCount(), originalVec.getValueCount() - offset);
+                    transferPair.splitAndTransfer((int) offset, (int) transferSize);
+                    compareVectorValues(originalContext, originalSlice, roundTripContext, rtVec);
+                }
             }
             else {
+                compareVectorValues(originalContext, originalVec, roundTripContext, rtVec);
+            }
+        }
+    }
 
-                // Decode dictionary fields for comparison
-                // Encoded values may differ depending on dictionary ordering
+    private static void compareVectorValues(
+            ArrowVsrContext originalContext, ValueVector originalVec,
+            ArrowVsrContext roundTripContext, ValueVector rtVec) {
 
-                var originalDict = originalContext.getDictionaries().lookup(originalVec.getField().getDictionary().getId());
-                var originalDecoded =  DictionaryEncoder.decode(originalVec, originalDict);
+        var field =  originalVec.getField();
 
-                // Slice the original vector if need be
-                var transferPair = originalDecoded.getTransferPair(originalDecoded.getAllocator());
-                var transferSize = Math.min(rtVec.getValueCount(), originalVec.getValueCount() - offset);
-                var originalSlice = transferPair.getTo();
-                transferPair.splitAndTransfer((int) offset, (int) transferSize);
+        if (field.getDictionary() == null) {
 
-                var rtDict = roundTripContext.getDictionaries().lookup(rtVec.getField().getDictionary().getId());
-                var rtDecoded = DictionaryEncoder.decode(rtVec, rtDict);
+            // Use Arrow visitor to do the comparison (this is strict, e.g. map order matters)
+            RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalVec, rtVec);
+
+            Assertions.assertTrue(
+                    visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
+                    "Vectors not equal for field " + field.getName());
+        }
+        else {
+
+            // Decode dictionary fields for comparison
+            // Encoded values may differ depending on dictionary ordering
+
+            var originalDict = originalContext.getDictionaries().lookup(originalVec.getField().getDictionary().getId());
+            var rtDict = roundTripContext.getDictionaries().lookup(rtVec.getField().getDictionary().getId());
+
+            // Decoded vectors are created locally, make sure to release them
+            try (var originalDecoded =  DictionaryEncoder.decode(originalVec, originalDict);
+                 var rtDecoded = DictionaryEncoder.decode(rtVec, rtDict)) {
 
                 // Null out the type compartor
                 // Field names for dict encoded fields get mangled by Arrow and will not match reliably
-                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalSlice, rtDecoded, null);
+                RangeEqualsVisitor visitor = new RangeEqualsVisitor(originalDecoded, rtDecoded, null);
 
                 Assertions.assertTrue(
-                        visitor.rangeEquals(new Range(0, 0, originalSlice.getValueCount())),
+                        visitor.rangeEquals(new Range(0, 0, originalVec.getValueCount())),
                         "Vectors not equal for field " + field.getName());
-
-                originalDecoded.close();
-                originalSlice.close();
-                rtDecoded.close();
             }
         }
     }
