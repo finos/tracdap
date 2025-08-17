@@ -23,3 +23,21 @@ az storage blob list \
     --account-name ${TRAC_AZURE_STORAGE_ACCOUNT} \
     --container-name ${TRAC_AZURE_CONTAINER} \
     --num-results 10
+
+# Apache Arrow's Azure FS implementation doesn't support workflow identities from OIDC
+# However, it is possible to generate a SAS token once logged in, and use that
+
+# Arrow GCP FS used to have a similar issue, which was eventually addressed
+# https://github.com/apache/arrow/issues/34595
+
+SAS_TOKEN_EXPIRY=`date -v+1d +%Y-%m-%d`
+
+SAS_TOKEN=`az storage container generate-sas \
+  --account-name ${TRAC_AZURE_STORAGE_ACCOUNT} \
+  --name ${TRAC_AZURE_CONTAINER} \
+  --expiry ${SAS_TOKEN_EXPIRY} \
+  --permissions rwdl`
+
+echo "TRAC_AZURE_CREDENTIALS=sas_token" >> ${GITHUB_ENV}
+echo "TRAC_AZURE_SAS_TOKEN=${SAS_TOKEN}" >> ${GITHUB_ENV}
+echo "TRAC_AZURE_SAS_TOKEN_EXPIRY=900" >> ${GITHUB_ENV}
