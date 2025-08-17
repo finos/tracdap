@@ -78,8 +78,11 @@ class BlobArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
         if credentials:
             properties["credentials"] = credentials
 
-        if credentials == "access_key":
-            properties["accessKey"] = os.getenv("TRAC_AZURE_ACCESS_KEY")
+        if credentials == "account_key":
+            properties["accountKey"] = os.getenv("TRAC_AZURE_ACCOUNT_KEY")
+
+        if credentials == "sas_token":
+            properties["sasToken"] = os.getenv("TRAC_AZURE_SAS_TOKEN")
 
         return properties
 
@@ -138,8 +141,11 @@ class BlobFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileRead
         if credentials:
             properties["credentials"] = credentials
 
-        if credentials == "access_key":
-            properties["accessKey"] = os.getenv("TRAC_AZURE_ACCESS_KEY")
+        if credentials == "account_key":
+            properties["accountKey"] = os.getenv("TRAC_AZURE_ACCOUNT_KEY")
+
+        if credentials == "sas_token":
+            properties["sasToken"] = os.getenv("TRAC_AZURE_SAS_TOKEN")
 
         return properties
 
