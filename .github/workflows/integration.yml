@@ -334,7 +334,8 @@ jobs:
       target: ${{ matrix.storage.TARGET }}
       protocol: ${{ matrix.storage.PROTOCOL }}
       matrix: ${{ toJson( matrix.storage ) }}
-      enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' }}
+      # Dependabot branches are in the main repo but it does not have permissions for CI storage
+      enabled: ${{ vars[ matrix.storage.ENABLE_IF ] != '' && github.actor != 'dependabot[bot]' }}
       has_java: ${{ matrix.storage.JAVA_TESTS != '' }}
       has_python: ${{ matrix.storage.PYTHON_TESTS != '' }}
 
