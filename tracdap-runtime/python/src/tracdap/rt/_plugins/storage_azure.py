@@ -156,8 +156,7 @@ class AzureBlobStorageProvider(IStorageProvider):
 
     def setup_credentials(self, runtime_fs: str):
 
-        # Only default (Google ADC) mechanism is supported
-        # Arrow GCP FS does also support access tokens, but ADC is probably all we ever need
+        # Default mechanism includes ENV, CLI, workload identity and managed identity
 
         mechanism = _helpers.get_plugin_property(self._properties, self.CREDENTIALS_PROPERTY)
 
