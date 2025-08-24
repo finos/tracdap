@@ -24,12 +24,15 @@ import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
 
-import pyarrow.fs as pa_fs
-
 log.configure_logging()
 plugins.PluginManager.register_core_plugins()
 
 
+# TODO: Arrow native storage for Azure is not available in CI
+# https://github.com/apache/arrow/issues/47353
+# Offline testing using default mechanism with az login works as expected
+
+@unittest.skipIf(os.getenv("CI") is not None, "Arrow native storage for Azure is not available in CI")
 class BlobArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
     suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
@@ -90,7 +93,6 @@ class BlobArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
         manager = storage.StorageManager(sys_config)
 
         return manager.get_file_storage(storage_key)
-
 
 
 class BlobFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
