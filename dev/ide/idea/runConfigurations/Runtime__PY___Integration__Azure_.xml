@@ -4,8 +4,7 @@
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
-      <env name="TRAC_AZURE_CREDENTIALS" value="access_key" />
-      <env name="TRAC_AZURE_ACCESS_KEY" value="(enter access key)" />
+      <env name="TRAC_AZURE_CREDENTIALS" value="default" />
       <env name="TRAC_AZURE_STORAGE_ACCOUNT" value="(enter storage account)" />
       <env name="TRAC_AZURE_CONTAINER" value="(enter container)" />
     </envs>

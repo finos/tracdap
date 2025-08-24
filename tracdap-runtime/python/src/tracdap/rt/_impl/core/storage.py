@@ -259,9 +259,14 @@ class CommonFileStorage(IFileStorage):
                 fs_impl = "fsspec"
 
         # Some optimization is possible if the underlying storage semantics are known
+        # TODO: The storage provider should supply this information
         self._file_semantics = True if fs_type in self.FILE_SEMANTICS_FS_TYPES else False
         self._bucket_semantics = True if fs_type in self.BUCKET_SEMANTICS_FS_TYPES else False
-        self._explicit_dir_semantics = True if self._bucket_semantics and fs_impl == "fsspec" else False
+
+        if self._bucket_semantics and (fs_impl == "fsspec" or fs_type == "abfs"):
+            self._explicit_dir_semantics = True
+        else:
+            self._explicit_dir_semantics = False
 
         self._log.info(
             f"INIT [{self._key}]: Common file storage, " +

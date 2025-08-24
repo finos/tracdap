@@ -21,18 +21,10 @@
 . ~/.bashrc
 
 # Log in to GCP using the credentials provided by the GitHub Action for Google Auth
+# This is required for the ls command to work
 
 gcloud auth login --cred-file ${GOOGLE_GHA_CREDS_PATH}
 
 # List bucket contents to check the connection
 
-gsutil ls gs://${TRAC_GCP_BUCKET} | head
-
-# Apache Arrow's GCP FS implementation doesn't support external accounts
-# https://github.com/apache/arrow/issues/34595
-
-# So, set up access token auth by configuring the ENV vars read by TRAC integration tests
-
-echo "TRAC_GCP_CREDENTIALS=access_token" >> ${GITHUB_ENV}
-echo "TRAC_GCP_ACCESS_TOKEN=`gcloud auth print-access-token`" >> ${GITHUB_ENV}
-echo "TRAC_GCP_ACCESS_TOKEN_EXPIRY=900" >> ${GITHUB_ENV}
+gsutil ls gs://${TRAC_GCP_BUCKET} | head -n 10
