@@ -42,7 +42,7 @@ elif [ ${prior_version_found} = 0 ]; then
 
   prior_version=`echo ${prior_version_tag} | sed s/^v//`
 
-  if [ `echo "${prior_version}" | grep -E "^\d+\.\d+\.\d+$"` ]; then
+  if [ `echo "${prior_version}" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$"` ]; then
       # Whole version number, bump patch for next patch version
       next_patch_version=`echo "${prior_version}" | awk -F. '{$NF=$NF+1; print}' OFS=.`
   else
