@@ -312,6 +312,7 @@ class TracContextTest(unittest.TestCase):
         # Test new log property syntax
 
         log2 = self.ctx.log
+        self.assertIsInstance(log2, logging.Logger)
 
         with self.assertLogs(log.name, logging.INFO):
             log2.info("Model logger test")
