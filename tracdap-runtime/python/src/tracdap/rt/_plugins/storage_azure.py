@@ -46,11 +46,8 @@ def _azure_fsspec_available():
 
 class AzureBlobStorageProvider(IStorageProvider):
 
-    # This client depends on the Azure fsspec implementation, since there is no native implementation from Arrow
-    # To enable it, the tracdap package must be installed with the optional [azure] feature
-
-    # Current supported authentication mechanisms are "default" and "access_key"
-    # Client always uses location mode = primary, version aware = False
+    # Supported authentication mechanisms are "default" and "account_key" and "sas_token"
+    # The "default" mechanism will try environment, CLI, managed identity and workload identity
 
     STORAGE_ACCOUNT_PROPERTY = "storageAccount"
     CONTAINER_PROPERTY = "container"

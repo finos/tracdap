@@ -60,14 +60,22 @@ import static org.finos.tracdap.common.storage.StorageErrors.ExplicitError.*;
 
 public class AzureBlobStorage extends CommonFileStorage {
 
+    // Supported authentication mechanisms are "default" and "account_key" and "sas_token"
+    // The "default" mechanism will try environment, CLI, managed identity and workload identity
+
     public static final String STORAGE_ACCOUNT_PROPERTY = "storageAccount";
     public static final String CONTAINER_PROPERTY = "container";
     public static final String PREFIX_PROPERTY = "prefix";
 
     public static final String CREDENTIALS_PROPERTY = "credentials";
     public static final String CREDENTIALS_DEFAULT = "default";
-    public static final String CREDENTIALS_ACCESS_KEY = "accessKey";
-    public static final String ACCESS_KEY_PROPERTY = "accessKey";
+    public static final String CREDENTIALS_ACCOUNT_KEY = "account_key";
+    public static final String CREDENTIALS_ACCESS_KEY = "access_key";    // synonym for backwards compatability
+    public static final String CREDENTIALS_SAS_TOKEN = "sas_token";
+
+    public static final String ACCOUNT_KEY_PROPERTY = "accountKey";
+    public static final String ACCESS_KEY_PROPERTY = "accessKey";        // synonym for backwards compatability
+    public static final String SAS_TOKEN_PROPERTY = "sasToken";
 
     public static final String BLOB_ENDPOINT_TEMPLATE = "https://%s.blob.core.windows.net/";
     public static final Duration STARTUP_TIMEOUT = Duration.of(1, ChronoUnit.MINUTES);
@@ -118,14 +126,48 @@ public class AzureBlobStorage extends CommonFileStorage {
             return builder -> builder.credential(credentials);
         }
 
-        if (CREDENTIALS_ACCESS_KEY.equalsIgnoreCase(mechanism)) {
+        if (CREDENTIALS_ACCOUNT_KEY.equalsIgnoreCase(mechanism) || CREDENTIALS_ACCESS_KEY.equalsIgnoreCase(mechanism)) {
 
-            log.info("Using [{}] credentials mechanism", CREDENTIALS_ACCESS_KEY);
+            if (CREDENTIALS_ACCESS_KEY.equalsIgnoreCase(mechanism)) {
+                log.warn("Credentials mechanism [{}] is non-standard ans has been deprecated, please use [{}] instead",
+                        CREDENTIALS_ACCESS_KEY, CREDENTIALS_ACCOUNT_KEY);
+            }
 
-            var accessKey = properties.getProperty(ACCESS_KEY_PROPERTY);
-            var credentials = new StorageSharedKeyCredential(storageAccount, accessKey);
+            log.info("Using [{}] credentials mechanism", CREDENTIALS_ACCOUNT_KEY);
+
+            var accountKey = CREDENTIALS_ACCOUNT_KEY.equalsIgnoreCase(mechanism)
+                    ? properties.getProperty(ACCOUNT_KEY_PROPERTY)
+                    : properties.getProperty(ACCESS_KEY_PROPERTY);
+
+            if (accountKey == null || accountKey.isEmpty()) {
+                var message = String.format("Missing required config property [%s] for Azure blob storage", ACCOUNT_KEY_PROPERTY);
+                log.error(message);
+                throw new EStartup(message);
+            }
+
+            var credentials = new StorageSharedKeyCredential(storageAccount, accountKey);
 
             return builder -> builder.credential(credentials);
+        }
+
+        if (CREDENTIALS_SAS_TOKEN.equalsIgnoreCase(mechanism)) {
+
+            log.info("Using [{}] credentials mechanism",  CREDENTIALS_SAS_TOKEN);
+
+            var rawSasToken = properties.getProperty(SAS_TOKEN_PROPERTY);
+
+            if (rawSasToken == null || rawSasToken.isEmpty()) {
+                var message = String.format("Missing required config property [%s] for Azure blob storage",  SAS_TOKEN_PROPERTY);
+                log.error(message);
+                throw new EStartup(message);
+            }
+
+            // SAS token should be a URL query param string, including the initial "?"
+            var sasToken = rawSasToken.startsWith("?")
+                    ? rawSasToken
+                    : "?" + rawSasToken;
+
+            return builder -> builder.sasToken(sasToken);
         }
 
         var message = String.format("Unrecognised credentials mechanism: [%s]", mechanism);
