@@ -35,6 +35,22 @@ import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
 
+class _LogWrapper:
+
+    # Wrapper for the ctx.log property, to keep backwards compatability
+    # ctx.log.info("New style log message, ctx.log is a property")
+    # ctx.log().info("Old style log message, ctx.log() is a method")
+
+    def __init__(self, log):
+        self.__log = log
+
+    def __call__(self):
+        return self.__log
+
+    def __getattr__(self, name):
+        return getattr(self.__log, name)
+
+
 class TracContextImpl(_api.TracContext):
 
     """
@@ -73,7 +89,7 @@ class TracContextImpl(_api.TracContext):
             log_provider = _logging.LogProvider()
 
         self.__ctx_log = log_provider.logger_for_object(self)
-        self.__model_log = log_provider.logger_for_class(model_class)
+        self.__model_log = _LogWrapper(log_provider.logger_for_class(model_class))
 
         self.__model_def = model_def
         self.__model_class = model_class
@@ -414,11 +430,10 @@ class TracContextImpl(_api.TracContext):
 
         return memory_stream(DelayedClose())
 
+    @property
     def log(self) -> logging.Logger:
 
-        _val.validate_signature(self.log)
-
-        return self.__model_log
+        return self.__model_log  # noqa
 
     @staticmethod
     def __get_static_schema(model_def: _meta.ModelDefinition, dataset_name: str):
