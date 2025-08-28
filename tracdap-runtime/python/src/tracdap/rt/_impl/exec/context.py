@@ -35,20 +35,21 @@ import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
 
-class _TracLogWrapper:
+class _TracLogWrapper(_logging.Logger):
 
     # Wrapper for the ctx.log property, to keep backwards compatability
     # ctx.log.info("New style log message, ctx.log is a property")
     # ctx.log().info("Old style log message, ctx.log() is a method call")
 
-    def __init__(self, log):
-        self.__log = log
+    def __init__(self, delegate: _logging.Logger):
+        super().__init__(delegate.name, delegate.level)
+        self.__delegate = delegate
+
+    def _log(self, level, msg, args, exc_info=None, extra=None, stack_info=False, stacklevel=1):
+        self.__delegate._log(level, msg, args, exc_info, extra, stack_info, stacklevel)
 
     def __call__(self):
-        return self.__log
-
-    def __getattr__(self, name):
-        return getattr(self.__log, name)
+        return self
 
 
 class TracContextImpl(_api.TracContext):
