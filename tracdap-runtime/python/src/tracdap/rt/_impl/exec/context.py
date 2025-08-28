@@ -431,7 +431,7 @@ class TracContextImpl(_api.TracContext):
         return memory_stream(DelayedClose())
 
     @property
-    def log(self) -> logging.Logger:
+    def log(self) -> tp.Union[logging.Logger, tp.Callable[[], _logging.Logger]]:
 
         return self.__model_log  # noqa
 
