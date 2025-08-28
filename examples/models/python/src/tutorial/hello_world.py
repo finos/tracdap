@@ -34,10 +34,10 @@ class HelloWorldModel(trac.TracModel):
 
     def run_model(self, ctx: trac.TracContext):
 
-        ctx.log().info("Hello world model is running")
+        ctx.log.info("Hello world model is running")
 
         input_number = ctx.get_parameter("input_number")
-        ctx.log().info(f"The input number is {input_number}")
+        ctx.log.info(f"The input number is {input_number}")
 
 
 if __name__ == "__main__":

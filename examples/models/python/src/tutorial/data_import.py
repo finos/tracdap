@@ -150,7 +150,7 @@ class SelectiveDataImport(trac.TracDataImport):
 
             else:
 
-                ctx.log().warning(f"Requested table [{table_name}] not found in storage [{storage_key}]")
+                ctx.log.warning(f"Requested table [{table_name}] not found in storage [{storage_key}]")
 
 
 class SimpleDataImport(trac.TracDataImport):

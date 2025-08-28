@@ -301,11 +301,21 @@ class TracContextTest(unittest.TestCase):
 
     def test_get_log(self):
 
+        # Test old method-call syntax
+
         log = self.ctx.log()
         self.assertIsInstance(log, logging.Logger)
 
         with self.assertLogs(log.name, logging.INFO):
             log.info("Model logger test")
+
+        # Test new log property syntax
+
+        log2 = self.ctx.log
+        self.assertIsInstance(log2, logging.Logger)
+
+        with self.assertLogs(log.name, logging.INFO):
+            log2.info("Model logger test")
 
     """
     Functionality not available yet:

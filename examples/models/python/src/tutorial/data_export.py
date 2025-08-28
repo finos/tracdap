@@ -54,7 +54,7 @@ class DataExportExample(trac.TracDataExport):
         no_overwrite = ctx.get_parameter("no_overwrite")
 
         if no_overwrite and storage.exists(export_file):
-            ctx.log().info(f"Export of [{export_file}] will be skipped because the file already exists")
+            ctx.log.info(f"Export of [{export_file}] will be skipped because the file already exists")
             return
 
         with storage.write_byte_stream(export_file) as stream:
