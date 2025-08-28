@@ -462,10 +462,14 @@ class TracContext(metaclass=_abc.ABCMeta):
 
         pass
 
-    def log(self) -> _logging.Logger:
+    @property
+    def log(self) -> _tp.Union[
+            _logging.Logger,
+            _tp.Callable[[], _logging.Logger]  # DOCGEN_REMOVE
+        ]:
 
         """
-        Get a Python logger that can be used for writing model logs.
+        A Python logger that can be used for writing model logs.
 
         Logs written to this logger are recorded by TRAC. When models are run on the platform,
         these logs are assembled and saved with the job outputs as a dataset, that can be queried
@@ -475,7 +479,7 @@ class TracContext(metaclass=_abc.ABCMeta):
         :rtype: :py:class:`logging.Logger`
         """
 
-        pass
+        return None  # noqa
 
 
 class TracModel(metaclass=_abc.ABCMeta):
