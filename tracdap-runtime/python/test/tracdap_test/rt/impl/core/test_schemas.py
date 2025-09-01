@@ -152,7 +152,7 @@ class SchemaResourcesTest(unittest.TestCase):
 
         repo_root = pathlib.Path(__file__) \
             .parent \
-            .joinpath("../../../../../..") \
+            .joinpath("../../../../../../..") \
             .resolve()
 
         examples_root = repo_root.joinpath("examples/models/python")

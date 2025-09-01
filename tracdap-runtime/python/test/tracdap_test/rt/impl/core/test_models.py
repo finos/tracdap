@@ -85,7 +85,7 @@ class ImportModelTest(unittest.TestCase):
 
         example_repo_url = pathlib.Path(__file__) \
             .parent \
-            .joinpath("../../../../../..") \
+            .joinpath("../../../../../../..") \
             .resolve()
 
         example_repo_config = meta.ResourceDefinition(
@@ -133,7 +133,7 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="trac_integrated",
-            entryPoint="tracdap_test.rt.core.test_models.SampleModel"
+            entryPoint="tracdap_test.rt.impl.core.test_models.SampleModel"
         )
 
         loader = models.ModelLoader(sys_config, self.scratch_dir)
