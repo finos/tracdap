@@ -157,6 +157,11 @@ class _StaticApiHook(_abc.ABC):
         pass
 
     @_abc.abstractmethod
+    def define_external_system(self, protocol: str, client_type: type) -> _meta.ModelResource:
+
+        pass
+
+    @_abc.abstractmethod
     def load_schema(
             self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
