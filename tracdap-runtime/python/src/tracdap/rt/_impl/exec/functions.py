@@ -28,6 +28,7 @@ import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.struct as _struct
 import tracdap.rt._impl.core.models as _models
@@ -35,8 +36,6 @@ import tracdap.rt._impl.core.util as _util
 
 from tracdap.rt._impl.exec.graph import *
 from tracdap.rt._impl.exec.graph import _T
-
-import pyarrow as pa
 
 
 class NodeContext:
@@ -833,9 +832,8 @@ class FunctionResolver:
 
     __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
-    def __init__(self, models: _models.ModelLoader, storage: _storage.StorageManager, log_provider: _logging.LogProvider):
-        self._models = models
-        self._storage = storage
+    def __init__(self, resources: _resources.ResourceManager, log_provider: _logging.LogProvider):
+        self._resources = resources
         self._log_provider = log_provider
 
     def resolve_node(self, node: Node[_T]) -> NodeFunction[_T]:
@@ -853,23 +851,23 @@ class FunctionResolver:
         return resolve_func(self, node)
 
     def resolve_load_data(self, node: LoadDataNode):
-        return LoadDataFunc(node, self._storage)
+        return LoadDataFunc(node, self._resources.get_storage())
 
     def resolve_save_data(self, node: SaveDataNode):
-        return SaveDataFunc(node, self._storage)
+        return SaveDataFunc(node, self._resources.get_storage())
 
     def resolve_import_model_node(self, node: ImportModelNode):
-        return ImportModelFunc(node, self._models)
+        return ImportModelFunc(node, self._resources.get_models())
 
     def resolve_run_model_node(self, node: RunModelNode) -> NodeFunction:
 
         # TODO: Verify model_class against model_def
 
-        model_class = self._models.load_model_class(node.model_scope, node.model_def)
-        checkout_directory = self._models.model_load_checkout_directory(node.model_scope, node.model_def)
-        storage_manager = self._storage if node.storage_access else None
+        model_loader = self._resources.get_models()
+        model_class = model_loader.load_model_class(node.model_scope, node.model_def)
+        checkout_directory = model_loader.model_load_checkout_directory(node.model_scope, node.model_def)
 
-        return RunModelFunc(node, model_class, checkout_directory, storage_manager, self._log_provider)
+        return RunModelFunc(node, model_class, checkout_directory, self._resources.get_storage(), self._log_provider)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 

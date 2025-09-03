@@ -42,12 +42,12 @@ class ModelLoader:
             self.code_cache: tp.Dict[str, pathlib.Path] = dict()
             self.shims: tp.Dict[pathlib.Path, str] = dict()
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig, scratch_dir: pathlib.Path):
+    def __init__(self, repos: _repos.RepositoryManager, scratch_dir: pathlib.Path):
 
         self.__log = _logging.logger_for_object(self)
 
+        self.__repos = repos
         self.__scratch_dir = scratch_dir.joinpath("models")
-        self.__repos = _repos.RepositoryManager(sys_config)
         self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
 
         safe_scratch_dir = _util.windows_unc_path(self.__scratch_dir)

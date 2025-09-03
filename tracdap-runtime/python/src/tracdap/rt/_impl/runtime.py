@@ -33,6 +33,8 @@ import tracdap.rt._impl.core.config_parser as _cparse
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
+import tracdap.rt._impl.core.repos as _repos
+import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.exec.actors as _actors
@@ -104,8 +106,10 @@ class TracRuntime:
 
         # Top level resources
         self._config_mgr: tp.Optional[_cparse.ConfigManager] = None
+        self._repos: tp.Optional[_repos] = None
         self._models: tp.Optional[_models.ModelLoader] = None
         self._storage: tp.Optional[_storage.StorageManager] = None
+        self._resources: tp.Optional[_resources.ResourceManager] = None
 
         # The execution engine
         self._system: tp.Optional[_actors.ActorSystem] = None
@@ -195,8 +199,10 @@ class TracRuntime:
 
             self._prepare_scratch_dir()
 
-            self._models = _models.ModelLoader(self._sys_config, self._scratch_dir)
+            self._repos = _repos.RepositoryManager(self._sys_config)
+            self._models = _models.ModelLoader(self._repos, self._scratch_dir)
             self._storage = _storage.StorageManager(self._sys_config)
+            self._resources = _resources.ResourceManager(self._sys_config, self._storage, self._repos, self._models)
 
             if self._dev_mode:
 
@@ -210,7 +216,7 @@ class TracRuntime:
             _guard.PythonGuardRails.protect_dangerous_functions()
 
             self._engine = _engine.TracEngine(
-                self._sys_config, self._models, self._storage,
+                self._sys_config, self._resources,
                 notify_callback=self._engine_callback)
 
             self._system = _actors.ActorSystem(

@@ -28,8 +28,7 @@ import tracdap.rt._impl.exec.functions as _func
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.core.models as _models
-import tracdap.rt._impl.core.storage as _storage
+import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.util as _util
 
 from .graph import NodeId
@@ -128,8 +127,7 @@ class TracEngine(_actors.Actor):
 
     def __init__(
             self, sys_config: _cfg.RuntimeConfig,
-            models: _models.ModelLoader,
-            storage: _storage.StorageManager,
+            resources: _resources.ResourceManager,
             notify_callback: tp.Callable[[str, tp.Optional[_cfg.JobResult], tp.Optional[Exception]], None]):
 
         super().__init__()
@@ -137,8 +135,7 @@ class TracEngine(_actors.Actor):
         self._log = _logging.logger_for_object(self)
 
         self._sys_config = sys_config
-        self._models = models
-        self._storage = storage
+        self._resources = resources
         self._notify_callback = notify_callback
 
         self._jobs: tp.Dict[str, _JobState] = dict()
@@ -202,7 +199,7 @@ class TracEngine(_actors.Actor):
         job_log = _JobLog(log_file_needed=job_logs_enabled)
 
         job_processor = JobProcessor(
-            self._sys_config, self._models, self._storage,
+            self._sys_config, self._resources,
             job_key, job_config, graph_spec=None, job_log=job_log)
 
         job_actor_id = self.actors().spawn(job_processor)
@@ -239,7 +236,7 @@ class TracEngine(_actors.Actor):
         child_job_log = _JobLog(parent_state.job_log)
 
         child_processor = JobProcessor(
-            self._sys_config, self._models, self._storage,
+            self._sys_config, self._resources,
             child_key, None, graph_spec=child_graph, job_log=child_job_log)
 
         child_actor_id = self.actors().spawn(child_processor)
@@ -353,7 +350,7 @@ class TracEngine(_actors.Actor):
         result_format = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_FORMAT, "JSON")
         result_content = _cfg_p.ConfigQuoter.quote(job_state.job_result, result_format)
 
-        storage = self._storage.get_file_storage(storage_key)
+        storage = self._resources.get_storage().get_file_storage(storage_key)
         storage.write_bytes(storage_path, result_content.encode('utf-8'))
 
     def _get_job_info(self, job_key: str, details: bool = False) -> tp.Optional[_cfg.JobResult]:
@@ -428,8 +425,7 @@ class JobProcessor(_actors.Actor):
     """
 
     def __init__(
-            self, sys_config: _cfg.RuntimeConfig,
-            models: _models.ModelLoader, storage: _storage.StorageManager,
+            self, sys_config: _cfg.RuntimeConfig, resources: _resources.ResourceManager,
             job_key: str, job_config: tp.Optional[_cfg.JobConfig], graph_spec: tp.Optional[_graph.Graph],
             job_log: tp.Optional[_JobLog] = None):
 
@@ -443,8 +439,7 @@ class JobProcessor(_actors.Actor):
         self.job_config = job_config
         self.graph_spec = graph_spec
         self._sys_config = sys_config
-        self._models = models
-        self._storage = storage
+        self._resources = resources
 
         self._job_log = job_log if job_log is not None else _JobLog()
         self._log_provider = self._job_log.log_provider
@@ -452,13 +447,13 @@ class JobProcessor(_actors.Actor):
 
         self._log.info(f"New job created for [{self.job_key}]")
 
-        self._resolver = _func.FunctionResolver(models, storage, self._log_provider)
+        self._resolver = _func.FunctionResolver(self._resources, self._log_provider)
         self._preallocated_ids: tp.Dict[_meta.ObjectType, tp.List[_meta.TagHeader]] = dict()
 
     def on_start(self):
 
         self._log.info(f"Starting job [{self.job_key}]")
-        self._models.create_scope(self.job_key)
+        self._resources.get_models().create_scope(self.job_key)
 
         if self.graph_spec is not None:
             self.actors().send(self.actors().id, "build_graph_succeeded", self.graph_spec)
@@ -468,7 +463,7 @@ class JobProcessor(_actors.Actor):
     def on_stop(self):
 
         self._log.info(f"Cleaning up job [{self.job_key}]")
-        self._models.destroy_scope(self.job_key)
+        self._resources.get_models().destroy_scope(self.job_key)
 
     def on_signal(self, signal: _actors.Signal) -> tp.Optional[bool]:
 
@@ -584,7 +579,7 @@ class JobProcessor(_actors.Actor):
         storage_def = file_spec.storage
 
         storage_item = storage_def.dataItems[file_def.dataItem].incarnations[0].copies[0]
-        storage = self._storage.get_file_storage(storage_item.storageKey)
+        storage = self._resources.get_storage().get_file_storage(storage_item.storageKey)
 
         with storage.write_byte_stream(storage_item.storagePath) as stream:
             stream.write(self._job_log.log_buffer.getbuffer())
