@@ -635,7 +635,7 @@ class TracModel(metaclass=_abc.ABCMeta):
 
         pass
 
-    def define_resources(self) -> _tp.Optional[_tp.Dict[str, ResourceDefinition]]:
+    def define_resources(self) -> _tp.Optional[_tp.Dict[str, ModelResource]]:
 
         """
         Define external resources that will be available to the model at runtime.
@@ -650,8 +650,8 @@ class TracModel(metaclass=_abc.ABCMeta):
         implement this method. Models that do define external resources will be automatically
         marked as not repeatable.
 
-        :return: An optional set of external resources that will be available to the model at runtime
-        :rtype: dict[str, :py:class:`ResourceDefinition <tracdap.rt.metadata.ResourceDefinition>`] | None
+        :return: An optional set of model resources that will be available to the model at runtime
+        :rtype: dict[str, :py:class:`ModelResource <tracdap.rt.metadata.ModelResource>`] | None
         """
 
         return None
