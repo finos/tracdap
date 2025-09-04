@@ -204,12 +204,14 @@ class ModelLoader:
             parameters = model.define_parameters()
             inputs = model.define_inputs()
             outputs = model.define_outputs()
+            resources = model.define_resources()
 
             model_def = copy.copy(model_stub)
             model_def.staticAttributes = attributes
             model_def.parameters = parameters
             model_def.inputs = inputs
             model_def.outputs = outputs
+            model_def.resources = resources
 
             if isinstance(model, _eapi.TracDataImport):
                 model_def.modelType = _meta.ModelType.DATA_IMPORT_MODEL
@@ -236,6 +238,10 @@ class ModelLoader:
                 output_type = output_def.schema.schemaType.name if output_def.objectType == _meta.ObjectType.DATA else output_def.objectType.name
                 self.__log.info(f"Output [{name}] - {output_type}")
                 output_def.outputProps = self._encoded_props(output_def.outputProps, "input", name)
+
+            for name, resource in model_def.resources.items():
+                protocol_info = f" {resource.protocol or ''} {resource.subProtocol or ''}".rstrip()
+                self.__log.info(f"Resource [{name}] - {resource.resourceType.name}{protocol_info}")
 
             return model_def
 

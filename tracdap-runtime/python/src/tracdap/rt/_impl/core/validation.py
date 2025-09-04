@@ -349,6 +349,8 @@ class StaticValidator:
     __file_extension_pattern = re.compile('\\A[a-zA-Z0-9]+\\Z')
     __mime_type_pattern = re.compile('\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z')
 
+    __qualified_identifier_pattern = re.compile("\\A[a-zA-Z_]\\w*(\\.[a-zA-Z_]\\w*)*\\Z", re.ASCII)
+
     __PRIMITIVE_TYPES = [
         meta.BasicType.BOOLEAN,
         meta.BasicType.INTEGER,
@@ -385,6 +387,7 @@ class StaticValidator:
         params_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelParameter], model_def.parameters)
         inputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelInputSchema], model_def.inputs)
         outputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelOutputSchema], model_def.outputs)
+        resources_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelResource], model_def.resources)
 
         if not attrs_type_check:
             cls._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
@@ -394,16 +397,20 @@ class StaticValidator:
             cls._fail(f"Invalid model inputs: define_inputs() returned the wrong type")
         if not outputs_type_check:
             cls._fail(f"Invalid model outputs: define_outputs() returned the wrong type")
+        if not resources_type_check:
+            cls._fail(f"Invalid model resources: define_resources() returned the wrong type")
 
         cls._valid_identifiers(model_def.staticAttributes.keys(), "model attribute")
         cls._valid_identifiers(model_def.parameters.keys(), "model parameter")
         cls._valid_identifiers(model_def.inputs.keys(), "model input")
         cls._valid_identifiers(model_def.outputs.keys(), "model output")
+        cls._valid_identifiers(model_def.resources.keys(), "model resource")
 
         cls._case_insensitive_duplicates(model_def.staticAttributes.keys(), "model attribute")
         cls._case_insensitive_duplicates(model_def.parameters.keys(), "model parameter")
         cls._case_insensitive_duplicates(model_def.inputs.keys(), "model input")
         cls._case_insensitive_duplicates(model_def.outputs.keys(), "model output")
+        cls._case_insensitive_duplicates(model_def.resources.keys(), "model resource")
 
         # Note unique context does not include static attributes
         # They are not part of the runtime context, so there is no need to constrain them
@@ -411,10 +418,12 @@ class StaticValidator:
         cls._unique_context_check(unique_ctx, model_def.parameters.keys(), "model parameter")
         cls._unique_context_check(unique_ctx, model_def.inputs.keys(), "model input")
         cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
+        cls._unique_context_check(unique_ctx, model_def.resources.keys(), "model resource")
 
         cls._check_parameters(model_def.parameters)
         cls._check_inputs_or_outputs(model_def.inputs)
         cls._check_inputs_or_outputs(model_def.outputs)
+        cls._check_resources(model_def.resources)
 
     @classmethod
     def quick_validate_schema(cls, schema: meta.SchemaDefinition):
@@ -481,6 +490,22 @@ class StaticValidator:
             else:
                 if socket.outputProps is not None:
                     cls._valid_identifiers(socket.outputProps.keys(), "entry in output props")
+
+    @classmethod
+    def _check_resources(cls, resources):
+
+        for resource_name, resource in resources.items():
+
+            if resource.resourceType == meta.ResourceType.EXTERNAL_SYSTEM:
+                if resource.protocol is None or len(resource.protocol) == 0:
+                    cls._fail(f"Invalid model resource: [{resource_name}] protocol is missing")
+                if resource.system.client_type is None or len(resource.system.client_type) == 0:
+                    cls._fail(f"Invalid model resource: [{resource_name}] client type is missing")
+                if not cls.__qualified_identifier_pattern.match(resource.system.client_type):
+                    cls._fail(f"Invalid model resource: [{resource_name}] client type is not a valid Python type")
+
+            else:
+                cls._fail(f"Invalid resource type [{resource.resourceType}] for [{resource_name}]")
 
     @classmethod
     def _check_socket_schema(cls, socket_name, socket):
