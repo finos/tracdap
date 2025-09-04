@@ -69,7 +69,7 @@ class ExternalSystemModel(trac.TracModel):
 
             response = github_content.getresponse()
             response_data = response.read()
-            response_text = str(response_data)
+            response_text = response_data.decode("utf-8")
             actual_first_line = response_text.splitlines()[0]
 
             self.TEST_CASE.assertEqual(expected_first_line, actual_first_line)
