@@ -640,18 +640,21 @@ def define_output_file(
     return define_output(file_type, label=label, optional=optional, output_props=output_props)
 
 
-def define_external_system(protocol: str, client_type: _tp.Type) -> ModelResource:
+def define_external_system(
+        protocol: str, client_type: _tp.Type, *,
+        sub_protocol: _tp.Optional[str] = None) -> ModelResource:
 
     """
     Define a model resource for an external system.
 
     :param protocol: The protocol for the external system
     :param client_type: The client type for the external system
+    :param sub_protocol: If specified, the target resource must match both protocol and sub-protocol
     :return: A model resource suitable to return from :py:meth:`define_resources() <tracdap.rt.api.TracModel.define_resources>`
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_external_system(protocol, client_type)
+    return sa.define_external_system(protocol, client_type, sub_protocol=sub_protocol)
 
 
 def load_schema(

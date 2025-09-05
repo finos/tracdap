@@ -263,15 +263,20 @@ class StaticApiImpl(_StaticApiHook):
         else:
             raise _ex.EUnexpected()
 
-    def define_external_system(self, protocol: str, client_type: type) -> _meta.ModelResource:
+    def define_external_system(
+            self, protocol: str, client_type: type, *,
+            sub_protocol: _tp.Optional[str] = None) \
+            -> _meta.ModelResource:
 
-        _val.validate_signature(self.define_external_system, protocol, client_type)
+        _val.validate_signature(
+            self.define_external_system, protocol, client_type,
+            sub_protocol=sub_protocol)
 
         client_type_name = _util.qualified_type_name(client_type)
 
         return _meta.ModelResource(
             resourceType=_meta.ResourceType.EXTERNAL_SYSTEM,
-            protocol=protocol, subProtocol=None,
+            protocol=protocol, subProtocol=sub_protocol,
             system=_meta.ModelSystemDetails(client_type=client_type_name))
 
     @staticmethod
