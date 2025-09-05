@@ -59,6 +59,12 @@ class ExtExternalSystemPlugin(trac_external.IExternalSystem):
 
     def create_client(self, client_type: type[_http.HTTPConnection], **client_args) -> _http.HTTPConnection:
 
+        if "create_client_none" in self._properties:
+            return None  # noqa
+
+        if "create_client_wrong_type" in self._properties:
+            return "not_a_valid_client"  # noqa
+
         scheme = self._properties.get("scheme")
         host = self._properties.get("host")
         port = self._properties.get("port")
@@ -72,7 +78,11 @@ class ExtExternalSystemPlugin(trac_external.IExternalSystem):
         raise ex.EConfig("Unsupported scheme: " + scheme)
 
     def close_client(self, client: _http.HTTPConnection):
+
         client.close()
+
+        if "close_client_return_something" in self._properties:  # noqa
+            return "unexpected_value"
 
 
 plugins.PluginManager.register_plugin(trac_external.IExternalSystem, ExtExternalSystemPlugin, ["test-ext-external"])

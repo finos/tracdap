@@ -242,3 +242,42 @@ class ExtExternalSystemTest(unittest.TestCase):
             self._config_path("job_config.json"),
             self._config_path("sys_config.json"),
             plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_create_client_none(self):
+
+        self.sys_config.resources["github_content"].properties["create_client_none"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_create_client_wrong_type(self):
+
+        self.sys_config.resources["github_content"].properties["create_client_wrong_type"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_close_client_return_something(self):
+
+        self.sys_config.resources["github_content"].properties["close_client_return_something"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
