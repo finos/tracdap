@@ -24,6 +24,7 @@ import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.logging as _log
+import tracdap.rt._impl.core.validation as _val
 
 
 class ResourceManager:
@@ -60,7 +61,7 @@ class ResourceManager:
                     secrets=resource_def.secrets)
 
                 system = _plugins.PluginManager.load_plugin(_external.IExternalSystem, config)
-                external_systems[resource_name] = system
+                external_systems[resource_name] = _val.plugin_validation_wrapper(_external.IExternalSystem, system)
 
         return external_systems
 

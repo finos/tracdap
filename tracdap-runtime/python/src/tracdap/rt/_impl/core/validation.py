@@ -62,6 +62,49 @@ def is_primitive_type(basic_type: meta.BasicType) -> bool:
     return StaticValidator.is_primitive_type(basic_type)
 
 
+T_PLUGIN = tp.TypeVar("T_PLUGIN")
+
+def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -> T_PLUGIN:
+
+    # Create a wrapper that validates return values from plugin API calls
+    # A dynamic type would give better type similarity, but is more fiddly to set up
+    # Since plugins are not exposed directly to client code, this approach should suffice
+
+    class PluginValidationWrapper:
+
+        def __init__(self, delegate: T_PLUGIN):
+            self.__delegate = delegate
+
+        def __getattr__(self, name: str) -> tp.Any:
+
+            method = getattr(self.__delegate, name)
+
+            if not callable(method):
+                return method
+
+            def wrapped_method(*args, **kwargs):
+
+                value = method(*args, **kwargs)
+
+                try:
+                    _TypeValidator.validate_return_type(method, value)
+                    return value
+                except ex.ERuntimeValidation as e:
+                    detail = "(invalid return type from plugin API call)"
+                    message = f"Invalid plugin: [{util.qualified_type_name(type(plugin))}] {detail}"
+                    raise ex.EPluginConformance(message) from e
+
+            return wrapped_method
+
+        def __instancecheck__(self, instance: tp.Any) -> bool:
+            return isinstance(instance, plugin_api)
+
+        def __subclasscheck__(self, subclass: tp.Any) -> bool:
+            return issubclass(subclass, self._interface)
+
+    return PluginValidationWrapper(plugin)
+
+
 T_SKIP_VAL = tp.TypeVar("T_SKIP_VAL")
 
 class SkipValidation(tp.Generic[T_SKIP_VAL]):
@@ -209,6 +252,9 @@ class _TypeValidator:
 
         if expected_type == tp.Any:
             return True
+
+        if expected_type == type(None) or expected_type == inspect._empty:
+            return value is None
 
         # Sometimes we need to validate a partial set of arguments
         # Explicitly passing a SkipValidation value allows for this
