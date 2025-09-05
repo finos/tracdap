@@ -572,16 +572,17 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
     def __init__(
             self, node: RunModelNode,
             model_class: _api.TracModel.__class__,
-            checkout_directory: pathlib.Path,
-            storage_manager: _storage.StorageManager,
-            log_provider: _logging.LogProvider):
+            resources: tp.Dict[str, tp.Any],
+            log_provider: _logging.LogProvider,
+            checkout_directory: pathlib.Path,):
 
         super().__init__()
+
         self.node = node
         self.model_class = model_class
-        self.checkout_directory = checkout_directory
-        self.storage_manager = storage_manager
+        self.resources = resources
         self.log_provider = log_provider
+        self.checkout_directory = checkout_directory
 
     def _execute(self, ctx: NodeContext) -> Bundle[_data.DataView]:
 
@@ -599,41 +600,18 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
                 if node_id.name in model_def.parameters or node_id.name in model_def.inputs:
                     local_ctx[node_id.name] = node_result
 
-        # Set up access to external storage if required
-
-        storage_map = {}
-
-        if self.node.storage_access:
-            write_access = True if self.node.model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL else False
-            for storage_key in self.node.storage_access:
-                if self.storage_manager.has_file_storage(storage_key, external=True):
-                    storage_impl = self.storage_manager.get_file_storage(storage_key, external=True)
-                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, self.checkout_directory, self.log_provider)
-                    storage_map[storage_key] = storage
-                elif self.storage_manager.has_data_storage(storage_key, external=True):
-                    storage_impl = self.storage_manager.get_data_storage(storage_key, external=True)
-                    # This is a work-around until the storage extension API can be updated / unified
-                    if not isinstance(storage_impl, _storage.IDataStorageBase):
-                        raise _ex.EStorageConfig(f"External storage for [{storage_key}] is using the legacy storage framework]")
-                    converter = _data.DataConverter.noop()
-                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, self.checkout_directory, self.log_provider)
-                    storage_map[storage_key] = storage
-                else:
-                    raise _ex.EStorageConfig(f"External storage is not available: [{storage_key}]")
-
-
         # Run the model against the mapped local context
 
         if model_def.modelType in [_meta.ModelType.DATA_IMPORT_MODEL, _meta.ModelType.DATA_EXPORT_MODEL]:
             trac_ctx = _ctx.TracDataContextImpl(
                 self.node.model_def, self.model_class,
-                local_ctx, dynamic_outputs, storage_map,
-                self.checkout_directory, self.log_provider)
+                local_ctx, dynamic_outputs, self.resources,
+                self.log_provider, self.checkout_directory)
         else:
             trac_ctx = _ctx.TracContextImpl(
                 self.node.model_def, self.model_class,
-                local_ctx, dynamic_outputs,
-                self.checkout_directory, self.log_provider)
+                local_ctx, dynamic_outputs, self.resources,
+                self.log_provider, self.checkout_directory)
 
         try:
             model = object.__new__(self.model_class)
@@ -826,12 +804,11 @@ class FunctionResolver:
     # TODO: Validate consistency for resource keys
     # Storage key should be validated for load data, save data and run model with storage access
     # Repository key should be validated for import model (and explicitly for run model)
+    # External systems are now validated, other resources should behave the same way
 
     # Currently jobs with missing resources will fail at runtime, with a suitable error
     # The resolver is called during graph building
     # Putting the check here will raise a consistency error before the job starts processing
-
-    __ResolveFunc = tp.Callable[['FunctionResolver', Node[_T]], NodeFunction[_T]]
 
     def __init__(self, resources: _resources.ResourceManager, log_provider: _logging.LogProvider):
         self._resources = resources
@@ -868,7 +845,10 @@ class FunctionResolver:
         model_class = model_loader.load_model_class(node.model_scope, node.model_def)
         checkout_directory = model_loader.model_load_checkout_directory(node.model_scope, node.model_def)
 
-        return RunModelFunc(node, model_class, checkout_directory, self._resources.get_storage(), self._log_provider)
+        # Prepare model resources - Missing resources will raise an error during the resolve phase
+        resources = self._resolve_model_resources(node, checkout_directory, self._log_provider)
+
+        return RunModelFunc(node, model_class, resources, self._log_provider, checkout_directory)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 
@@ -887,10 +867,77 @@ class FunctionResolver:
         BundleItemNode: NoopFunc,
     }
 
-    __node_mapping: tp.Dict[Node.__class__, __ResolveFunc] = {
+    __node_mapping: tp.Dict[Node.__class__, tp.Callable[["FunctionResolver", Node], NodeFunction]] = {
 
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node
     }
+
+    def _resolve_model_resources(
+            self, node: RunModelNode,
+            checkout_directory, log_provider) \
+            -> tp.Dict[str, tp.Any]:
+
+        resources = {}
+
+        for model_resource_key, model_resource in node.model_def.resources.items():
+
+            resource_key = node.resource_mapping.get(model_resource_key)
+            resource_def = self._resources.get_resource_definition(resource_key) if resource_key else None
+
+            self._check_model_resource(
+                model_resource_key, model_resource,
+                resource_key, resource_def)
+
+            if resource_def.resourceType == _meta.ResourceType.EXTERNAL_SYSTEM:
+                system_impl = self._resources.get_external_system(resource_key)
+                system = _ctx.TracExternalSystemWrapper(system_impl)
+                resources[model_resource_key] = system
+
+        if node.storage_access:
+
+            storage_manager = self._resources.get_storage()
+
+            write_access = True if node.model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL else False
+            for storage_key in node.storage_access:
+                if storage_manager.has_file_storage(storage_key, external=True):
+                    storage_impl = storage_manager.get_file_storage(storage_key, external=True)
+                    storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, checkout_directory, log_provider)
+                    resources[storage_key] = storage
+                elif storage_manager.has_data_storage(storage_key, external=True):
+                    storage_impl = storage_manager.get_data_storage(storage_key, external=True)
+                    # This is a work-around until the storage extension API can be updated / unified
+                    if not isinstance(storage_impl, _storage.IDataStorageBase):
+                        raise _ex.EStorageConfig(f"External storage for [{storage_key}] is using the legacy storage framework]")
+                    converter = _data.DataConverter.noop()
+                    storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, checkout_directory, log_provider)
+                    resources[storage_key] = storage
+                else:
+                    raise _ex.EStorageConfig(f"External storage is not available: [{storage_key}]")
+
+        return resources
+
+    @classmethod
+    def _check_model_resource(
+            cls, model_resource_key: str, model_resource: _meta.ModelResource,
+            resource_key: str, resource_def: _meta.ResourceDefinition):
+
+        if resource_key is None:
+            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not available (missing resource mapping)")
+
+        if resource_def is None:
+            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not available (missing job resource [{resource_key}])")
+
+        if model_resource.resourceType != resource_def.resourceType:
+            detail = f"(expected {model_resource.resourceType}, got {resource_def.resourceType})"
+            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not compatible with the model {detail}")
+
+        if model_resource.protocol and model_resource.protocol != resource_def.protocol:
+            detail = f"(expected protocol {model_resource.protocol}, got protocol {resource_def.protocol})"
+            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not compatible with the model {detail}")
+
+        if model_resource.subProtocol and model_resource.subProtocol != resource_def.subProtocol:
+            detail = f"(expected sub-protocol {model_resource.protocol}, got sub-protocol {resource_def.protocol})"
+            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not compatible with the model {detail}")

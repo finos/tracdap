@@ -26,6 +26,7 @@ import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
+import tracdap.rt.ext.external as _external
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.storage as _storage
@@ -35,7 +36,7 @@ import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
 
-class _TracLogWrapper(_logging.Logger):
+class TracLogWrapper(_logging.Logger):
 
     # Wrapper for the ctx.log property, to keep backwards compatability
     # ctx.log.info("New style log message, ctx.log is a property")
@@ -50,6 +51,42 @@ class _TracLogWrapper(_logging.Logger):
 
     def __call__(self):
         return self
+
+
+class TracExternalSystemWrapper:
+
+    def __init__(self, system: _external.IExternalSystem):
+        self.__supported_types = system.supported_types()
+        self.__supported_args = system.supported_args()
+        self.__create_func = lambda client_type, **client_args: system.create_client(client_type, **client_args)
+        self.__close_func = lambda client: system.close_client(client)
+
+    def supported_types(self):
+        return self.__supported_types
+
+    def supported_args(self):
+        return self.__supported_args
+
+    def create_client(
+            self, client_type: tp.Type[_api.CLIENT_TYPE], **client_args) \
+            -> tp.ContextManager[_api.CLIENT_TYPE]:
+
+        if client_type not in self.__supported_types:
+            client_type_name = _util.qualified_type_name(client_type)
+            raise _ex.ERuntimeValidation(f"Unsupported client type [{client_type_name}]")
+
+        for arg_name, arg in client_args.items():
+            supported_type = self.__supported_args.get(arg_name)
+            if supported_type is None:
+                raise _ex.ERuntimeValidation(f"Unsupported client arg [{arg_name}]")
+            if not _val.check_type(supported_type, arg):
+                detail = f"(expected {_val.type_name(supported_type)}, got {str(arg)})"
+                raise _ex.ERuntimeValidation(f"Invalid client arg [{arg_name}] {detail}")
+
+        return self.__create_func(client_type, **client_args)
+
+    def close_client(self, client):
+        self.__close_func(client)
 
 
 class TracContextImpl(_api.TracContext):
@@ -82,25 +119,29 @@ class TracContextImpl(_api.TracContext):
                  model_class: _api.TracModel.__class__,
                  local_ctx: tp.Dict[str, tp.Any],
                  dynamic_outputs: tp.List[str] = None,
-                 checkout_directory: pathlib.Path = None,
-                 log_provider: _logging.LogProvider = None):
+                 resources: tp.Dict[str, tp.Any] = None,
+                 log_provider: _logging.LogProvider = None,
+                 checkout_directory: pathlib.Path = None):
 
         # If no log provider is supplied, use the default (system logs only)
         if log_provider is None:
             log_provider = _logging.LogProvider()
 
         self.__ctx_log = log_provider.logger_for_object(self)
-        self.__model_log = _TracLogWrapper(log_provider.logger_for_class(model_class))
+        self.__model_log = TracLogWrapper(log_provider.logger_for_class(model_class))
 
         self.__model_def = model_def
         self.__model_class = model_class
         self.__local_ctx = local_ctx if local_ctx is not None else {}
         self.__dynamic_outputs = dynamic_outputs if dynamic_outputs is not None else []
+        self.__resources = resources if resources is not None else {}
+        self.__rct = _util.RuntimeContextTracking()
 
         self.__val = TracContextValidator(
             self.__ctx_log,
             self.__model_def,
             self.__local_ctx,
+            self.__resources,
             self.__dynamic_outputs,
             checkout_directory)
 
@@ -261,6 +302,27 @@ class TracContextImpl(_api.TracContext):
 
         buffer = self.get_file(file_name)
         return contextlib.closing(io.BytesIO(buffer))
+
+    def get_external_system(
+            self, system_name: str,
+            client_type: tp.Type[_api.CLIENT_TYPE],
+            **client_args) -> tp.ContextManager[_api.CLIENT_TYPE]:
+
+        _val.validate_signature(self.get_external_system, system_name, client_type)
+
+        self.__val.check_item_valid_identifier(system_name, TracContextValidator.SYSTEM)
+        self.__val.check_item_defined_in_model(system_name, TracContextValidator.SYSTEM)
+        self.__val.check_item_available_in_context(system_name, TracContextValidator.SYSTEM)
+
+        system = self.__resources.get(system_name)
+
+        self.__val.check_context_object_type(system_name, system, TracExternalSystemWrapper)
+        self.__val.check_external_system_client_type(system_name, system, client_type)
+        self.__val.check_external_system_client_args(system_name, system, client_args)
+
+        client = system.create_client(client_type, **client_args)
+
+        return self.__rct.create(system_name, client, system.close_client)
 
     def put_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
 
@@ -470,9 +532,9 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
             self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
             local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
             storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage, _eapi.TracDataStorage]],
-            checkout_directory: pathlib.Path = None, log_provider: _logging.LogProvider = None):
+            log_provider: _logging.LogProvider = None, checkout_directory: pathlib.Path = None):
 
-        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, checkout_directory, log_provider)
+        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, storage_map, log_provider, checkout_directory)
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
@@ -851,16 +913,6 @@ class TracContextErrorReporter:
         else:
             raise _ex.ERuntimeValidation(message)
 
-    @staticmethod
-    def _type_name(type_: type):
-
-        module = type_.__module__
-
-        if module is None or module == str.__class__.__module__ or module == tp.__name__:
-            return _val.type_name(type_, False)
-        else:
-            return _val.type_name(type_, True)
-
 
 class TracContextValidator(TracContextErrorReporter):
 
@@ -868,11 +920,13 @@ class TracContextValidator(TracContextErrorReporter):
     PARAMETER = "Parameter"
     DATASET = "Dataset"
     FILE = "File"
+    SYSTEM = "System"
 
     def __init__(
             self, log: logging.Logger,
             model_def: _meta.ModelDefinition,
             local_ctx: tp.Dict[str, tp.Any],
+            resources: tp.Dict[str, tp.Any],
             dynamic_outputs: tp.List[str],
             checkout_directory: pathlib.Path):
 
@@ -880,6 +934,7 @@ class TracContextValidator(TracContextErrorReporter):
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
+        self.__resources = resources
         self.__dynamic_outputs = dynamic_outputs
 
     def check_item_valid_identifier(self, item_name: str, item_type: str):
@@ -894,6 +949,9 @@ class TracContextValidator(TracContextErrorReporter):
 
         if item_type == self.PARAMETER:
             if item_name not in self.__model_def.parameters:
+                self._report_error(f"{item_type} {item_name} is not defined in the model")
+        elif item_type == self.SYSTEM:
+            if item_name not in self.__model_def.resources:
                 self._report_error(f"{item_type} {item_name} is not defined in the model")
         else:
             if item_name not in self.__model_def.inputs and item_name not in self.__model_def.outputs:
@@ -914,12 +972,16 @@ class TracContextValidator(TracContextErrorReporter):
 
     def check_item_available_in_context(self, item_name: str, item_type: str):
 
-        if item_name not in self.__local_ctx:
+        ctx = self.__resources if item_type in [self.SYSTEM] else self.__local_ctx
+
+        if item_name not in ctx:
             self._report_error(f"{item_type} {item_name} is not available in the current context")
 
     def check_item_not_available_in_context(self, item_name: str, item_type: str):
 
-        if item_name in self.__local_ctx:
+        ctx = self.__resources if item_type in [self.SYSTEM] else self.__local_ctx
+
+        if item_name in ctx:
             self._report_error(f"{item_type} {item_name} already exists in the current context")
 
     def check_dataset_is_dynamic_output(self, dataset_name: str):
@@ -978,7 +1040,7 @@ class TracContextValidator(TracContextErrorReporter):
             self._report_error(f"The schema provided for [{dataset_name}] is null")
 
         if not isinstance(schema, _meta.SchemaDefinition):
-            schema_type_name = self._type_name(type(schema))
+            schema_type_name = _util.qualified_type_name(type(schema))
             self._report_error(f"The object provided for [{dataset_name}] is not a schema (got {schema_type_name})")
 
         try:
@@ -993,8 +1055,8 @@ class TracContextValidator(TracContextErrorReporter):
 
         if not isinstance(dataset, expected_type):
 
-            expected_type_name = self._type_name(expected_type)
-            actual_type_name = self._type_name(type(dataset))
+            expected_type_name = _util.qualified_type_name(expected_type)
+            actual_type_name = _util.qualified_type_name(type(dataset))
 
             self._report_error(
                 f"Provided dataset is the wrong type" +
@@ -1004,8 +1066,8 @@ class TracContextValidator(TracContextErrorReporter):
 
         if not isinstance(item, expected_type):
 
-            expected_type_name = self._type_name(expected_type)
-            actual_type_name = self._type_name(type(item))
+            expected_type_name = _util.qualified_type_name(expected_type)
+            actual_type_name = _util.qualified_type_name(type(item))
 
             self._report_error(
                 f"The object referenced by [{item_name}] in the current context has the wrong type" +
@@ -1039,8 +1101,8 @@ class TracContextValidator(TracContextErrorReporter):
                 self._report_error(f"Using [{framework}], required argument [{arg_name}] is missing")
 
             else:
-                expected_type_name = self._type_name(arg_type)
-                actual_type_name = self._type_name(type(arg_value))
+                expected_type_name = _val.type_name(arg_type)
+                actual_type_name = _val.type_name(type(arg_value))
 
                 self._report_error(
                     f"Using [{framework}], argument [{arg_name}] has the wrong type" +
@@ -1082,6 +1144,31 @@ class TracContextValidator(TracContextErrorReporter):
                 self._report_error(f"Storage key [{storage_key}] refers to data storage, not file storage")
             else:
                 self._report_error(f"Storage key [{storage_key}] refers to file storage, not data storage")
+
+    def check_external_system_client_type(self, system_name, system, client_type):
+
+        model_system = self.__model_def.resources.get(system_name)
+        model_type_name = model_system.system.client_type if model_system and model_system.system else None
+        client_type_name = _util.qualified_type_name(client_type)
+
+        if client_type_name != model_type_name:
+            detail = f"(requested {client_type_name}, expected {model_type_name})"
+            self._report_error(f"System [{system_name}] has the wrong client type {detail}")
+
+        if client_type not in system.supported_types():
+            self._report_error(f"System [{system_name}] does not support the client type [{client_type_name}]")
+
+    def check_external_system_client_args(self, system_name, system, client_args):
+
+        supported_args = system.supported_args()
+
+        for arg_name, arg in client_args.items():
+            if supported_args is None or arg_name not in supported_args:
+                self._report_error(f"System [{system_name}] client arg [{arg_name}] is not supported")
+            supported_type = supported_args[arg_name]
+            if not _val.check_type(supported_type, arg):
+                type_info = f"(expected {_val.type_name(supported_type)}, got {str(arg)})"
+                self._report_error(f"System [{system_name}] client arg [{arg_name}] has the wrong type {type_info}")
 
 
 class TracStorageValidator(TracContextErrorReporter):
@@ -1134,8 +1221,8 @@ class TracStorageValidator(TracContextErrorReporter):
 
         if not isinstance(dataset, expected_type):
 
-            expected_type_name = self._type_name(expected_type)
-            actual_type_name = self._type_name(type(dataset))
+            expected_type_name = _util.qualified_type_name(expected_type)
+            actual_type_name = _util.qualified_type_name(type(dataset))
 
             self._report_error(
                 f"Provided dataset is the wrong type" +
