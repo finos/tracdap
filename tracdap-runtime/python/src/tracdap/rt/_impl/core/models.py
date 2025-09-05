@@ -22,7 +22,6 @@ import copy
 import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 
 import tracdap.rt._impl.core.logging as _logging
@@ -200,14 +199,15 @@ class ModelLoader:
             model: _api.TracModel = _api.TracModel.__new__(model_class)
             model_class.__init__(model)
 
-            attributes = model.define_attributes()
             parameters = model.define_parameters()
             inputs = model.define_inputs()
             outputs = model.define_outputs()
-            resources = model.define_resources()
+
+            # Optional - models are not required to define these
+            attributes = model.define_attributes() or dict()
+            resources = model.define_resources() or dict()
 
             model_def = copy.copy(model_stub)
-            model_def.staticAttributes = attributes
             model_def.parameters = parameters
             model_def.inputs = inputs
             model_def.outputs = outputs
@@ -249,6 +249,23 @@ class ModelLoader:
 
             model_class_name = f"{model_class.__module__}.{model_class.__name__}"
             msg = f"An error occurred while scanning model class [{model_class_name}]: {str(e)}"
+
+            self.__log.error(msg, exc_info=True)
+            raise _ex.EModelValidation(msg) from e
+
+    def scan_model_attrs(self, model_class: _api.TracModel.__class__) -> tp.Dict[str, _meta.Value]:
+
+        try:
+
+            model: _api.TracModel = _api.TracModel.__new__(model_class)
+            model_class.__init__(model)
+
+            return model.define_attributes() or dict()
+
+        except Exception as e:
+
+            model_class_name = f"{model_class.__module__}.{model_class.__name__}"
+            msg = f"An error occurred while scanning model attributes for [{model_class_name}]: {str(e)}"
 
             self.__log.error(msg, exc_info=True)
             raise _ex.EModelValidation(msg) from e

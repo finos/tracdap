@@ -547,7 +547,7 @@ class TracModel(metaclass=_abc.ABCMeta):
     .. seealso:: :py:class:`TracContext <tracdap.rt.api.TracContext>`
     """
 
-    def define_attributes(self) -> _tp.Dict[str, Value]:  # noqa
+    def define_attributes(self) -> _tp.Optional[_tp.Dict[str, Value]]:
 
         """
         Define attributes that will be associated with the model when it is loaded into the TRAC platform.
@@ -569,7 +569,7 @@ class TracModel(metaclass=_abc.ABCMeta):
         :rtype: dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`]
         """
 
-        return {}
+        return None
 
     @_abc.abstractmethod
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:

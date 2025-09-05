@@ -547,11 +547,12 @@ class ImportModelFunc(NodeFunction[GraphOutput]):
         model_def = self._models.scan_model(model_stub, model_class)
         model_obj = _meta.ObjectDefinition(_meta.ObjectType.MODEL, model=model_def)
 
-        model_attrs = [
+        model_attrs = self._models.scan_model_attrs(model_class)
+        model_attrs_updates = [
             _meta.TagUpdate(_meta.TagOperation.CREATE_OR_REPLACE_ATTR, attr_name, attr_value)
-            for attr_name, attr_value in model_def.staticAttributes.items()]
+            for attr_name, attr_value in model_attrs]
 
-        return GraphOutput(model_id, model_obj, model_attrs)
+        return GraphOutput(model_id, model_obj, model_attrs_updates)
 
     @staticmethod
     def _build_model_stub(import_details: _meta.ImportModelJob):
