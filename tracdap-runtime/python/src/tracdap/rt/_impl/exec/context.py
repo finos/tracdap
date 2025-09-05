@@ -56,10 +56,16 @@ class TracLogWrapper(_logging.Logger):
 class TracExternalSystemWrapper:
 
     def __init__(self, system: _external.IExternalSystem):
+        self.__plugin_type_name = _util.qualified_type_name(type(system))
         self.__supported_types = system.supported_types()
         self.__supported_args = system.supported_args()
         self.__create_func = lambda client_type, **client_args: system.create_client(client_type, **client_args)
         self.__close_func = lambda client: system.close_client(client)
+
+        if not any(self.__supported_types):
+            detail = "(no supported types)"
+            message = f"Invalid plugin: [{self.__plugin_type_name}] {detail}"
+            raise _ex.EPluginConformance(message)
 
     def supported_types(self):
         return self.__supported_types
@@ -83,7 +89,14 @@ class TracExternalSystemWrapper:
                 detail = f"(expected {_val.type_name(supported_type)}, got {str(arg)})"
                 raise _ex.ERuntimeValidation(f"Invalid client arg [{arg_name}] {detail}")
 
-        return self.__create_func(client_type, **client_args)
+        client = self.__create_func(client_type, **client_args)
+
+        if not isinstance(client, client_type):
+            detail = "(create_client() returned the wrong type)"
+            message = f"Invalid plugin: [{self.__plugin_type_name}] {detail}"
+            raise _ex.EPluginConformance(message)
+
+        return client
 
     def close_client(self, client):
         self.__close_func(client)

@@ -90,7 +90,7 @@ def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -
                     _TypeValidator.validate_return_type(method, value)
                     return value
                 except ex.ERuntimeValidation as e:
-                    detail = "(invalid return type from plugin API call)"
+                    detail = "(plugin API call returned the wrong type)"
                     message = f"Invalid plugin: [{util.qualified_type_name(type(plugin))}] {detail}"
                     raise ex.EPluginConformance(message) from e
 
