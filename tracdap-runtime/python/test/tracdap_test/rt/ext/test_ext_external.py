@@ -65,7 +65,10 @@ class ExternalSystemModel(trac.TracModel):
         download_path = ctx.get_parameter("download_path")
         expected_first_line = ctx.get_parameter("first_line")
 
-        with ctx.get_external_system("github_content", HTTPConnection) as github_content:
+        with ctx.get_external_system("github_content", HTTPConnection, timeout=10) as github_content:
+
+            # Timeout parameter is passed as a client arg, make sure it is being set
+            self.TEST_CASE.assertEqual(10, github_content.timeout)
 
             github_content.connect()
             github_content.request("GET", download_path)
@@ -75,6 +78,7 @@ class ExternalSystemModel(trac.TracModel):
             response_text = response_data.decode("utf-8")
             actual_first_line = response_text.splitlines()[0]
 
+            # End to end check, the file was downloaded successfully
             self.TEST_CASE.assertEqual(expected_first_line, actual_first_line)
 
 

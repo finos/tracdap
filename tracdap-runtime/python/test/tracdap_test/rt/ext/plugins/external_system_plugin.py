@@ -54,19 +54,20 @@ class ExtExternalSystemPlugin(trac_external.IExternalSystem):
         if "supported_args_bad_value" in self._properties:
             return { "arg_1": 1 }  # noqa
 
-        return None
+        # Allow timeout to be set as a client arg
+        return { "timeout": int }
 
-    def create_client(self, client_type: type[_http.HTTPConnection], **kwargs) -> _http.HTTPConnection:
+    def create_client(self, client_type: type[_http.HTTPConnection], **client_args) -> _http.HTTPConnection:
 
         scheme = self._properties.get("scheme")
         host = self._properties.get("host")
         port = self._properties.get("port")
 
         if scheme == "https":
-            return _http.HTTPSConnection(host, int(port))
+            return _http.HTTPSConnection(host, int(port), **client_args)
 
         if scheme == "http":
-            return _http.HTTPConnection(host, int(port))
+            return _http.HTTPConnection(host, int(port), **client_args)
 
         raise ex.EConfig("Unsupported scheme: " + scheme)
 
