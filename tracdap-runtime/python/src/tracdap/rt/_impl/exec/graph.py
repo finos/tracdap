@@ -162,6 +162,7 @@ class GraphContext:
     ctx_namespace: NodeNamespace
 
     sys_config: _cfg.RuntimeConfig
+    resource_mapping: _tp.Dict[str, str]
 
 
 @_dc.dataclass(frozen=True)
@@ -383,6 +384,7 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     parameter_ids: _tp.FrozenSet[NodeId]
     input_ids: _tp.FrozenSet[NodeId]
 
+    resource_mapping: _tp.Optional[_tp.Dict[str, str]] = None
     storage_access: _tp.Optional[_tp.List[str]] = None
 
     graph_context: _tp.Optional[GraphContext] = None

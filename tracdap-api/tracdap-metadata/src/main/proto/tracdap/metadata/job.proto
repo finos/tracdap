@@ -134,6 +134,7 @@ message RunModelJob {
   map<string, TagSelector> inputs = 3;
   map<string, TagSelector> outputs = 4;
   map<string, TagSelector> priorOutputs = 5;
+  map<string, string> resources = 7;
 
   repeated TagUpdate outputAttrs = 6;
 }
@@ -150,6 +151,7 @@ message RunFlowJob {
   map<string, TagSelector> outputs = 4;
   map<string, TagSelector> priorOutputs = 5;
   map<string, TagSelector> models = 6;
+  map<string, string> resources = 8;
 
   repeated TagUpdate outputAttrs = 7;
 }

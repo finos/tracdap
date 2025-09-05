@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy as _copy
 import itertools as _itr
 import typing as _tp
 
@@ -44,13 +45,17 @@ class GraphBuilder:
 
         sys_config = context.sys_config
         job_config = _cfg.JobConfig(context.job_id)
+        resource_mapping = context.resource_mapping
 
-        return GraphBuilder(sys_config, job_config)
+        return GraphBuilder(sys_config, job_config, resource_mapping)
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig):
+    def __init__(
+            self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig,
+            resource_mapping: _tp.Optional[_tp.Dict[str, str]] = None):
 
         self._sys_config = sys_config
         self._job_config = job_config
+        self._resource_mapping = resource_mapping or dict()
 
         self._job_key = _util.object_key(job_config.jobId)
         self._job_namespace = NodeNamespace(self._job_key)
@@ -75,6 +80,9 @@ class GraphBuilder:
         # Do not share preallocated IDs with the child graph
         builder._preallocated_ids = dict()
 
+        # Resources are available from parent -> child but not vice versa
+        builder._resource_mapping = _copy.copy(self._resource_mapping)
+
         return builder
 
     def build_job(self, job_def: _meta.JobDefinition, ) -> Graph:
@@ -85,9 +93,11 @@ class GraphBuilder:
                 graph = self.build_standard_job(job_def, self.build_import_model_job)
 
             elif job_def.jobType == _meta.JobType.RUN_MODEL:
+                self._resource_mapping.update(job_def.runModel.resources)
                 graph = self.build_standard_job(job_def, self.build_run_model_job)
 
             elif job_def.jobType == _meta.JobType.RUN_FLOW:
+                self._resource_mapping.update(job_def.runFlow.resources)
                 graph = self.build_standard_job(job_def, self.build_run_flow_job)
 
             elif job_def.jobType in [_meta.JobType.IMPORT_DATA, _meta.JobType.EXPORT_DATA]:
@@ -660,7 +670,7 @@ class GraphBuilder:
             return self.build_model(namespace, job_def, model_or_flow.model, explicit_deps)
 
         elif model_or_flow.objectType == _meta.ObjectType.FLOW:
-            return self.build_flow(namespace, job_def, model_or_flow.flow)
+            return self.build_flow(namespace, job_def, model_or_flow.flow, explicit_deps)
 
         else:
             message = f"Invalid job config, expected model or flow, got [{model_or_flow.objectType}]"
@@ -676,7 +686,8 @@ class GraphBuilder:
             explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        self.check_model_type(job_def, model_def)
+        self.check_model_type(model_def, job_def)
+        self.check_model_resources(model_def)
 
         def param_id(node_name):
             return NodeId(node_name, namespace, _meta.Value)
@@ -688,6 +699,9 @@ class GraphBuilder:
         parameter_ids = set(map(param_id, model_def.parameters))
         input_ids = set(map(data_id, model_def.inputs))
         output_ids = set(map(data_id, model_def.outputs))
+
+        # Filter resource mapping to just what is used in the model
+        resource_mapping = dict(filter(lambda kv: kv[0] in model_def.resources, self._resource_mapping.items()))
 
         # Set up storage access for import / export data jobs
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
@@ -713,13 +727,15 @@ class GraphBuilder:
         context = GraphContext(
             self._job_config.jobId,
             self._job_namespace, namespace,
-            self._sys_config)
+            self._sys_config,
+            self._resource_mapping)
 
         model_node = RunModelNode(
             model_id, model_def, model_scope,
             frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace,
-            storage_access=storage_access, graph_context=context)
+            resource_mapping=resource_mapping, storage_access=storage_access,
+            graph_context=context)
 
         nodes = {model_id: model_node}
 
@@ -850,8 +866,9 @@ class GraphBuilder:
                 self._error(_ex.EJobValidation(f"No model was provided for flow node [{node_name}]"))
 
             # Explicit check for model compatibility - report an error now, do not try build_model()
-            self.check_model_compatibility(model_selector, model_obj.model, node_name, node)
-            self.check_model_type(job_def, model_obj.model)
+            self.check_model_compatibility(model_obj.model, node_name, node)
+            self.check_model_type(model_obj.model, job_def)
+            self.check_model_resources(model_obj.model)
 
             return self.build_model_or_flow_with_context(
                 namespace, node_name,
@@ -864,9 +881,7 @@ class GraphBuilder:
         # Allow building to continue for better error reporting
         return GraphSection(dict())
 
-    def check_model_compatibility(
-            self, model_selector: _meta.TagSelector,
-            model_def: _meta.ModelDefinition, node_name: str, flow_node: _meta.FlowNode):
+    def check_model_compatibility(self, model_def: _meta.ModelDefinition, node_name: str, flow_node: _meta.FlowNode):
 
         model_params = list(sorted(model_def.parameters.keys()))
         model_inputs = list(sorted(model_def.inputs.keys()))
@@ -877,10 +892,10 @@ class GraphBuilder:
         node_outputs = list(sorted(flow_node.outputs))
 
         if model_params != node_params or model_inputs != node_inputs or model_outputs != node_outputs:
-            model_key = _util.object_key(model_selector)
-            self._error(_ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_key}])"))
+            model_name = self.model_friendly_name(model_def)
+            self._error(_ex.EJobValidation(f"Incompatible model for flow node [{node_name}] (Model: [{model_name}])"))
 
-    def check_model_type(self, job_def: _meta.JobDefinition, model_def: _meta.ModelDefinition):
+    def check_model_type(self, model_def: _meta.ModelDefinition, job_def: _meta.JobDefinition):
 
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
             allowed_model_types = [_meta.ModelType.DATA_IMPORT_MODEL]
@@ -892,7 +907,21 @@ class GraphBuilder:
         if model_def.modelType not in allowed_model_types:
             job_type = job_def.jobType.name
             model_type = model_def.modelType.name
-            self._error(_ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}]"))
+            model_name = self.model_friendly_name(model_def)
+            self._error(_ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}] for [{model_name}]"))
+
+    def check_model_resources(self, model_def: _meta.ModelDefinition):
+
+        unmapped_resources = list(filter(lambda r: r not in self._resource_mapping, model_def.resources.keys()))
+
+        if any(unmapped_resources):
+            model_name = self.model_friendly_name(model_def)
+            self._error(_ex.EJobValidation(f"Missing resources for model [{model_name}]: {', '.join(unmapped_resources)}"))
+
+    @staticmethod
+    def model_friendly_name(model_def: _meta.ModelDefinition):
+
+        return model_def.entryPoint.split(".")[-1]
 
     @staticmethod
     def build_context_push(
