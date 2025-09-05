@@ -15,11 +15,13 @@
 
 import typing as _tp
 import pathlib
+import tempfile as temp
 import unittest
 from http.client import HTTPConnection
 
 import tracdap.rt.api as trac
 import tracdap.rt.ext.plugins as plugins
+import tracdap.rt.launch as launch
 import tracdap.rt.metadata as meta
 import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.core.config_parser as cfg  # noqa
@@ -105,6 +107,20 @@ class ExtExternalSystemTest(unittest.TestCase):
             })
 
         self.sys_config = sys_config
+        self.temp_dir = temp.TemporaryDirectory()
+
+        self._write_config(sys_config, "sys_config.json")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def _write_config(self, config_obj, config_file):
+        with open(self._config_path(config_file), "wt") as stream:
+            sys_config_json = cfg.ConfigQuoter.quote(config_obj, "json")
+            stream.write(sys_config_json)
+
+    def _config_path(self, config_file):
+        return pathlib.Path(self.temp_dir.name).joinpath(config_file)
 
     def test_full_runtime_ok(self):
 
@@ -112,25 +128,19 @@ class ExtExternalSystemTest(unittest.TestCase):
         download_path = "https://raw.githubusercontent.com/finos/tracdap/refs/heads/main/README.md"
         first_line = "# ![TRAC: The modern model platform](doc/_images/tracmmp_horizontal_400.png)"
 
-        job_id = util.new_object_id(meta.ObjectType.JOB)
-
-        job_def = meta.JobDefinition(
+        job_config = cfg.JobConfig(job=meta.JobDefinition(
             runModel=meta.RunModelJob(
-                parameters={
-                    "download_path": trac_types.MetadataCodec.encode_value(download_path),
-                    "first_line": trac_types.MetadataCodec.encode_value(first_line)
+                parameters={  # noqa
+                    "download_path": download_path,
+                    "first_line": first_line
                 }
             )
-        )
+        ))
 
-        trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
-        trac_runtime.pre_start()
+        self._write_config(job_config, "job_config.json")
 
-        with trac_runtime as rt:
-
-            job_config = rt.load_job_config(
-                cfg.JobConfig(jobId=job_id, job=job_def),
-                model_class=ExternalSystemModel)
-
-            rt.submit_job(job_config)
-            rt.wait_for_job(job_id)
+        launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=plugin_package)
