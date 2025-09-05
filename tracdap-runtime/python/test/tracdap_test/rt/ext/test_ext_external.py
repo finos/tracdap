@@ -20,6 +20,7 @@ import unittest
 from http.client import HTTPConnection
 
 import tracdap.rt.api as trac
+import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.launch as launch
 import tracdap.rt.metadata as meta
@@ -79,6 +80,8 @@ class ExternalSystemModel(trac.TracModel):
 
 class ExtExternalSystemTest(unittest.TestCase):
 
+    PLUGIN_PACKAGE = "tracdap_test.rt.ext.plugins"
+
     @classmethod
     def setUpClass(cls) -> None:
         log.configure_logging()
@@ -106,25 +109,6 @@ class ExtExternalSystemTest(unittest.TestCase):
                 "port": "443"
             })
 
-        self.sys_config = sys_config
-        self.temp_dir = temp.TemporaryDirectory()
-
-        self._write_config(sys_config, "sys_config.json")
-
-    def tearDown(self):
-        self.temp_dir.cleanup()
-
-    def _write_config(self, config_obj, config_file):
-        with open(self._config_path(config_file), "wt") as stream:
-            sys_config_json = cfg.ConfigQuoter.quote(config_obj, "json")
-            stream.write(sys_config_json)
-
-    def _config_path(self, config_file):
-        return pathlib.Path(self.temp_dir.name).joinpath(config_file)
-
-    def test_full_runtime_ok(self):
-
-        plugin_package = "tracdap_test.rt.ext.plugins"
         download_path = "https://raw.githubusercontent.com/finos/tracdap/refs/heads/main/README.md"
         first_line = "# ![TRAC: The modern model platform](doc/_images/tracmmp_horizontal_400.png)"
 
@@ -137,10 +121,81 @@ class ExtExternalSystemTest(unittest.TestCase):
             )
         ))
 
-        self._write_config(job_config, "job_config.json")
+        self.sys_config = sys_config
+        self.job_config = job_config
+
+        self.temp_dir = temp.TemporaryDirectory()
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def _write_config(self, config_obj, config_file):
+        with open(self._config_path(config_file), "wt") as stream:
+            sys_config_json = cfg.ConfigQuoter.quote(config_obj, "json")
+            stream.write(sys_config_json)
+
+    def _config_path(self, config_file):
+        return pathlib.Path(self.temp_dir.name).joinpath(config_file)
+
+    def test_use_plugin_ok(self):
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
 
         launch.launch_model(
             ExternalSystemModel,
             self._config_path("job_config.json"),
             self._config_path("sys_config.json"),
-            plugin_package=plugin_package)
+            plugin_package=self.PLUGIN_PACKAGE)
+
+    def test_client_types_none(self):
+
+        self.sys_config.resources["github_content"].properties["client_types_none"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_client_types_empty(self):
+
+        self.sys_config.resources["github_content"].properties["client_types_empty"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_client_types_bad_list(self):
+
+        self.sys_config.resources["github_content"].properties["client_types_bad_list"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_client_types_bad_entry(self):
+
+        self.sys_config.resources["github_content"].properties["client_types_bad_entry"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
