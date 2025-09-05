@@ -77,17 +77,19 @@ def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -
 
         def __getattr__(self, name: str) -> tp.Any:
 
-            method = getattr(self.__delegate, name)
+            # Use abstract method to validate (concrete plugin may have bad annotations)
+            abstract_method = getattr(plugin_api, name)
+            concrete_method = getattr(self.__delegate, name)
 
-            if not callable(method):
-                return method
+            if abstract_method is None or not callable(abstract_method):
+                return concrete_method
 
             def wrapped_method(*args, **kwargs):
 
-                value = method(*args, **kwargs)
+                value = concrete_method(*args, **kwargs)
 
                 try:
-                    _TypeValidator.validate_return_type(method, value)
+                    _TypeValidator.validate_return_type(abstract_method, value)
                     return value
                 except ex.ERuntimeValidation as e:
                     detail = "(plugin API call returned the wrong type)"
