@@ -221,6 +221,20 @@ def retrieve_runtime_metadata(obj: tp.Any) -> tp.Optional[api.RuntimeMetadata]:
     return None
 
 
+def qualified_type_name(type_obj: type) -> str:
+
+    # Simple qualified type name
+    # Type validator has an implementation that also handles generics, recursion etc.
+
+    if type_obj is None:
+        type_obj = type(None)
+
+    if type_obj.__module__ is None or type_obj.__module__ == int.__class__.__module__:
+        return type_obj.__qualname__
+
+    return f"{type_obj.__module__}.{type_obj.__qualname__}"
+
+
 def get_origin(metaclass: type):
 
     # Minimum supported Python is 3.7, which does not provide get_origin and get_args
@@ -367,3 +381,89 @@ def read_property(properties: tp.Dict[str, str], key: str, default: tp.Optional[
 
     except (ValueError, TypeError):
         raise ex.EConfigParse(f"Wrong property type: [{key}] = [{value}], expected type is [{convert}]")
+
+
+class RuntimeContextTracking:
+
+    # Explicit tracking for resources that TRAC gives out to model code
+    # For each resource, both __enter__ and __exit__ must be called exactly once
+    # Use close_all() to clean up and raise an exception for any unclosed resources
+
+    __T = tp.TypeVar("__T")
+
+    def __init__(self):
+        self.__rct_hooks: dict[int, tuple] = dict()
+
+    def create(self, name: str, obj: __T, close_func: tp.Callable[[__T], None]):
+
+        wrapper = self._Wrapper(self)
+        context_id = id(wrapper)
+
+        enter_func = lambda: obj
+        exit_func = lambda exc_type, exc_val, exc_tb: close_func(obj)
+
+        self.__rct_hooks[context_id] = (name, enter_func, exit_func)
+
+        return wrapper
+
+    def wrap(self, name: str, delegate: tp.ContextManager[__T]) -> tp.ContextManager[__T]:
+
+        context_id = id(delegate)
+        enter_func = delegate.__enter__
+        exit_func = delegate.__exit__
+
+        self.__rct_hooks[context_id] = (name, enter_func, exit_func)
+
+        return self._Wrapper(self, context_id)
+
+    def close_all(self, silent: bool = False):
+
+        if any(self.__rct_hooks):
+
+            names = []
+
+            for hook_funcs in self.__rct_hooks.values():
+                name, enter_func, exit_func = hook_funcs
+                names.append(name)
+                exit_func.__call__(None, None, None)
+
+            if not silent:
+                names = ", ".join(names)
+                raise ex.ERuntimeValidation(f"One or more resources were not closed: [{names}]")
+
+    def _enter_context_manager(self, hook_id: int):
+
+        hook_funcs = self.__rct_hooks.get(hook_id)
+
+        if hook_funcs is None:
+            raise ex.ERuntimeValidation("Attempt to open an unknown resource")
+
+        name, enter_func, exit_func = hook_funcs
+
+        if enter_func is None:
+            raise ex.ERuntimeValidation(f"Resource [{name}] has already been opened")
+
+        self.__rct_hooks[hook_id] = (name, None, exit_func)
+
+        return enter_func.__call__()
+
+    def _exit_context_manager(self, hook_id: int, exc_type, exc_val, exc_tb):
+
+        hook_funcs = self.__rct_hooks.pop(hook_id)
+
+        if hook_funcs is not None:
+            name, enter_func, exit_func = hook_funcs
+            exit_func.__call__(exc_type, exc_val, exc_tb)
+
+    class _Wrapper(tp.ContextManager[__T]):
+
+        def __init__(self, rct: "RuntimeContextTracking", context_id: tp.Optional[int] = None):
+            super().__init__()
+            self.__rct = rct
+            self.__context_id = context_id if context_id is not None else id(self)
+
+        def __enter__(self):
+            return self.__rct._enter_context_manager(self.__context_id)
+
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            self.__rct._exit_context_manager(self.__context_id, exc_type, exc_val, exc_tb)

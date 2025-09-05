@@ -25,13 +25,13 @@ import tracdap.rt._impl.core.util as util
 import tracdap.rt.exceptions as _ex
 
 _SHIM_TEST_DIR = pathlib.Path(__file__).parent \
-    .joinpath("../../../..") \
+    .joinpath("../../../../..") \
     .joinpath("test_data/shim_test") \
     .resolve()
 
 
 _SHIM_TEST_DIR_2 = pathlib.Path(__file__).parent \
-    .joinpath("../../../..") \
+    .joinpath("../../../../..") \
     .joinpath("test_data/shim_test_2") \
     .resolve()
 

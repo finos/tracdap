@@ -25,6 +25,7 @@ import "tracdap/metadata/type.proto";
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/data.proto";
 import "tracdap/metadata/file.proto";
+import "tracdap/metadata/resource.proto";
 
 
 /**
@@ -117,6 +118,32 @@ message ModelOutputSchema {
 
 
 /**
+ * Describes an external resource used by a model
+ */
+message ModelResource {
+
+    ResourceType resourceType = 1;
+    optional string protocol = 2;
+    optional string subProtocol = 3;
+
+    oneof details {
+        ModelSystemDetails system = 4;
+    }
+}
+
+
+/**
+ * Details of an external system resource used by a model
+ *
+ * @see ModelResource
+ */
+message ModelSystemDetails {
+
+    string client_type = 1;
+}
+
+
+/**
  * Define a model for execution on the TRAC platform
  */
 message ModelDefinition {
@@ -132,6 +159,7 @@ message ModelDefinition {
     map<string, ModelParameter> parameters = 7;
     map<string, ModelInputSchema> inputs = 8;
     map<string, ModelOutputSchema> outputs = 9;
+    map<string, ModelResource> resources = 14;
 
     /**
      * Static attributes defined in model code

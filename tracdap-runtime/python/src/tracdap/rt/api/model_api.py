@@ -18,8 +18,6 @@ import dataclasses as _dc
 import typing as _tp
 import logging as _logging
 
-from .constants import STRUCT_TYPE  # DOCGEN_REMOVE
-
 # Import metadata domain objects into the API namespace
 # This significantly improves type hinting, inline documentation and auto-complete in JetBrains IDEs
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
@@ -36,6 +34,13 @@ if _tp.TYPE_CHECKING:
         import polars
     except ModuleNotFoundError:
         pass
+
+
+STRUCT_TYPE = _tp.TypeVar('STRUCT_TYPE')
+"""Template type for use with STRUCT data objects, which can be either Python dataclasses or Pydantic models"""
+
+CLIENT_TYPE = _tp.TypeVar('CLIENT_TYPE')
+"""Template type for use with external systems"""
 
 
 @_dc.dataclass(frozen=True)
@@ -309,6 +314,34 @@ class TracContext(metaclass=_abc.ABCMeta):
 
         pass
 
+    def get_external_system(
+            self, system_name: str,
+            client_type: _tp.Type[CLIENT_TYPE],
+            **client_args) -> _tp.ContextManager[CLIENT_TYPE]:
+
+        """
+        Get a new client instance for an external system.
+
+        External systems must be defined in :py:meth:`define_resources() <TracModel.define_resources>`
+        before they can be used. A suitable plugin must be installed to support the required system type.
+        The support values for ``client_type`` and ``client_args`` depend on that plugin and vary
+        from system to system.
+
+        The returned client instance can only be used inside a ``with`` block. Trying to use the
+        client outside without a ``with`` block, or failing to close the client before the end of
+        :py:meth:`run_model() <TracModel.run_model>` will result in a runtime validation error.
+
+        :param system_name: The system name to get a new client instance for
+        :param client_type: The python type for the new client instance
+        :param client_args: Any extra arguments to pass to the new client instance (optional)
+        :return: A new client instance for the requested system
+
+        :type system_name: str
+        :type client_type: type
+        """
+
+        pass
+
     def put_schema(self, dataset_name: str, schema: SchemaDefinition):
 
         """
@@ -514,7 +547,7 @@ class TracModel(metaclass=_abc.ABCMeta):
     .. seealso:: :py:class:`TracContext <tracdap.rt.api.TracContext>`
     """
 
-    def define_attributes(self) -> _tp.Dict[str, Value]:  # noqa
+    def define_attributes(self) -> _tp.Optional[_tp.Dict[str, Value]]:
 
         """
         Define attributes that will be associated with the model when it is loaded into the TRAC platform.
@@ -533,10 +566,10 @@ class TracModel(metaclass=_abc.ABCMeta):
         will result in a model validation failure.
 
         :return: A set of attributes that will be applied to the model when it is loaded into the TRAC platform
-        :rtype: Dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`]
+        :rtype: dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`]
         """
 
-        return {}
+        return None
 
     @_abc.abstractmethod
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:
@@ -554,7 +587,7 @@ class TracModel(metaclass=_abc.ABCMeta):
         will result in a model validation failure.
 
         :return: The full set of parameters that will be available to the model at
-        :rtype: Dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
+        :rtype: dict[str, :py:class:`ModelParameter <tracdap.rt.metadata.ModelParameter>`]
         """
 
         pass
@@ -575,7 +608,7 @@ class TracModel(metaclass=_abc.ABCMeta):
         will result in a model validation failure.
 
         :return: The full set of inputs that will be available to the model at runtime
-        :rtype: Dict[str, :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`]
+        :rtype: dict[str, :py:class:`ModelInputSchema <tracdap.rt.metadata.ModelInputSchema>`]
         """
 
         pass
@@ -597,10 +630,31 @@ class TracModel(metaclass=_abc.ABCMeta):
         will result in a model validation failure.
 
         :return: The full set of outputs that will be produced by the model at runtime
-        :rtype: Dict[str, :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`]
+        :rtype: dict[str, :py:class:`ModelOutputSchema <tracdap.rt.metadata.ModelOutputSchema>`]
         """
 
         pass
+
+    def define_resources(self) -> _tp.Optional[_tp.Dict[str, ModelResource]]:
+
+        """
+        Define external resources that will be available to the model at runtime.
+
+        Models that need to connect to external systems or storage locations can define those
+        resources using this method. Only resources defined in this method will be made available
+        to the model, regardless of what other resources might be available on the platform.
+        TRAC will validate that all the required resources are available and compatible with the
+        model requirements before starting a job.
+
+        Using resources is optional, models that use no external resources do not need to
+        implement this method. Models that do define external resources will be automatically
+        marked as not repeatable.
+
+        :return: An optional set of model resources that will be available to the model at runtime
+        :rtype: dict[str, :py:class:`ModelResource <tracdap.rt.metadata.ModelResource>`] | None
+        """
+
+        return None
 
     @_abc.abstractmethod
     def run_model(self, ctx: TracContext):

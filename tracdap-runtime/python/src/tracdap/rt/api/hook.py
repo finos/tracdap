@@ -157,6 +157,14 @@ class _StaticApiHook(_abc.ABC):
         pass
 
     @_abc.abstractmethod
+    def define_external_system(
+            self, protocol: str, client_type: type, *,
+            sub_protocol: _tp.Optional[str] = None) \
+            -> _meta.ModelResource:
+
+        pass
+
+    @_abc.abstractmethod
     def load_schema(
             self, package: _tp.Union[_ts.ModuleType, str], schema_file: str,
             schema_type: _meta.SchemaType = _meta.SchemaType.TABLE) \
@@ -191,32 +199,3 @@ class _StaticApiHook(_abc.ABC):
             -> _tp.ContextManager[_tp.TextIO]:
 
         pass
-
-
-class _ApiContextHook(_abc.ABC):
-
-    @_abc.abstractmethod
-    def register_context_manager(self, name: str, open_func: _tp.Callable, close_func: _tp.Callable) -> int:
-        pass
-
-    @_abc.abstractmethod
-    def enter_context_manager(self, hook_id: int):
-        pass
-
-    @_abc.abstractmethod
-    def exit_context_manager(self, hook_id: int, exc_type, exc_val, exc_tb):
-        pass
-
-
-class _ApiContextWrapper(_tp.ContextManager[_T]):
-
-    def __init__(self, hook: _ApiContextHook, delegate: _tp.ContextManager[_T], name: str):
-        super().__init__()
-        self.__hook = hook
-        self.__hook_id = hook.register_context_manager(name, delegate.__enter__, delegate.__exit__)  # noqa
-
-    def __enter__(self):
-        return self.__hook.enter_context_manager(self.__hook_id)  # noqa
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.__hook.exit_context_manager(self.__hook_id, exc_type, exc_val, exc_tb)  # noqa

@@ -31,11 +31,9 @@ import tracdap.rt._impl.core.validation as _val
 # Import hook interfaces into this module namespace
 from tracdap.rt.api.hook import _StaticApiHook  # noqa
 from tracdap.rt.api.hook import _Named  # noqa
-from tracdap.rt.api.hook import _ApiContextHook  # noqa
-from tracdap.rt.api.hook import _ApiContextWrapper  # noqa
 
 
-class StaticApiImpl(_StaticApiHook, _ApiContextHook):
+class StaticApiImpl(_StaticApiHook):
 
     _T = _tp.TypeVar("_T")
 
@@ -53,11 +51,11 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
     @classmethod
     def shutdown_impl(cls, silent: bool = False):
         impl: StaticApiImpl = _StaticApiHook.get_instance()  # noqa
-        impl._shutdown_context_managers(silent = silent)
+        impl.__rct.close_all(silent = silent)
 
     def __init__(self):
         self.__sys_config = _config.RuntimeConfig()
-        self.__cxm_hooks = {}
+        self.__rct = _util.RuntimeContextTracking()
 
     def array_type(self, item_type: _meta.BasicType) -> _meta.TypeDescriptor:
 
@@ -265,6 +263,22 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
         else:
             raise _ex.EUnexpected()
 
+    def define_external_system(
+            self, protocol: str, client_type: type, *,
+            sub_protocol: _tp.Optional[str] = None) \
+            -> _meta.ModelResource:
+
+        _val.validate_signature(
+            self.define_external_system, protocol, client_type,
+            sub_protocol=sub_protocol)
+
+        client_type_name = _util.qualified_type_name(client_type)
+
+        return _meta.ModelResource(
+            resourceType=_meta.ResourceType.EXTERNAL_SYSTEM,
+            protocol=protocol, subProtocol=sub_protocol,
+            system=_meta.ModelSystemDetails(client_type=client_type_name))
+
     @staticmethod
     def _build_named_dict(
             *attrs: _tp.Union[_Named[_T], _tp.List[_Named[_T]]]) \
@@ -326,7 +340,7 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
             int)
 
         stream = _shim.ShimLoader.open_resource(package, resource_file, resource_size_limit)
-        return _ApiContextWrapper(self, stream, resource_file)
+        return self.__rct.wrap(resource_file, stream)
 
     def load_text_resource(
             self, package: _tp.Union[_ts.ModuleType, str], resource_file: str,
@@ -357,51 +371,4 @@ class StaticApiImpl(_StaticApiHook, _ApiContextHook):
             int)
 
         stream = _shim.ShimLoader.open_text_resource(package, resource_file, encoding, resource_size_limit)
-        return _ApiContextWrapper(self, stream, resource_file)
-
-    def register_context_manager(self, name: str, enter_func: _tp.Callable, exit_func: _tp.Callable) -> int:
-
-        hook_id = id(enter_func)
-
-        self.__cxm_hooks[hook_id] = (name, enter_func, exit_func)
-
-        return hook_id
-
-    def enter_context_manager(self, hook_id: int):
-
-        hook_funcs = self.__cxm_hooks.get(hook_id)
-
-        if hook_funcs is None:
-            raise _ex.ERuntimeValidation("Attempt to open an unknown resource")
-
-        name, enter_func, exit_func = hook_funcs
-
-        if enter_func is None:
-            raise _ex.ERuntimeValidation(f"Resource [{name}] has already been opened")
-
-        self.__cxm_hooks[hook_id] = (name, None, exit_func)
-
-        return enter_func.__call__()
-
-    def exit_context_manager(self, hook_id: int, exc_type, exc_val, exc_tb):
-
-        hook_funcs = self.__cxm_hooks.pop(hook_id)
-
-        if hook_funcs is not None:
-            name, enter_func, exit_func = hook_funcs
-            exit_func.__call__(exc_type, exc_val, exc_tb)
-
-    def _shutdown_context_managers(self, silent: bool = False):
-
-        if any(self.__cxm_hooks):
-
-            names = []
-
-            for hook_funcs in self.__cxm_hooks.values():
-                name, enter_func, exit_func = hook_funcs
-                names.append(name)
-                exit_func.__call__(None, None, None)
-
-            if not silent:
-                names = ", ".join(names)
-                raise _ex.ERuntimeValidation(f"One or more resources were not closed: [{names}]")
+        return self.__rct.wrap(resource_file, stream)

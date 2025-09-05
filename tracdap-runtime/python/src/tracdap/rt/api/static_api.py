@@ -19,7 +19,6 @@ import sys
 import typing as _tp
 import types as _ts
 
-from .constants import STRUCT_TYPE  # DOCGEN_REMOVE
 from .hook import _StaticApiHook
 from .hook import _Named
 
@@ -369,7 +368,7 @@ def define_table(*fields: _tp.Union[FieldSchema, _tp.List[FieldSchema]]) -> Sche
     return sa.define_schema(*fields, schema_type=SchemaType.TABLE_SCHEMA, dynamic=False)
 
 
-def define_struct(struct_type: _tp.Type[STRUCT_TYPE]) -> SchemaDefinition:
+def define_struct(struct_type: _tp.Type) -> SchemaDefinition:
 
     """
     Define a :py:attr:`STRUCT_SCHEMA <tracdap.rt.metadata.SchemaType.STRUCT_SCHEMA>` from a Python
@@ -497,7 +496,7 @@ def define_input_table(
 
 
 def define_input_struct(
-        struct_type: _tp.Type[STRUCT_TYPE], *,
+        struct_type: _tp.Type, *,
         label: _tp.Optional[str] = None, optional: bool = False,
         input_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelInputSchema:
 
@@ -591,7 +590,7 @@ def define_output_table(
 
 
 def define_output_struct(
-        struct_type: _tp.Type[STRUCT_TYPE], *,
+        struct_type: _tp.Type, *,
         label: _tp.Optional[str] = None, optional: bool = False,
         output_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelOutputSchema:
 
@@ -639,6 +638,23 @@ def define_output_file(
 
     file_type = define_file_type(extension, mime_type)
     return define_output(file_type, label=label, optional=optional, output_props=output_props)
+
+
+def define_external_system(
+        protocol: str, client_type: _tp.Type, *,
+        sub_protocol: _tp.Optional[str] = None) -> ModelResource:
+
+    """
+    Define a model resource for an external system.
+
+    :param protocol: The protocol for the external system
+    :param client_type: The client type for the external system
+    :param sub_protocol: If specified, the target resource must match both protocol and sub-protocol
+    :return: A model resource suitable to return from :py:meth:`define_resources() <tracdap.rt.api.TracModel.define_resources>`
+    """
+
+    sa = _StaticApiHook.get_instance()
+    return sa.define_external_system(protocol, client_type, sub_protocol=sub_protocol)
 
 
 def load_schema(

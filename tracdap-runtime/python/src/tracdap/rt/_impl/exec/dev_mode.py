@@ -25,6 +25,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.type_system as _types
@@ -135,7 +136,7 @@ class DevModeTranslator:
 
         self._sys_config = sys_config
         self._config_mgr = config_mgr
-        self._model_loader = model_loader or _models.ModelLoader(self._sys_config, scratch_dir)
+        self._model_loader = model_loader or _models.ModelLoader(_repos.RepositoryManager(self._sys_config), scratch_dir)
         self._storage_manager = storage_manager or _storage.StorageManager(self._sys_config)
 
     def translate_job_config(
@@ -172,6 +173,9 @@ class DevModeTranslator:
 
         if job_def.jobType is None or job_def.jobType == _meta.JobType.JOB_TYPE_NOT_SET:
             job_def = self._process_job_type(job_def)
+
+        # Make all external resources available using their system resource keys
+        job_def = self._process_resources(job_def)
 
         # Load and populate any models provided as a Python class or class name
         job_config, job_def = self._process_models(job_config, job_def, model_class)
@@ -267,6 +271,23 @@ class DevModeTranslator:
 
         job_def = copy.copy(job_def)
         job_def.jobType = job_type
+
+        return job_def
+
+    def _process_resources(self, job_def: _meta.JobDefinition) -> _meta.JobDefinition:
+
+        job_detail = self._get_job_detail(job_def)
+
+        if not hasattr(job_detail, "resources") or self._sys_config.resources is None:
+            return job_def
+
+        if job_detail.resources is None:
+            job_detail.resources = dict()
+
+        for resource_key, resource in self._sys_config.resources.items():
+            if resource_key not in job_detail.resources:
+                if resource.resourceType in [_meta.ResourceType.EXTERNAL_STORAGE, _meta.ResourceType.EXTERNAL_SYSTEM]:
+                    job_detail.resources[resource_key] = resource_key
 
         return job_def
 

@@ -22,7 +22,6 @@ import copy
 import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
 import tracdap.rt.metadata as _meta
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 
 import tracdap.rt._impl.core.logging as _logging
@@ -42,12 +41,12 @@ class ModelLoader:
             self.code_cache: tp.Dict[str, pathlib.Path] = dict()
             self.shims: tp.Dict[pathlib.Path, str] = dict()
 
-    def __init__(self, sys_config: _cfg.RuntimeConfig, scratch_dir: pathlib.Path):
+    def __init__(self, repos: _repos.RepositoryManager, scratch_dir: pathlib.Path):
 
         self.__log = _logging.logger_for_object(self)
 
+        self.__repos = repos
         self.__scratch_dir = scratch_dir.joinpath("models")
-        self.__repos = _repos.RepositoryManager(sys_config)
         self.__scopes: tp.Dict[str, ModelLoader._ScopeState] = dict()
 
         safe_scratch_dir = _util.windows_unc_path(self.__scratch_dir)
@@ -200,16 +199,19 @@ class ModelLoader:
             model: _api.TracModel = _api.TracModel.__new__(model_class)
             model_class.__init__(model)
 
-            attributes = model.define_attributes()
             parameters = model.define_parameters()
             inputs = model.define_inputs()
             outputs = model.define_outputs()
 
+            # Optional - models are not required to define these
+            attributes = model.define_attributes() or dict()
+            resources = model.define_resources() or dict()
+
             model_def = copy.copy(model_stub)
-            model_def.staticAttributes = attributes
             model_def.parameters = parameters
             model_def.inputs = inputs
             model_def.outputs = outputs
+            model_def.resources = resources
 
             if isinstance(model, _eapi.TracDataImport):
                 model_def.modelType = _meta.ModelType.DATA_IMPORT_MODEL
@@ -237,12 +239,33 @@ class ModelLoader:
                 self.__log.info(f"Output [{name}] - {output_type}")
                 output_def.outputProps = self._encoded_props(output_def.outputProps, "input", name)
 
+            for name, resource in model_def.resources.items():
+                protocol_info = f" {resource.protocol or ''} {resource.subProtocol or ''}".rstrip()
+                self.__log.info(f"Resource [{name}] - {resource.resourceType.name}{protocol_info}")
+
             return model_def
 
         except Exception as e:
 
             model_class_name = f"{model_class.__module__}.{model_class.__name__}"
             msg = f"An error occurred while scanning model class [{model_class_name}]: {str(e)}"
+
+            self.__log.error(msg, exc_info=True)
+            raise _ex.EModelValidation(msg) from e
+
+    def scan_model_attrs(self, model_class: _api.TracModel.__class__) -> tp.Dict[str, _meta.Value]:
+
+        try:
+
+            model: _api.TracModel = _api.TracModel.__new__(model_class)
+            model_class.__init__(model)
+
+            return model.define_attributes() or dict()
+
+        except Exception as e:
+
+            model_class_name = f"{model_class.__module__}.{model_class.__name__}"
+            msg = f"An error occurred while scanning model attributes for [{model_class_name}]: {str(e)}"
 
             self.__log.error(msg, exc_info=True)
             raise _ex.EModelValidation(msg) from e

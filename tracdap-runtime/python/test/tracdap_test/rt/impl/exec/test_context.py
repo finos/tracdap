@@ -17,6 +17,7 @@ import logging
 import unittest
 import decimal
 import datetime
+import http.client as http
 import pandas as pd
 
 import tracdap.rt.api as _api
@@ -25,9 +26,10 @@ import tracdap.rt._impl.static_api as _api_hook  # noqa
 import tracdap.rt._impl.core.type_system as _types  # noqa
 import tracdap.rt._impl.core.data as _data  # noqa
 
-from tracdap.rt._impl.exec.context import TracContextImpl  # noqa
+from tracdap.rt._impl.exec.context import TracContextImpl, TracExternalSystemWrapper  # noqa
 
 import tracdap_test.resources.test_models as test_models
+import tracdap_test.rt.ext.plugins.external_system_plugin as ext_system
 
 
 _api_hook.StaticApiImpl.register_impl()
@@ -39,7 +41,12 @@ _test_model_def = _api.ModelDefinition(
 
     parameters=test_models.TestModel().define_parameters(),
     inputs=test_models.TestModel().define_inputs(),
-    outputs=test_models.TestModel().define_outputs())
+    outputs=test_models.TestModel().define_outputs(),
+    resources={
+        "github": _api.define_external_system("test-ext-external", http.HTTPConnection),
+        "github_2": _api.define_external_system("test-ext-external", str),
+        "github_3": _api.define_external_system("test-ext-external", http.HTTPConnection),
+    })
 
 
 class TracContextTest(unittest.TestCase):
@@ -116,7 +123,15 @@ class TracContextTest(unittest.TestCase):
 
         local_ctx = {**params, **data}
 
-        self.ctx = TracContextImpl(_test_model_def, test_models.TestModel, local_ctx)
+        github_props = { "scheme": "https", "host": "github.com", "port": "443" }
+        github_content = ext_system.ExtExternalSystemPlugin(github_props)
+
+        resources = {
+            "github": TracExternalSystemWrapper(github_content),
+            "github_2": TracExternalSystemWrapper(github_content)
+        }
+
+        self.ctx = TracContextImpl(_test_model_def, test_models.TestModel, local_ctx, resources=resources)
 
     # Getting params
 
@@ -277,8 +292,6 @@ class TracContextTest(unittest.TestCase):
             _ex.ERuntimeValidation,
             lambda: self.ctx.put_pandas_table(None, self.RESULT_DATA))  # noqa
 
-        # Add other put methods here as they are implemented, e.g. put_pyspark_table
-
     def test_put_dataset_name_invalid(self):
 
         for identifier in self.INVALID_IDENTIFIERS:
@@ -287,15 +300,71 @@ class TracContextTest(unittest.TestCase):
                 _ex.ERuntimeValidation,
                 lambda: self.ctx.put_pandas_table(identifier, self.RESULT_DATA))
 
-            # Add other put methods here as they are implemented, e.g. put_pyspark_table
-
     def test_put_dataset_unknown(self):
 
         self.assertRaises(
             _ex.ERuntimeValidation,
             lambda: self.ctx.put_pandas_table("unknown_output", self.RESULT_DATA))
 
-        # Add other put methods here as they are implemented, e.g. put_pyspark_table
+    # Add other put methods here as they are implemented, e.g. put_pyspark_table
+
+    # External system resources
+
+    def test_get_external_system_ok(self):
+
+        with self.ctx.get_external_system("github", http.HTTPConnection, timeout=10) as github:
+            self.assertEqual(10, github.timeout)
+
+    def test_get_external_system_invalid_identifier(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("inV4$li=D!", http.HTTPConnection))
+
+    def test_get_external_system_resource_not_define(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("unknown", http.HTTPConnection))
+
+    def test_get_external_system_resource_not_available(self):
+
+        # Resource is defined in the model but not available in the context
+        # Should not happen in real execution as this is checked in the resolve phase
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("github_3", http.HTTPConnection))
+
+    def test_get_external_system_client_type_does_not_match_model(self):
+
+        # Test mismatch between type in define_resources and get_external_system
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("github", str))
+
+    def test_get_external_system_client_type_unsupported(self):
+
+        # Resource github_2 is defined in the model with client_type = str
+        # Now define_resources and get_external_system both say the same type (str)
+        # But that type is not supported by the plugin
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("github_2", str))
+
+    def test_get_external_system_client_arg_unknown(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("github", http.HTTPConnection, unknown="hello"))
+
+    def test_get_external_system_client_arg_wrong_type(self):
+
+        self.assertRaises(
+            _ex.ERuntimeValidation,
+            lambda: self.ctx.get_external_system("github", http.HTTPConnection, timeout="hello"))
 
     # Misc extra tests
 

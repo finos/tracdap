@@ -46,8 +46,12 @@ def check_type(expected_type: tp.Type, value: tp.Any) -> bool:
     return _TypeValidator.check_type(expected_type, value)
 
 
-def type_name(type_: tp.Type, qualified: bool) -> str:
-    return _TypeValidator._type_name(type_, qualified)  # noqa
+def type_name(type_: tp.Type) -> str:
+    module = type_.__module__
+    if module is None or module == str.__class__.__module__ or module == tp.__name__:
+        return _TypeValidator._type_name(type_, False)  # noqa
+    else:
+        return _TypeValidator._type_name(type, True)  # noqa
 
 
 def quick_validate_model_def(model_def: meta.ModelDefinition):
@@ -56,6 +60,51 @@ def quick_validate_model_def(model_def: meta.ModelDefinition):
 
 def is_primitive_type(basic_type: meta.BasicType) -> bool:
     return StaticValidator.is_primitive_type(basic_type)
+
+
+T_PLUGIN = tp.TypeVar("T_PLUGIN")
+
+def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -> T_PLUGIN:
+
+    # Create a wrapper that validates return values from plugin API calls
+    # A dynamic type would give better type similarity, but is more fiddly to set up
+    # Since plugins are not exposed directly to client code, this approach should suffice
+
+    class PluginValidationWrapper:
+
+        def __init__(self, delegate: T_PLUGIN):
+            self.__delegate = delegate
+
+        def __getattr__(self, name: str) -> tp.Any:
+
+            # Use abstract method to validate (concrete plugin may have bad annotations)
+            abstract_method = getattr(plugin_api, name)
+            concrete_method = getattr(self.__delegate, name)
+
+            if abstract_method is None or not callable(abstract_method):
+                return concrete_method
+
+            def wrapped_method(*args, **kwargs):
+
+                value = concrete_method(*args, **kwargs)
+
+                try:
+                    _TypeValidator.validate_return_type(abstract_method, value)
+                    return value
+                except ex.ERuntimeValidation as e:
+                    detail = "(plugin API call returned the wrong type)"
+                    message = f"Invalid plugin: [{util.qualified_type_name(type(plugin))}] {detail}"
+                    raise ex.EPluginConformance(message) from e
+
+            return wrapped_method
+
+        def __instancecheck__(self, instance: tp.Any) -> bool:
+            return isinstance(instance, plugin_api)
+
+        def __subclasscheck__(self, subclass: tp.Any) -> bool:
+            return issubclass(subclass, self._interface)
+
+    return PluginValidationWrapper(plugin)
 
 
 T_SKIP_VAL = tp.TypeVar("T_SKIP_VAL")
@@ -206,6 +255,9 @@ class _TypeValidator:
         if expected_type == tp.Any:
             return True
 
+        if expected_type == type(None) or expected_type == inspect._empty:
+            return value is None
+
         # Sometimes we need to validate a partial set of arguments
         # Explicitly passing a SkipValidation value allows for this
         if isinstance(value, SkipValidation):
@@ -349,6 +401,8 @@ class StaticValidator:
     __file_extension_pattern = re.compile('\\A[a-zA-Z0-9]+\\Z')
     __mime_type_pattern = re.compile('\\A\\w+/[-.\\w]+(?:\\+[-.\\w]+)?\\Z')
 
+    __qualified_identifier_pattern = re.compile("\\A[a-zA-Z_]\\w*(\\.[a-zA-Z_]\\w*)*\\Z", re.ASCII)
+
     __PRIMITIVE_TYPES = [
         meta.BasicType.BOOLEAN,
         meta.BasicType.INTEGER,
@@ -385,6 +439,7 @@ class StaticValidator:
         params_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelParameter], model_def.parameters)
         inputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelInputSchema], model_def.inputs)
         outputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelOutputSchema], model_def.outputs)
+        resources_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelResource], model_def.resources)
 
         if not attrs_type_check:
             cls._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
@@ -394,16 +449,20 @@ class StaticValidator:
             cls._fail(f"Invalid model inputs: define_inputs() returned the wrong type")
         if not outputs_type_check:
             cls._fail(f"Invalid model outputs: define_outputs() returned the wrong type")
+        if not resources_type_check:
+            cls._fail(f"Invalid model resources: define_resources() returned the wrong type")
 
         cls._valid_identifiers(model_def.staticAttributes.keys(), "model attribute")
         cls._valid_identifiers(model_def.parameters.keys(), "model parameter")
         cls._valid_identifiers(model_def.inputs.keys(), "model input")
         cls._valid_identifiers(model_def.outputs.keys(), "model output")
+        cls._valid_identifiers(model_def.resources.keys(), "model resource")
 
         cls._case_insensitive_duplicates(model_def.staticAttributes.keys(), "model attribute")
         cls._case_insensitive_duplicates(model_def.parameters.keys(), "model parameter")
         cls._case_insensitive_duplicates(model_def.inputs.keys(), "model input")
         cls._case_insensitive_duplicates(model_def.outputs.keys(), "model output")
+        cls._case_insensitive_duplicates(model_def.resources.keys(), "model resource")
 
         # Note unique context does not include static attributes
         # They are not part of the runtime context, so there is no need to constrain them
@@ -411,10 +470,12 @@ class StaticValidator:
         cls._unique_context_check(unique_ctx, model_def.parameters.keys(), "model parameter")
         cls._unique_context_check(unique_ctx, model_def.inputs.keys(), "model input")
         cls._unique_context_check(unique_ctx, model_def.outputs.keys(), "model output")
+        cls._unique_context_check(unique_ctx, model_def.resources.keys(), "model resource")
 
         cls._check_parameters(model_def.parameters)
         cls._check_inputs_or_outputs(model_def.inputs)
         cls._check_inputs_or_outputs(model_def.outputs)
+        cls._check_resources(model_def.resources)
 
     @classmethod
     def quick_validate_schema(cls, schema: meta.SchemaDefinition):
@@ -481,6 +542,22 @@ class StaticValidator:
             else:
                 if socket.outputProps is not None:
                     cls._valid_identifiers(socket.outputProps.keys(), "entry in output props")
+
+    @classmethod
+    def _check_resources(cls, resources):
+
+        for resource_name, resource in resources.items():
+
+            if resource.resourceType == meta.ResourceType.EXTERNAL_SYSTEM:
+                if resource.protocol is None or len(resource.protocol) == 0:
+                    cls._fail(f"Invalid model resource: [{resource_name}] protocol is missing")
+                if resource.system.client_type is None or len(resource.system.client_type) == 0:
+                    cls._fail(f"Invalid model resource: [{resource_name}] client type is missing")
+                if not cls.__qualified_identifier_pattern.match(resource.system.client_type):
+                    cls._fail(f"Invalid model resource: [{resource_name}] client type is not a valid Python type")
+
+            else:
+                cls._fail(f"Invalid resource type [{resource.resourceType}] for [{resource_name}]")
 
     @classmethod
     def _check_socket_schema(cls, socket_name, socket):

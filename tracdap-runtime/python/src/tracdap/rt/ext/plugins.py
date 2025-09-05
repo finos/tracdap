@@ -120,9 +120,15 @@ class PluginManager:
             plugin_type = service_type.__name__
             raise _ex.EPluginNotAvailable(f"No plugin available for [{plugin_type}] with protocol [{config.protocol}]")
 
-        plugin = plugin_class(config.properties)
+        try:
+            return plugin_class(config.properties)
 
-        return plugin
+        except TypeError as e:
+            # Plugins that do not correctly implement the abstract base will get this error
+            plugin_type_name = f"{plugin_class.__module__}.{plugin_class.__qualname__}"
+            detail = "(plugin does not match the interface)"
+            message = f"Invalid plugin: [{plugin_type_name}] {detail}"
+            raise _ex.EPluginConformance(message) from e
 
     @classmethod
     def load_config_plugin(cls,

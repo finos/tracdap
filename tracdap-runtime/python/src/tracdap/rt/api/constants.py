@@ -14,7 +14,6 @@
 #  limitations under the License.
 
 import tracdap.rt.metadata
-import typing as _tp
 
 
 class CommonFileTypes:
@@ -59,7 +58,3 @@ DATE = tracdap.rt.metadata.BasicType.DATE
 
 DATETIME = tracdap.rt.metadata.BasicType.DATETIME
 """Synonym for :py:attr:`BasicType.DATETIME <tracdap.rt.metadata.BasicType.DATETIME>`"""
-
-
-STRUCT_TYPE = _tp.TypeVar('STRUCT_TYPE')
-"""Template type for use with STRUCT data objects, which can be either Python dataclasses or Pydantic models"""

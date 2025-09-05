@@ -24,6 +24,7 @@ import tracdap.rt.config as config
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa
+import tracdap.rt._impl.core.repos as repos  # noqa
 import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 
@@ -85,7 +86,7 @@ class ImportModelTest(unittest.TestCase):
 
         example_repo_url = pathlib.Path(__file__) \
             .parent \
-            .joinpath("../../../../../..") \
+            .joinpath("../../../../../../..") \
             .resolve()
 
         example_repo_config = meta.ResourceDefinition(
@@ -103,7 +104,8 @@ class ImportModelTest(unittest.TestCase):
             entryPoint="tutorial.hello_world.HelloWorldModel"
         )
 
-        loader = models.ModelLoader(sys_config, self.scratch_dir)
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
         loader.create_scope(self.test_scope)
 
         model_class = loader.load_model_class(self.test_scope, stub_model_def)
@@ -133,10 +135,11 @@ class ImportModelTest(unittest.TestCase):
         stub_model_def = meta.ModelDefinition(
             language="python",
             repository="trac_integrated",
-            entryPoint="tracdap_test.rt.core.test_models.SampleModel"
+            entryPoint="tracdap_test.rt.impl.core.test_models.SampleModel"
         )
 
-        loader = models.ModelLoader(sys_config, self.scratch_dir)
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
         loader.create_scope(self.test_scope)
 
         model_class = loader.load_model_class(self.test_scope, stub_model_def)
@@ -153,7 +156,8 @@ class ImportModelTest(unittest.TestCase):
             return meta.TypeDescriptor(basic_type)
 
         sys_config = config.RuntimeConfig()
-        loader = models.ModelLoader(sys_config, self.scratch_dir)
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
 
         model_class = SampleModel
         model_def = loader.scan_model(meta.ModelDefinition(), model_class)

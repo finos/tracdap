@@ -24,10 +24,10 @@ import tracdap.rt.launch as launch
 import tracdap.rt._impl.runtime as runtime
 import tracdap.rt._impl.core.logging as log
 
-import tracdap_test.rt.plugins.test_ext.test_ext_config_loader as ext_loader
+from .plugins.config_loader_plugin import TestExtConfigModel
 
 
-class ConfigParserTest(unittest.TestCase):
+class ExtConfigLoaderTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -58,7 +58,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_ext_config_loader_sys_ok(self):
 
-        plugin_package = "tracdap_test.rt.plugins.test_ext"
+        plugin_package = "tracdap_test.rt.ext.plugins"
 
         trac_runtime = runtime.TracRuntime("test-ext:sys_config_HuX-7", plugin_packages=[plugin_package], dev_mode=True)
         trac_runtime.pre_start()
@@ -68,7 +68,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_ext_config_loader_sys_not_found(self):
 
-        plugin_package = "tracdap_test.rt.plugins.test_ext"
+        plugin_package = "tracdap_test.rt.ext.plugins"
 
         trac_runtime = runtime.TracRuntime("test-ext:sys_config_unknown", plugin_packages=[plugin_package], dev_mode=True)
 
@@ -77,7 +77,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_ext_config_loader_job_ok(self):
 
-        plugin_package = "tracdap_test.rt.plugins.test_ext"
+        plugin_package = "tracdap_test.rt.ext.plugins"
 
         trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
 
@@ -89,7 +89,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_ext_config_loader_job_not_found(self):
 
-        plugin_package = "tracdap_test.rt.plugins.test_ext"
+        plugin_package = "tracdap_test.rt.ext.plugins"
 
         trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
 
@@ -100,7 +100,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_ext_config_loader_wrong_protocol(self):
 
-        plugin_package = "tracdap_test.rt.plugins.test_ext"
+        plugin_package = "tracdap_test.rt.ext.plugins"
 
         trac_runtime = runtime.TracRuntime(self.sys_config, plugin_packages=[plugin_package], dev_mode=True)
 
@@ -112,61 +112,61 @@ class ConfigParserTest(unittest.TestCase):
     def test_launch_model(self):
 
         launch.launch_model(
-            ext_loader.TestExtModel, "test-ext:job_config_A1-6", "test-ext:sys_config_HuX-7",
-            plugin_package="tracdap_test.rt.plugins.test_ext")
+            TestExtConfigModel, "test-ext:job_config_A1-6", "test-ext:sys_config_HuX-7",
+            plugin_package="tracdap_test.rt.ext.plugins")
 
     def test_launch_model_wrong_protocol(self):
 
         self.assertRaises(ex.EStartup, lambda: launch.launch_model(
-            ext_loader.TestExtModel, "test-ext:job_config_A1-6", "test-ext-2:sys_config_HuX-7",
-            plugin_package="tracdap_test.rt.plugins.test_ext"))
+            TestExtConfigModel, "test-ext:job_config_A1-6", "test-ext-2:sys_config_HuX-7",
+            plugin_package="tracdap_test.rt.ext.plugins"))
 
         self.assertRaises(ex.EConfigLoad, lambda: launch.launch_model(
-            ext_loader.TestExtModel, "test-ext-2:job_config_A1-6", "test-ext:sys_config_HuX-7",
-            plugin_package="tracdap_test.rt.plugins.test_ext"))
+            TestExtConfigModel, "test-ext-2:job_config_A1-6", "test-ext:sys_config_HuX-7",
+            plugin_package="tracdap_test.rt.ext.plugins"))
 
     def test_launch_model_config_not_found(self):
 
         self.assertRaises(ex.EStartup, lambda: launch.launch_model(
-            ext_loader.TestExtModel, "test-ext:job_config_A1-6", "test-ext:sys_config_unknown",
-            plugin_package="tracdap_test.rt.plugins.test_ext"))
+            TestExtConfigModel, "test-ext:job_config_A1-6", "test-ext:sys_config_unknown",
+            plugin_package="tracdap_test.rt.ext.plugins"))
 
         self.assertRaises(ex.EConfigLoad, lambda: launch.launch_model(
-            ext_loader.TestExtModel, "test-ext:job_config_unknown", "test-ext:sys_config_HuX-7",
-            plugin_package="tracdap_test.rt.plugins.test_ext"))
+            TestExtConfigModel, "test-ext:job_config_unknown", "test-ext:sys_config_HuX-7",
+            plugin_package="tracdap_test.rt.ext.plugins"))
 
     def test_launch_job(self):
 
         launch.launch_job(
             "test-ext:job_config_A1-6", "test-ext:sys_config_HuX-7",
-            dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext")
+            dev_mode=True, plugin_package="tracdap_test.rt.ext.plugins")
 
     def test_launch_job_wrong_protocol(self):
 
         self.assertRaises(ex.EStartup, lambda: launch.launch_job(
             "test-ext:job_config_A1-6", "test-ext-2:sys_config_HuX-7",
-            dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
+            dev_mode=True, plugin_package="tracdap_test.rt.ext.plugins"))
 
         self.assertRaises(ex.EConfigLoad, lambda: launch.launch_job(
             "test-ext-2:job_config_A1-6", "test-ext:sys_config_HuX-7",
-            dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
+            dev_mode=True, plugin_package="tracdap_test.rt.ext.plugins"))
 
     def test_launch_job_config_not_found(self):
 
         self.assertRaises(ex.EStartup, lambda: launch.launch_job(
             "test-ext:job_config_A1-6", "test-ext:sys_config_unknown",
-            dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
+            dev_mode=True, plugin_package="tracdap_test.rt.ext.plugins"))
 
         self.assertRaises(ex.EConfigLoad, lambda: launch.launch_job(
             "test-ext:job_config_unknown", "test-ext:sys_config_HuX-7",
-            dev_mode=True, plugin_package="tracdap_test.rt.plugins.test_ext"))
+            dev_mode=True, plugin_package="tracdap_test.rt.ext.plugins"))
 
     def test_launch_cli(self):
 
         launch.launch.launch_cli([
             "--sys-config", "test-ext:sys_config_HuX-7",
             "--job-config", "test-ext:job_config_A1-6",
-            "--plugin-package", "tracdap_test.rt.plugins.test_ext",
+            "--plugin-package", "tracdap_test.rt.ext.plugins",
             "--dev-mode"])
 
     def test_launch_cli_wrong_protocol(self):
@@ -174,13 +174,13 @@ class ConfigParserTest(unittest.TestCase):
         self.assertRaises(ex.EStartup, lambda: launch.launch.launch_cli([
             "--sys-config", "test-ext-2:sys_config_HuX-7",
             "--job-config", "test-ext:job_config_A1-6",
-            "--plugin-package", "tracdap_test.rt.plugins.test_ext",
+            "--plugin-package", "tracdap_test.rt.ext.plugins",
             "--dev-mode"]))
 
         self.assertRaises(ex.EConfigLoad, lambda: launch.launch.launch_cli([
             "--sys-config", "test-ext:sys_config_HuX-7",
             "--job-config", "test-ext-2:job_config_A1-6",
-            "--plugin-package", "tracdap_test.rt.plugins.test_ext",
+            "--plugin-package", "tracdap_test.rt.ext.plugins",
             "--dev-mode"]))
 
     def test_launch_cli_config_not_found(self):
@@ -188,11 +188,11 @@ class ConfigParserTest(unittest.TestCase):
         self.assertRaises(ex.EStartup, lambda: launch.launch.launch_cli([
             "--sys-config", "test-ext:sys_config_unknown",
             "--job-config", "test-ext:job_config_A1-6",
-            "--plugin-package", "tracdap_test.rt.plugins.test_ext",
+            "--plugin-package", "tracdap_test.rt.ext.plugins",
             "--dev-mode"]))
 
         self.assertRaises(ex.EConfigLoad, lambda: launch.launch.launch_cli([
             "--sys-config", "test-ext:sys_config_HuX-7",
             "--job-config", "test-ext:job_config_unknown",
-            "--plugin-package", "tracdap_test.rt.plugins.test_ext",
+            "--plugin-package", "tracdap_test.rt.ext.plugins",
             "--dev-mode"]))

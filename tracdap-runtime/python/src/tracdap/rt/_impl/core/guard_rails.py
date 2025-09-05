@@ -80,6 +80,8 @@ class PythonGuardRails:
     MODEL_ENTRY_POINTS = _get_model_entry_points()
     TRAC_PACKAGE_PATH: pathlib.Path = _get_package_path("tracdap.rt")
     SITE_PACKAGE_PATH: pathlib.Path = _get_package_path("pyarrow")
+    STDLIB_PACKAGE_PATH: pathlib.Path = _get_package_path("typing")
+    FROZEN_PACKAGE_REFIX = "<frozen "
 
     PROTECTED_FUNC_STACK_DEPTH = 2
 
@@ -253,11 +255,12 @@ class PythonGuardRails:
 
             frame_path = pathlib.Path(frame.filename)
 
-            if cls.path_is_in_dir(frame_path, cls.SITE_PACKAGE_PATH):
-                return None
+            if cls.path_is_in_dir(frame_path, cls.SITE_PACKAGE_PATH) or \
+               cls.path_is_in_dir(frame_path, cls.TRAC_PACKAGE_PATH) or \
+               cls.path_is_in_dir(frame_path, cls.STDLIB_PACKAGE_PATH) or \
+               frame_path.name.startswith(cls.FROZEN_PACKAGE_REFIX):
 
-            if cls.path_is_in_dir(frame_path, cls.TRAC_PACKAGE_PATH):
-                return None
+                    return None
 
             last_model_frame = frame
 

@@ -37,8 +37,11 @@ enum ResourceType {
   /// Storage location for data held internally by the TRAC platform
   INTERNAL_STORAGE = 2;
 
-  // Storage location for upstream / downstream integration points
+  /// Storage location for upstream / downstream integration points
   EXTERNAL_STORAGE = 3;
+
+  /// An external system or API endpoint that can be called from model code
+  EXTERNAL_SYSTEM = 4;
 }
 
 /**

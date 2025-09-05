@@ -27,7 +27,7 @@ import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
 
 
 ROOT_DIR = pathlib.Path(__file__).parent \
-    .joinpath("../../../../../..") \
+    .joinpath("../../../../../../..") \
     .resolve()
 
 PYTHON_EXAMPLES_DIR = ROOT_DIR \

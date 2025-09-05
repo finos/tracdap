@@ -20,12 +20,12 @@ import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.api import TracContext
 
 from tracdap.rt.ext.config import *
-from tracdap.rt_gen.domain.tracdap.metadata import ModelOutputSchema, ModelInputSchema, ModelParameter
+from tracdap.rt.metadata import ModelOutputSchema, ModelInputSchema, ModelParameter
 
 _TEST_EXT_PROTOCOL = "test-ext"
 
 
-class TestExtModel(trac.TracModel):
+class TestExtConfigModel(trac.TracModel):
 
     def define_parameters(self) -> _tp.Dict[str, ModelParameter]:
 
@@ -62,7 +62,7 @@ class TestExtConfigLoader(IConfigLoader):
     STATIC_JOB_OBJ = {
         "job": {
             "runModel": {
-                "model": f'{__name__}.TestExtModel',
+                "model": f'{__name__}.TestExtConfigModel',
                 "parameters": { "param_1": 42 }
             }
         }
@@ -103,4 +103,4 @@ class TestExtConfigLoader(IConfigLoader):
         raise RuntimeError(f"Config key not found: [{config_key}")
 
 
-plugins.PluginManager.register_plugin(IConfigLoader, TestExtConfigLoader, ["test-ext"])
+plugins.PluginManager.register_plugin(IConfigLoader, TestExtConfigLoader, [_TEST_EXT_PROTOCOL])

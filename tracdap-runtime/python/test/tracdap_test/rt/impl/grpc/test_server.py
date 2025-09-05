@@ -28,7 +28,7 @@ import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2 as runtime_pb2
 import tracdap.rt_gen.grpc.tracdap.api.internal.runtime_pb2_grpc as runtime_grpc
 
 _ROOT_DIR = pathlib.Path(__file__).parent \
-    .joinpath("../../../../../..") \
+    .joinpath("../../../../../../..") \
     .resolve()
 
 
