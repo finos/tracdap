@@ -29,21 +29,31 @@ class ExtExternalSystemPlugin(trac_external.IExternalSystem):
 
     def supported_types(self) -> list[type]:
 
-        if "client_types_none" in self._properties:
+        if "supported_types_none" in self._properties:
             return None  # noqa
 
-        if "client_types_empty" in self._properties:
+        if "supported_types_empty" in self._properties:
             return []
 
-        if "client_types_bad_list" in self._properties:
+        if "supported_types_bad_list" in self._properties:
             return _http.HTTPConnection  # noqa
 
-        if "client_types_bad_entry" in self._properties:
+        if "supported_types_bad_entry" in self._properties:
             return ["not_a_type"]  # noqa
 
         return [_http.HTTPConnection, _http.HTTPSConnection]
 
     def supported_args(self) -> _tp.Optional[_tp.Dict[str, type]]:
+
+        if "supported_args_bad_dict" in self._properties:
+            return []  # noqa
+
+        if "supported_args_bad_key" in self._properties:
+            return { 1: int }  # noqa
+
+        if "supported_args_bad_value" in self._properties:
+            return { "arg_1": 1 }  # noqa
+
         return None
 
     def create_client(self, client_type: type[_http.HTTPConnection], **kwargs) -> _http.HTTPConnection:

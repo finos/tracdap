@@ -148,22 +148,9 @@ class ExtExternalSystemTest(unittest.TestCase):
             self._config_path("sys_config.json"),
             plugin_package=self.PLUGIN_PACKAGE)
 
-    def test_client_types_none(self):
+    def test_supported_types_none(self):
 
-        self.sys_config.resources["github_content"].properties["client_types_none"] = "true"
-
-        self._write_config(self.sys_config, "sys_config.json")
-        self._write_config(self.job_config, "job_config.json")
-
-        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
-            ExternalSystemModel,
-            self._config_path("job_config.json"),
-            self._config_path("sys_config.json"),
-            plugin_package=self.PLUGIN_PACKAGE))
-
-    def test_client_types_empty(self):
-
-        self.sys_config.resources["github_content"].properties["client_types_empty"] = "true"
+        self.sys_config.resources["github_content"].properties["supported_types_none"] = "true"
 
         self._write_config(self.sys_config, "sys_config.json")
         self._write_config(self.job_config, "job_config.json")
@@ -174,9 +161,9 @@ class ExtExternalSystemTest(unittest.TestCase):
             self._config_path("sys_config.json"),
             plugin_package=self.PLUGIN_PACKAGE))
 
-    def test_client_types_bad_list(self):
+    def test_supported_types_empty(self):
 
-        self.sys_config.resources["github_content"].properties["client_types_bad_list"] = "true"
+        self.sys_config.resources["github_content"].properties["supported_types_empty"] = "true"
 
         self._write_config(self.sys_config, "sys_config.json")
         self._write_config(self.job_config, "job_config.json")
@@ -187,9 +174,61 @@ class ExtExternalSystemTest(unittest.TestCase):
             self._config_path("sys_config.json"),
             plugin_package=self.PLUGIN_PACKAGE))
 
-    def test_client_types_bad_entry(self):
+    def test_supported_types_bad_list(self):
 
-        self.sys_config.resources["github_content"].properties["client_types_bad_entry"] = "true"
+        self.sys_config.resources["github_content"].properties["supported_types_bad_list"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_supported_types_bad_entry(self):
+
+        self.sys_config.resources["github_content"].properties["supported_types_bad_entry"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_supported_args_bad_dict(self):
+
+        self.sys_config.resources["github_content"].properties["supported_args_bad_dict"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_supported_args_bad_key(self):
+
+        self.sys_config.resources["github_content"].properties["supported_args_bad_key"] = "true"
+
+        self._write_config(self.sys_config, "sys_config.json")
+        self._write_config(self.job_config, "job_config.json")
+
+        self.assertRaises(ex.EPluginConformance, lambda: launch.launch_model(
+            ExternalSystemModel,
+            self._config_path("job_config.json"),
+            self._config_path("sys_config.json"),
+            plugin_package=self.PLUGIN_PACKAGE))
+
+    def test_supported_args_bad_value(self):
+
+        self.sys_config.resources["github_content"].properties["supported_args_bad_value"] = "true"
 
         self._write_config(self.sys_config, "sys_config.json")
         self._write_config(self.job_config, "job_config.json")
