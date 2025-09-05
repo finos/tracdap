@@ -221,6 +221,20 @@ def retrieve_runtime_metadata(obj: tp.Any) -> tp.Optional[api.RuntimeMetadata]:
     return None
 
 
+def qualified_type_name(type_obj: type) -> str:
+
+    # Simple qualified type name
+    # Type validator has an implementation that also handles generics, recursion etc.
+
+    if type_obj is None:
+        type_obj = type(None)
+
+    if type_obj.__module__ is None or type_obj.__module__ == int.__class__.__module__:
+        return type_obj.__qualname__
+
+    return f"{type_obj.__module__}.{type_obj.__qualname__}"
+
+
 def get_origin(metaclass: type):
 
     # Minimum supported Python is 3.7, which does not provide get_origin and get_args

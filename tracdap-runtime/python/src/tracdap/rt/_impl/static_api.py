@@ -267,7 +267,7 @@ class StaticApiImpl(_StaticApiHook):
 
         _val.validate_signature(self.define_external_system, protocol, client_type)
 
-        client_type_name = f"{client_type.__module__}.{client_type.__name__}"
+        client_type_name = _util.qualified_type_name(client_type)
 
         return _meta.ModelResource(
             resourceType=_meta.ResourceType.EXTERNAL_SYSTEM,
