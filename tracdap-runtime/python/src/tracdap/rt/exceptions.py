@@ -69,6 +69,23 @@ class EConfigParse(EConfig):
 
 class EPluginNotAvailable(ETrac):
 
+    """
+    A required plugin is not available.
+    """
+
+    pass
+
+
+class EPluginConformance(ETrac):
+
+    """
+    A plugin does not conform to its plugin interface.
+
+    Plugin conformance errors may be raised on startup or during model execution,
+    depending on the plugin type and how a particular plugin is used.
+    Plugins returning invalid values from an API call is one possible cause of this error.
+    """
+
     pass
 
 
