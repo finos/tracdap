@@ -25,16 +25,13 @@ import argparse
 import unittest
 
 
-SCRIPT_DIR = pathlib.Path(__file__) \
-    .parent \
-    .resolve()
+RUNTIME_DIR = pathlib.Path(__file__).parent.resolve()
+RUNTIME_EXT_DIR = RUNTIME_DIR.parent.joinpath("python-ext").resolve()
 
-ROOT_PATH = SCRIPT_DIR \
-    .parent.parent \
-    .resolve()
-
-BUILD_PATH = SCRIPT_DIR \
-    .joinpath("build")
+ROOT_PATH = RUNTIME_DIR.parent.parent.resolve()
+BUILD_PATH = ROOT_PATH.joinpath("build/python")
+WORK_PATH = BUILD_PATH.joinpath("work")
+DIST_PATH = BUILD_PATH.joinpath("dist")
 
 COPY_FILES = [
     "pyproject.toml",
@@ -59,7 +56,7 @@ def copy_source_files():
 
     for file in COPY_FILES:
 
-        source_path = SCRIPT_DIR.joinpath(file)
+        source_path = RUNTIME_DIR.joinpath(file)
         target_path = BUILD_PATH.joinpath(file)
 
         if source_path.is_dir():
@@ -73,14 +70,14 @@ def copy_license():
     # Copy the license file out of the project root
 
     shutil.copy(
-        SCRIPT_DIR.joinpath("../../LICENSE"),
+        RUNTIME_DIR.joinpath("../../LICENSE"),
         BUILD_PATH.joinpath("LICENSE"))
 
 
 def generate_from_proto(unpacked: bool = False):
 
     if unpacked:
-        generated_dir = SCRIPT_DIR.joinpath("generated")
+        generated_dir = RUNTIME_DIR.joinpath("generated")
         grpc_relocate = "tracdap:tracdap/rt_gen/grpc/tracdap"
     else:
         generated_dir = BUILD_PATH.joinpath("generated")
@@ -285,15 +282,15 @@ def run_tests(test_path, pattern=None):
     try:
 
         os.chdir(ROOT_PATH)
-        sys.path.append(str(SCRIPT_DIR.joinpath("generated")))
-        sys.path.append(str(SCRIPT_DIR.joinpath("src")))
-        sys.path.append(str(SCRIPT_DIR.joinpath("test")))
+        sys.path.append(str(RUNTIME_DIR.joinpath("generated")))
+        sys.path.append(str(RUNTIME_DIR.joinpath("src")))
+        sys.path.append(str(RUNTIME_DIR.joinpath("test")))
 
         runner = unittest.TextTestRunner()
         loader = unittest.TestLoader()
         suite = loader.discover(
-            start_dir=str(SCRIPT_DIR.joinpath(test_path)),
-            top_level_dir=str(SCRIPT_DIR.joinpath("test")),
+            start_dir=str(RUNTIME_DIR.joinpath(test_path)),
+            top_level_dir=str(RUNTIME_DIR.joinpath("test")),
             pattern=pattern)
 
         result = runner.run(suite)
