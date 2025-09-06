@@ -168,7 +168,7 @@ jobs:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
 
-  python_runtime_package:
+  python_runtime_packages:
 
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -201,8 +201,8 @@ jobs:
       - name: Save artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: python_runtime_package
-          path: tracdap-runtime/python/build/dist
+          name: python_runtime_packages
+          path: build/python/dist
           retention-days: 7
 
 
@@ -261,7 +261,7 @@ jobs:
 
     needs:
       - platform_packages
-      - python_runtime_package
+      - python_runtime_packages
       - web_api_package
 
     steps:
@@ -288,8 +288,8 @@ jobs:
       - name: Fetch Python runtime package
         uses: actions/download-artifact@v4
         with:
-          name: python_runtime_package
-          path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_package
+          name: python_runtime_packages
+          path: tracdap-api-packages-${{ steps.tracdap-version.outputs.tracdap_version }}/python_runtime_packages
 
       - name: Fetch web API package
         uses: actions/download-artifact@v4
@@ -331,7 +331,7 @@ jobs:
     runs-on: ubuntu-latest
 
     needs:
-      - python_runtime_package
+      - python_runtime_packages
 
     steps:
 
@@ -348,7 +348,7 @@ jobs:
       - name: Fetch Python runtime package
         uses: actions/download-artifact@v4
         with:
-          name: python_runtime_package
+          name: python_runtime_packages
           path: tracdap_dist/
 
       - name: Publish to PyPI
