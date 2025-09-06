@@ -136,7 +136,6 @@ class DocGen:
         # Copy only API packages / modules from the runtime library
         api_modules = [
             "tracdap/rt/__init__.py",
-            "tracdap/rt/_version.py",
             "tracdap/rt/api/",
             "tracdap/rt/launch/",
             "tracdap/rt/exceptions.py"]
