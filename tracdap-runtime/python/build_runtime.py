@@ -15,6 +15,7 @@
 
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import fileinput
@@ -23,6 +24,7 @@ import sys
 import packaging.version
 import argparse
 import unittest
+import importlib.util
 
 
 RUNTIME_DIR = pathlib.Path(__file__).parent.resolve()
@@ -33,12 +35,12 @@ BUILD_PATH = ROOT_PATH.joinpath("build/python")
 WORK_PATH = BUILD_PATH.joinpath("work")
 DIST_PATH = BUILD_PATH.joinpath("dist")
 
-COPY_FILES = [
-    "pyproject.toml",
-    "setup.cfg",
+COPY_PROJECT_FILES = {
     "README.md",
-    "src"
-]
+    "setup.cfg",
+    "requirements.txt",
+    "requirements_optional.txt"
+}
 
 TRAC_PYTHON_BUILD_ISOLATION = os.environ.get("TRAC_PYTHON_BUILD_ISOLATION") or "true"
 BUILD_ISOLATION = TRAC_PYTHON_BUILD_ISOLATION.lower() in ["true", "yes", "1"]
@@ -49,38 +51,59 @@ def reset_build_dir():
     if BUILD_PATH.exists():
         shutil.rmtree(BUILD_PATH)
 
-    BUILD_PATH.mkdir(parents=False, exist_ok=False)
+    BUILD_PATH.mkdir(parents=True, exist_ok=False)
+    WORK_PATH.mkdir(parents=False, exist_ok=False)
+    DIST_PATH.mkdir(parents=False, exist_ok=False)
 
 
-def copy_source_files():
+def copy_project_files(plugin_path, plugin_package, project_root=RUNTIME_DIR):
 
-    for file in COPY_FILES:
+    if project_root == RUNTIME_DIR:
+        plugin_content_dir = project_root
+    else:
+        plugin_content_dir = project_root.joinpath(plugin_path)
 
-        source_path = RUNTIME_DIR.joinpath(file)
-        target_path = BUILD_PATH.joinpath(file)
+    plugin_package_path = f"src/{plugin_package.replace('.', '/')}"
+    plugin_package_dir = project_root.joinpath(plugin_package_path)
 
-        if source_path.is_dir():
-            shutil.copytree(source_path, target_path)
-        else:
+    project_work_dir = WORK_PATH.joinpath(plugin_path)
+    project_work_dir.mkdir(parents=True, exist_ok=False)
+
+    # Copy source code for the plugin's root package
+    target_package_dir = project_work_dir.joinpath(plugin_package_path)
+    shutil.copytree(plugin_package_dir, target_package_dir)
+
+    # Copy other content files from the plugins content folder
+    for file in COPY_PROJECT_FILES:
+        source_path = plugin_content_dir.joinpath(file)
+        target_path = project_work_dir.joinpath(file)
+        if source_path.exists():
             shutil.copy(source_path, target_path)
 
+    source_toml_file = project_root.joinpath("pyproject.toml")
+    target_toml_file = project_work_dir.joinpath("pyproject.toml")
+    shutil.copy(source_toml_file, target_toml_file)
 
-def copy_license():
+
+def copy_license(project_work_dir="runtime"):
 
     # Copy the license file out of the project root
 
-    shutil.copy(
-        RUNTIME_DIR.joinpath("../../LICENSE"),
-        BUILD_PATH.joinpath("LICENSE"))
+    source_license_file = ROOT_PATH.joinpath("LICENSE")
+    target_license_file = WORK_PATH.joinpath(project_work_dir).joinpath("LICENSE")
+
+    shutil.copy(source_license_file, target_license_file)
 
 
-def generate_from_proto(unpacked: bool = False):
+def generate_from_proto(runtime_path="runtime", unpacked: bool = False):
+
+    work_dir = WORK_PATH.joinpath(runtime_path)
 
     if unpacked:
         generated_dir = RUNTIME_DIR.joinpath("generated")
         grpc_relocate = "tracdap:tracdap/rt_gen/grpc/tracdap"
     else:
-        generated_dir = BUILD_PATH.joinpath("generated")
+        generated_dir = work_dir.joinpath("generated")
         grpc_relocate = "tracdap:tracdap/rt/_impl/grpc/tracdap"
 
     if generated_dir.exists():
@@ -141,11 +164,13 @@ def generate_from_proto(unpacked: bool = False):
         raise subprocess.SubprocessError("Failed to generate gRPC classes from definitions")
 
 
-def move_generated_into_src():
+def move_generated_into_src(runtime_path):
 
-    move_generated_package_into_src("src/tracdap/rt/metadata", "generated/tracdap/rt_gen/domain/tracdap/metadata")
-    move_generated_package_into_src("src/tracdap/rt/config", "generated/tracdap/rt_gen/domain/tracdap/config")
-    move_generated_package_into_src("src/tracdap/rt/_impl/grpc/tracdap", "generated/tracdap/rt/_impl/grpc/tracdap")
+    work_dir = WORK_PATH.joinpath(runtime_path)
+
+    move_generated_package_into_src(work_dir, "src/tracdap/rt/metadata", "generated/tracdap/rt_gen/domain/tracdap/metadata")
+    move_generated_package_into_src(work_dir, "src/tracdap/rt/config", "generated/tracdap/rt_gen/domain/tracdap/config")
+    move_generated_package_into_src(work_dir, "src/tracdap/rt/_impl/grpc/tracdap", "generated/tracdap/rt/_impl/grpc/tracdap")
 
     # Update reference to gRPC generated classes in server.py
 
@@ -155,7 +180,7 @@ def move_generated_into_src():
     ]
 
     for src_file in grpc_src_files:
-        for line in fileinput.input(BUILD_PATH.joinpath(src_file), inplace=True):
+        for line in fileinput.input(work_dir.joinpath(src_file), inplace=True):
             if "rt_gen" in line:
                 print(line.replace("rt_gen.grpc", "rt._impl.grpc"), end="")
             else:
@@ -163,19 +188,19 @@ def move_generated_into_src():
 
     # Remove references to rt_gen package in setup.cfg, since everything is now in place under src/
 
-    for line in fileinput.input(BUILD_PATH.joinpath("setup.cfg"), inplace=True):
+    for line in fileinput.input(work_dir.joinpath("setup.cfg"), inplace=True):
         if "rt_gen" not in line:
             print(line, end='')
 
 
-def move_generated_package_into_src(src_relative_path, generate_rel_path):
+def move_generated_package_into_src(work_dir, src_relative_path, generate_rel_path):
 
     # For generated packages, the main source tree contains placeholders that import everything
     # from the generated tree. We want to remove the placeholders and put the generated code into
     # the main source tree
 
-    src_metadata_path = BUILD_PATH.joinpath(src_relative_path)
-    generated_metadata_path = BUILD_PATH.joinpath(generate_rel_path)
+    src_metadata_path = work_dir.joinpath(src_relative_path)
+    generated_metadata_path = work_dir.joinpath(generate_rel_path)
 
     if src_metadata_path.exists():
         shutil.rmtree(src_metadata_path)
@@ -183,7 +208,9 @@ def move_generated_package_into_src(src_relative_path, generate_rel_path):
     shutil.copytree(generated_metadata_path, src_metadata_path)
 
 
-def set_trac_version():
+def set_trac_version(project_path="runtime", project_packages=None):
+
+    work_dir = WORK_PATH.joinpath(project_path)
 
     if platform.system().lower().startswith("win"):
         command = ['powershell', '-ExecutionPolicy', 'Bypass', '-File', f'{ROOT_PATH}\\dev\\version.ps1']
@@ -206,6 +233,21 @@ def set_trac_version():
     # Using Python's Version class normalises the version according to PEP440
     trac_version = packaging.version.Version(raw_version)
 
+    # Set the version number embedded into the package
+    # This can be done for multiple packages - e.g. tracdap.rt and tracdap.rt.api
+    for project_package in project_packages or []:
+
+        root_package_path = f"src/{project_package.replace('.', '/')}"
+        version_file_path = work_dir.joinpath(root_package_path).joinpath("__init__.py")
+
+        for line in fileinput.input(version_file_path, inplace=True):
+
+            if "AUTOVERSION_INSERT" in line:
+                print(f'__version__ = "{str(trac_version)}"')
+
+            elif "AUTOVERSION_REMOVE" not in line and "__version__" not in line:
+                print(line, end="")
+
     # Set the version number used in the package metadata
 
     # setup.cfg uses file: and attr: for reading the version in from external sources
@@ -213,37 +255,53 @@ def set_trac_version():
     # file: works for the sdist build but is throwing an error for bdist_wheel, this could be a bug
     # Writing the version directly into setup.cfg avoids both of these issues
 
-    for line in fileinput.input(BUILD_PATH.joinpath("setup.cfg"), inplace=True):
-        if line.startswith("version ="):
-            print(f"version = {str(trac_version)}")
-        else:
-            print(line, end="")
+    if work_dir.joinpath("setup.cfg").exists():
+        for line in fileinput.input(work_dir.joinpath("setup.cfg"), inplace=True):
+            if line.startswith("version ="):
+                print(f"version = {str(trac_version)}")
+            else:
+                print(line, end="")
 
-    # Set the version number embedded into the package
+def update_toml_file(project_path="runtime", project_root=RUNTIME_DIR):
 
-    embedded_version_file = BUILD_PATH.joinpath("src/tracdap/rt/_version.py")
-    embedded_header_copied = False
+    # Load the settings file as a module
+    settings_file = project_root.joinpath(project_path).joinpath("_settings.py")
+    setting_spec = importlib.util.spec_from_file_location("_settings", settings_file)
+    settings_module = importlib.util.module_from_spec(setting_spec)
+    setting_spec.loader.exec_module(settings_module)
 
-    for line in fileinput.input(embedded_version_file, inplace=True):
+    settings = dict((k, v) for k, v in vars(settings_module).items() if not k.startswith('__'))
 
-        if line.isspace() and not embedded_header_copied:
-            embedded_header_copied = True
-            print("")
-            print(f'__version__ = "{str(trac_version)}"')
+    # Substitute variables from the settings file into the project TOML file
+    work_dir = WORK_PATH.joinpath(project_path)
+    toml_file = work_dir.joinpath("pyproject.toml")
+    variable = re.compile("\\$\\{(\\w+)}")
 
-        if not embedded_header_copied:
-            print(line, end="")
+    with fileinput.FileInput(toml_file, inplace=True) as file:
+        for line in file:
+            match = variable.search(line)
+            if match:
+                variable_name = match.group(1)
+                variable_value = settings.get(variable_name)
+                if variable_value is None:
+                    raise RuntimeError(f"Missing variable [{variable_name}] in _settings.py")
+                else:
+                    print(line.replace(match.group(0), variable_value), end='')
+            else:
+                print(line, end="")
 
 
-def run_pypa_build():
+def run_pypa_build(project_work_dir="runtime"):
+
+    work_dir = WORK_PATH.joinpath(project_work_dir)
 
     build_exe = sys.executable
-    build_args = ["python", "-m", "build"]
+    build_args = ["python", "-m", "build", "--outdir", str(DIST_PATH)]
 
     if not BUILD_ISOLATION:
         build_args.append('--no-isolation')
 
-    build_result = subprocess.run(executable=build_exe, args=build_args, cwd=BUILD_PATH)
+    build_result = subprocess.run(executable=build_exe, args=build_args, cwd=work_dir)
 
     if build_result.returncode != 0:
         raise subprocess.SubprocessError(f"PyPA Build failed with exit code {build_result.returncode}")
@@ -255,8 +313,13 @@ def cli_args():
 
     parser.add_argument(
         "--target", type=str, metavar="target",
-        choices=["codegen", "test", "examples", "integration", "dist"], nargs="*", required=True,
+        choices=["codegen", "test", "examples", "integration", "dist", "ext", "clean"], nargs="*", required=True,
         help="The target to build")
+
+    parser.add_argument(
+        "--plugin", type=str, metavar="plugins", dest="plugins",
+        nargs="*", required=False, default=[],
+        help="Select the plugins to build (only applies if target = ext)")
 
     parser.add_argument(
         "--pattern", type=str, metavar="pattern",
@@ -265,7 +328,11 @@ def cli_args():
 
     parser.add_argument(
         "--build-dir", type=pathlib.Path, metavar="build_dir", required=False,
-        help="Specify a build location (defaults to ./build in same directory as this script)")
+        help="Specify a build location (defaults to ./build/python in the repo dir)")
+
+    parser.add_argument(
+        "--dist-dir", type=pathlib.Path, metavar="dist_dir", required=False,
+        help="Specify a distribution location (defaults to ./build/python/dist in the repo dir)")
 
     return parser.parse_args()
 
@@ -304,6 +371,55 @@ def run_tests(test_path, pattern=None):
         sys.path = python_path
 
 
+def find_plugins(args) -> list[str]:
+
+    plugins_dir = pathlib.Path(RUNTIME_EXT_DIR).joinpath("plugins")
+    plugins = [plugin.name for plugin in plugins_dir.iterdir() if plugin.is_dir()]
+
+    if args.plugins:
+        selected_plugins = list(filter(lambda p: p in args.plugins, plugins))
+        unknown_plugins = list(filter(lambda p: p not in plugins, args.plugins))
+    else:
+        selected_plugins = plugins
+        unknown_plugins = []
+
+    if any(unknown_plugins):
+        raise RuntimeError(f"Unknown plugins: [{', '.join(unknown_plugins)}]")
+
+    return selected_plugins
+
+
+def build_runtime():
+
+    runtime_path = "runtime"
+    runtime_package = "tracdap.rt"
+    api_package = "tracdap.rt.api"
+
+    copy_project_files(runtime_path, runtime_package)
+    copy_license(runtime_path)
+
+    generate_from_proto(runtime_path)
+    move_generated_into_src(runtime_path)
+
+    set_trac_version(runtime_path, [runtime_package, api_package])
+
+    run_pypa_build(runtime_path)
+
+
+def build_plugin(plugin_name):
+
+    plugin_path = f"plugins/{plugin_name}"
+    plugin_package = f"tracdap.ext.{plugin_name}"
+
+    copy_project_files(plugin_path, plugin_package, RUNTIME_EXT_DIR)
+    copy_license(plugin_path)
+
+    set_trac_version(plugin_path, [plugin_package])
+    update_toml_file(plugin_path, RUNTIME_EXT_DIR)
+
+    run_pypa_build(plugin_path)
+
+
 def main():
 
     args = cli_args()
@@ -312,6 +428,14 @@ def main():
     global BUILD_PATH
     if args.build_dir is not None:
         BUILD_PATH = args.build_dir
+
+    # Update DIST_PATH if it is specified on the command line
+    global DIST_PATH
+    if args.dist_dir is not None:
+        DIST_PATH = args.dist_dir
+
+    if any(map(lambda target: target in args.target, ["clean", "dist", "ext"])):
+        reset_build_dir()
 
     if "codegen" in args.target:
         generate_from_proto(unpacked=True)
@@ -327,16 +451,12 @@ def main():
             run_tests("test/tracdap_test", pattern)
 
     if "dist" in args.target:
+        build_runtime()
 
-        reset_build_dir()
-        copy_source_files()
-        copy_license()
-        set_trac_version()
-
-        generate_from_proto()
-        move_generated_into_src()
-
-        run_pypa_build()
+    if "ext" in args.target:
+        plugins = find_plugins(args)
+        for plugin_name in plugins:
+            build_plugin(plugin_name)
 
 
 main()
