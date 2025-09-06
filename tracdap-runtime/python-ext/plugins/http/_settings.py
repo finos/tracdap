@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PROJECT_NAME=tracdap-ext-http
-PROJECT_DESCRIPTION=An extension for TRAC D.A.P. that allows connecting to generic HTTP endpoints
-
-PACKAGES="tracdap/ext/http"
+PROJECT_NAME = "tracdap-ext-http"
+PROJECT_DESCRIPTION = "An extension for TRAC D.A.P. that lets models connect to HTTP endpoints"
+PROJECT_ROOT_PACKAGE = "tracdap.ext.http"
