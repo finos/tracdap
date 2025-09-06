@@ -196,7 +196,7 @@ jobs:
       - name: Build runtime package
         env:
           TRAC_PYTHON_BUILD_ISOLATION: false
-        run: python tracdap-runtime/python/build_runtime.py --target dist
+        run: python tracdap-runtime/python/build_runtime.py --target dist ext
 
       - name: Save artifacts
         uses: actions/upload-artifact@v4
