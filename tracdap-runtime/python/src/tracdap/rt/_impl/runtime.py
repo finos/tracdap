@@ -25,6 +25,7 @@ import pathlib
 import tempfile
 import typing as tp
 
+import tracdap.rt as _rt
 import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
@@ -41,7 +42,6 @@ import tracdap.rt._impl.exec.actors as _actors
 import tracdap.rt._impl.exec.engine as _engine
 import tracdap.rt._impl.exec.dev_mode as _dev_mode
 import tracdap.rt._impl.static_api as _static_api
-import tracdap.rt._version as _version
 
 
 @dc.dataclass
@@ -69,7 +69,7 @@ class TracRuntime:
             plugin_packages: tp.List[str] = None,
             dev_mode: bool = False):
 
-        trac_version = _version.__version__
+        trac_version = _rt.__version__
         python_version = sys.version.replace("\n", "")
 
         sys_config_path = "[embedded]" if isinstance(sys_config, _cfg.RuntimeConfig) else sys_config

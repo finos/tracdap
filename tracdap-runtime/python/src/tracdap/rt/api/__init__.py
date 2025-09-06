@@ -17,6 +17,9 @@
 TRAC model API for Python
 """
 
+# AUTOVERSION_INSERT
+__version__ = "DEVELOPMENT"
+
 # Make metadata classes available to client code when importing the API package
 # Remove this import when generating docs, so metadata classes are only documented once
 from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE

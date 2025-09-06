@@ -13,4 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from ._version import __version__
+# AUTOVERSION_REMOVE - Do not change the version here!
+# AUTOVERSION_REMOVE - For package builds this will be set automatically by the build script
+# AUTOVERSION_REMOVE - Otherwise the version should always be set to DEVELOPMENT
+# AUTOVERSION_INSERT
+__version__ = "DEVELOPMENT"
