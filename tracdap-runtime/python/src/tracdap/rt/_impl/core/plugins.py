@@ -38,17 +38,9 @@ class PluginManagerImpl(PluginManager):
     __plugins = {}
 
     @classmethod
-    def __set_hook(cls):
-
-        if PluginManager._PluginManager__hook is None:
-            PluginManager._PluginManager__hook = PluginManagerImpl
-
-    @classmethod
     def register_core_plugins(cls):
 
         _guard.run_model_guard()
-
-        cls.__set_hook()
 
         if cls.__core_registered:
             return

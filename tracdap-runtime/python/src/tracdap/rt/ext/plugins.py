@@ -16,7 +16,6 @@
 import typing as _tp
 
 import tracdap.rt.config as _cfg
-import tracdap.rt.exceptions as _ex
 
 
 class PluginManager:
@@ -29,9 +28,10 @@ class PluginManager:
     def __get_hook(cls) -> _tp.Type["PluginManager"]:
 
         if cls.__hook is None:
-            raise _ex.EStartup("Plugin manager is not initialized")
-        else:
-            return cls.__hook
+            import tracdap.rt._impl.core.plugins as _plugins  # noqa
+            cls.__hook = _plugins.PluginManagerImpl
+
+        return cls.__hook
 
     @classmethod
     def register_plugin(

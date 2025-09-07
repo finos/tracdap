@@ -26,12 +26,12 @@ import pandas as pd
 import pandas.testing as pd_test
 
 import tracdap.rt.api.experimental as trac
-import tracdap.rt.ext.plugins as plugins
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data  # noqa
 import tracdap.rt._impl.core.logging as _log # noqa
+import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.storage as _storage  # noqa
 import tracdap.rt._impl.core.util as _util  # noqa
 import tracdap.rt._impl.exec.context as _ctx  # noqa
@@ -109,7 +109,7 @@ class TestDataImportExport(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
 
-        plugins.PluginManager.register_core_plugins()
+        plugins.PluginManagerImpl.register_core_plugins()
 
         cls.test_dir = tempfile.TemporaryDirectory()
         cls.test_number = 0
