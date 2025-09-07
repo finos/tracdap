@@ -113,7 +113,7 @@ class ExtExternalSystemTest(unittest.TestCase):
                 "port": "443"
             })
 
-        download_path = "https://raw.githubusercontent.com/finos/tracdap/refs/heads/main/README.md"
+        download_path = "/finos/tracdap/refs/heads/main/README.md"
         first_line = "# ![TRAC: The modern model platform](doc/_images/tracmmp_horizontal_400.png)"
 
         job_config = cfg.JobConfig(job=meta.JobDefinition(
