@@ -16,11 +16,14 @@
 import typing as _tp
 import pkgutil as _pkg
 import importlib as _il
+import inspect as _inspect
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.util as _util
+import tracdap.rt._impl.core.validation as _val
 
 from tracdap.rt.ext.plugins import *
 
@@ -132,7 +135,8 @@ class PluginManagerImpl(PluginManager):
     def load_plugin(
             cls,
             service_type: _tp.Type[T_SERVICE],
-            config: _cfg.PluginConfig) \
+            config: _cfg.PluginConfig,
+            resource_name: _tp.Optional[str] = None) \
             -> T_SERVICE:
 
         _guard.run_model_guard()
@@ -144,8 +148,10 @@ class PluginManagerImpl(PluginManager):
             plugin_type = service_type.__name__
             raise _ex.EPluginNotAvailable(f"No plugin available for [{plugin_type}] with protocol [{config.protocol}]")
 
+        plugin_args = cls.__build_plugin_args(plugin_class, config, resource_name)
+
         try:
-            return plugin_class(config.properties)
+            return plugin_class(**plugin_args)
 
         except TypeError as e:
             # Plugins that do not correctly implement the abstract base will get this error
@@ -167,3 +173,58 @@ class PluginManagerImpl(PluginManager):
 
         return cls.load_plugin(service_type, config)
 
+    @classmethod
+    def __build_plugin_args(
+            cls, plugin_class: _tp.Type[T_SERVICE],
+            config: _cfg.PluginConfig,
+            resource_name: _tp.Optional[str]):
+
+        # Plugins that don't define __init__ don't need any constructor args
+        # hasattr(cls, "__init__") still returns true, because object.__init__ is inherited
+        if plugin_class.__init__ is object.__init__:
+            return {}
+
+        signature = _inspect.signature(plugin_class.__init__)
+        hints = _tp.get_type_hints(plugin_class.__init__)
+        args = dict()
+
+        for arg_name in signature.parameters:
+
+            if arg_name == "self":
+                continue
+
+            if arg_name == "resource_name":
+                cls.__check_plugin_arg(plugin_class, "resource_name", str, hints)
+                args["resource_name"] = resource_name or f"trac_plugin_{plugin_class.__name__}"
+
+            elif arg_name == "config":
+                cls.__check_plugin_arg(plugin_class, "config", _cfg.PluginConfig, hints)
+                args["config"] = config
+
+            elif arg_name == "properties":
+                cls.__check_plugin_arg(plugin_class, "properties", _tp.Dict[str, str], hints)
+                properties = dict()
+                if config.publicProperties:
+                    properties.update(config.publicProperties)
+                if config.properties:
+                    properties.update(config.properties)
+                args["properties"] = properties
+
+            else:
+                detail = f"(unknown argument)"
+                message = f"Invalid argument [{arg_name}] for plugin [{_util.qualified_type_name(plugin_class)}] {detail}"
+                raise _ex.EPluginConformance(message)
+
+        return args
+
+    @classmethod
+    def __check_plugin_arg(
+            cls, plugin_class: _tp.Type[T_SERVICE], arg_name: str,
+            expected_type: type, plugin_hints: dict):
+
+        hint_type = plugin_hints.get(arg_name)
+
+        if hint_type is not None and not _val.check_type_hint(expected_type, hint_type):
+            detail = f"(wrong type, expected {_val.type_name(expected_type)}, got {_val.type_name(hint_type)})"
+            message = f"Invalid argument [{arg_name}] for plugin [{_util.qualified_type_name(plugin_class)}] {detail}"
+            raise _ex.EPluginConformance(message)
