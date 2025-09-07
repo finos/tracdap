@@ -20,24 +20,28 @@ try:
 except ModuleNotFoundError:
     _ul3 = None
 
+import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.external as _external
 import tracdap.rt.ext.plugins as _plugins
+import tracdap.rt.ext.util as _util
 
 
 class HttpPlugin(_external.IExternalSystem):
 
-    __HC_CLIENT_ARGS = ["timeout"]
-    __UL3_CLIENT_ARGS = ["timeout"]
+    HOST_KEY = "host"
+    PORT_KEY = "port"
+    TLS_KEY = "tls"
+    TIMEOUT_KEY = "timeout"
 
-    def __init__(self, properties: dict[str, str]):
+    def __init__(self, resource_name: str, config: _cfg.PluginConfig):
 
-        self.__properties = properties
+        self.__resource_name = resource_name
 
-        self.__resource_name = "http_resource"
-        self.__host = "github.com"
-        self.__port = None
-        self.__tls = True
+        self.__host = _util.read_plugin_config(config, self.HOST_KEY)
+        self.__port = _util.read_plugin_config(config, self.PORT_KEY, optional=True, convert=int)
+        self.__tls = _util.read_plugin_config(config, self.TLS_KEY, default=True, convert=bool)
+        self.__timeout = _util.read_plugin_config(config, self.TIMEOUT_KEY, optional=True, convert=int)
 
     def supported_types(self) -> list[type]:
 
@@ -88,26 +92,33 @@ class HttpPlugin(_external.IExternalSystem):
         raise _ex.EPluginNotAvailable(f"Client type [{client_type.__qualname__}] is not available in {self.__class__.__name__}")
 
     def _create_client_hc_http(self, **client_args) -> _hc.HTTPConnection:
-        hc_args = self._filter_args_hc(**client_args)
+        hc_args = self._build_common_args(**client_args)
         return _hc.HTTPSConnection(self.__host, self.__port, **hc_args)
 
     def _create_client_hc_https(self, **client_args) -> _hc.HTTPSConnection:
-        hc_args = self._filter_args_hc(**client_args)
+        hc_args = self._build_common_args(**client_args)
         return _hc.HTTPSConnection(self.__host, self.__port, **hc_args)
 
-    def _filter_args_hc(self, **client_args):
-        return {k: v for k, v in client_args.items() if k in self.__HC_CLIENT_ARGS}
-
     def _create_client_ul3_http(self, **client_args) -> _ul3.HTTPConnectionPool:
-        ul3_args = self._filter_args_ul3(**client_args)
+        ul3_args = self._build_common_args(**client_args)
         return _ul3.HTTPSConnectionPool(self.__host, self.__port, **ul3_args)
 
     def _create_client_ul3_https(self, **client_args) -> _ul3.HTTPSConnectionPool:
-        ul3_args = self._filter_args_ul3(**client_args)
+        ul3_args = self._build_common_args(**client_args)
         return _ul3.HTTPSConnectionPool(self.__host, self.__port, **ul3_args)
 
-    def _filter_args_ul3(self, **client_args):
-        return {k: v for k, v in client_args.items() if k in self.__HC_CLIENT_ARGS}
+    def _build_common_args(self, **client_args):
+
+        args = dict()
+
+        if self.TIMEOUT_KEY in client_args and self.__timeout is not None:
+            args[self.TIMEOUT_KEY] = min(client_args[self.TIMEOUT_KEY], self.__timeout)
+        elif self.TIMEOUT_KEY in client_args:
+            args[self.TIMEOUT_KEY] = client_args[self.TIMEOUT_KEY]
+        elif self.__timeout is not None:
+            args[self.TIMEOUT_KEY] = self.__timeout
+
+        return args
 
     def _error_tls_not_enabled(self):
         detail = f"The resource [{self.__resource_name }] does not have TLS enabled"
