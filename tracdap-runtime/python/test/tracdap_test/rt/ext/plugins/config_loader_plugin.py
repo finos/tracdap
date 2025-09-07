@@ -68,10 +68,6 @@ class TestExtConfigLoader(IConfigLoader):
         }
     }
 
-    # Properties dict will be empty for config plugins
-    def __init__(self, _: _tp.Dict[str, str]):
-        pass
-
     def has_config_file(self, config_url: str) -> bool:
         return False
 
