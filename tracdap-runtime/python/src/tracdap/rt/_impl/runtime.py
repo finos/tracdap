@@ -29,11 +29,11 @@ import tracdap.rt as _rt
 import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.core.config_parser as _cparse
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
+import tracdap.rt._impl.core.plugins as _plugins
 import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
@@ -147,11 +147,11 @@ class TracRuntime:
             # Calling these methods multiple times is safe (e.g. for embedded or testing scenarios)
             # However, plugins are never un-registered for the lifetime of the processes
 
-            _plugins.PluginManager.register_core_plugins()
-            _plugins.PluginManager.register_trac_extensions()
+            _plugins.PluginManagerImpl.register_core_plugins()
+            _plugins.PluginManagerImpl.register_trac_extensions()
 
             for plugin_package in self._plugin_packages:
-                _plugins.PluginManager.register_plugin_package(plugin_package)
+                _plugins.PluginManagerImpl.register_plugin_package(plugin_package)
 
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()
