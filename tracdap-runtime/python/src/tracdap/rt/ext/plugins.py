@@ -31,6 +31,7 @@ class PluginManager:
     __log = _logging.getLogger(f"{__name__}.PluginManager")
 
     __core_registered = False
+    __ext_registered = False
     __3rd_party_registered = list()
 
     __plugins = {}
@@ -47,6 +48,28 @@ class PluginManager:
         cls.__register_plugin_package("tracdap.rt._plugins")
 
         cls.__core_registered = True
+
+    @classmethod
+    def register_trac_extensions(cls):
+
+        _guard.run_model_guard()
+
+        if cls.__ext_registered:
+            return
+
+        cls.__log.info("Register TRAC extensions...")
+
+        try:
+
+            ext_package = _il.import_module("tracdap.ext")
+
+            for module in _pkg.iter_modules(ext_package.__path__):
+                cls.__register_plugin_package(f"tracdap.ext.{module.name}")
+
+        except ModuleNotFoundError:
+            cls.__log.info("No TRAC extensions are installed")
+
+        cls.__ext_registered = True
 
     @classmethod
     def register_plugin_package(cls, plugin_package_name: str):

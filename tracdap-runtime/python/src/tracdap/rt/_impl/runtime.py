@@ -148,6 +148,7 @@ class TracRuntime:
             # However, plugins are never un-registered for the lifetime of the processes
 
             _plugins.PluginManager.register_core_plugins()
+            _plugins.PluginManager.register_trac_extensions()
 
             for plugin_package in self._plugin_packages:
                 _plugins.PluginManager.register_plugin_package(plugin_package)
