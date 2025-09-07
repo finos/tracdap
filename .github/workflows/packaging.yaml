@@ -346,12 +346,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: python_runtime_packages
-          path: tracdap_dist/
+          path: tracdap_python_dist/
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          packages-dir: build/python/dist/
+          packages-dir: tracdap_python_dist/
 
   publish_to_npm:
 
