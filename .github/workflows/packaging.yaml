@@ -206,7 +206,6 @@ jobs:
           path: build/python/dist
           retention-days: 7
 
-
   web_api_package:
     if: ${{ false }}
 
@@ -253,7 +252,6 @@ jobs:
           name: web_api_package
           path: tracdap-api/packages/web/dist
           retention-days: 7
-
 
   publish_to_github:
 
