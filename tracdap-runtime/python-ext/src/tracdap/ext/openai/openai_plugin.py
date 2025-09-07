@@ -16,7 +16,7 @@
 import os
 
 try:
-    import openai
+    import openai  # noqa
 except ModuleNotFoundError:
     openai = None
 

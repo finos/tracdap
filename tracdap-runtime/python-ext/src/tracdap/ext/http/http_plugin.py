@@ -16,7 +16,7 @@
 import http.client as _hc
 
 try:
-    import urllib3 as _ul3
+    import urllib3 as _ul3  # noqa
 except ModuleNotFoundError:
     _ul3 = None
 
@@ -91,19 +91,19 @@ class HttpPlugin(_external.IExternalSystem):
 
         raise _ex.EPluginNotAvailable(f"Client type [{client_type.__qualname__}] is not available in {self.__class__.__name__}")
 
-    def _create_client_hc_http(self, **client_args) -> _hc.HTTPConnection:
+    def _create_client_hc_http(self, **client_args):
         hc_args = self._build_common_args(**client_args)
         return _hc.HTTPSConnection(self.__host, self.__port, **hc_args)
 
-    def _create_client_hc_https(self, **client_args) -> _hc.HTTPSConnection:
+    def _create_client_hc_https(self, **client_args):
         hc_args = self._build_common_args(**client_args)
         return _hc.HTTPSConnection(self.__host, self.__port, **hc_args)
 
-    def _create_client_ul3_http(self, **client_args) -> _ul3.HTTPConnectionPool:
+    def _create_client_ul3_http(self, **client_args):
         ul3_args = self._build_common_args(**client_args)
         return _ul3.HTTPSConnectionPool(self.__host, self.__port, **ul3_args)
 
-    def _create_client_ul3_https(self, **client_args) -> _ul3.HTTPSConnectionPool:
+    def _create_client_ul3_https(self, **client_args):
         ul3_args = self._build_common_args(**client_args)
         return _ul3.HTTPSConnectionPool(self.__host, self.__port, **ul3_args)
 
