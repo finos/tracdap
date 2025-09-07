@@ -21,20 +21,32 @@ authors = [
 ]
 
 classifiers = [
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent"
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Topic :: Office/Business",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules"
 ]
 
-requires-python = ">= 3.9, < 3.14"
+requires-python = ">= 3.9"
 
 
 [project.urls]
 
-homepage = "https://tracdap.finos.org/"
-repository = "https://github.com/finos/tracdap.git"
-documentation = "https://tracdap.readthedocs.io/"
-issues = "https://github.com/finos/tracdap/issues"
-
+Homepage = "https://tracdap.finos.org/"
+Documentation = "https://tracdap.readthedocs.io/"
+"Source Code" = "https://github.com/finos/tracdap"
+"Issue Tracker" = "https://github.com/finos/tracdap/issues"
 
 [tool.setuptools.packages.find]
 
