@@ -30,10 +30,10 @@ requires-python = ">= 3.9, < 3.14"
 
 [project.urls]
 
-Homepage = "https://tracdap.finos.org/"
-Documentation = "https://tracdap.readthedocs.io/"
-Repository = "https://github.com/finos/tracdap"
-"Bug Tracker" = "https://github.com/finos/tracdap/issues"
+homepage = "https://tracdap.finos.org/"
+repository = "https://github.com/finos/tracdap.git"
+documentation = "https://tracdap.readthedocs.io/"
+issues = "https://github.com/finos/tracdap/issues"
 
 
 [tool.setuptools.packages.find]
