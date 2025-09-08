@@ -138,7 +138,7 @@ class OpenAIPlugin(_external.IExternalSystem):
 
     def _create_client_std(self, **client_args):
 
-        std_args = self._build_common_args(**client_args)
+        std_args = self._build_std_args(**client_args)
         return openai.OpenAI(**std_args)
 
     def _create_client_azure(self, **client_args):
