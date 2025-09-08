@@ -89,7 +89,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     private static final String PYTHON_EXE = IS_WINDOWS ? "python.exe" : "python";
     private static final String VENV_BIN_SUBDIR = IS_WINDOWS ? "Scripts" : "bin";
     private static final String VENV_ENV_VAR = "VIRTUAL_ENV";
-    private static final String TRAC_RUNTIME_DIST_DIR = "tracdap-runtime/python/build/dist";
+    private static final String TRAC_RUNTIME_DIST_DIR = "build/python/dist";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
