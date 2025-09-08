@@ -14,6 +14,11 @@
 #  limitations under the License.
 
 import os
+import threading
+import concurrent.futures as fut
+import queue
+import logging
+
 
 try:
     import openai  # noqa
@@ -46,6 +51,9 @@ class OpenAIPlugin(_external.IExternalSystem):
 
     def __init__(self, resource_name: str, config: _cfg.PluginConfig):
 
+        log_name = f"{OpenAIPlugin.__module__}.{OpenAIPlugin.__name__}"
+        self.__log = logging.getLogger(log_name)
+
         self.__resource_name = resource_name
         self.__protocol = config.protocol
         self.__sub_protocol = config.subProtocol
@@ -53,7 +61,7 @@ class OpenAIPlugin(_external.IExternalSystem):
         self.__organization = _util.read_plugin_config(config, self.ORGANIZATION_KEY, optional=True)
         self.__project = _util.read_plugin_config(config, self.PROJECT_KEY, optional=True)
         self.__base_url = _util.read_plugin_config(config, self.BASE_URL_KEY, optional=True)
-        self.__timeout = _util.read_plugin_config(config, self.TIMEOUT_KEY, default=openai.DEFAULT_TIMEOUT, convert=float)
+        self.__timeout = _util.read_plugin_config(config, self.TIMEOUT_KEY, default=openai.DEFAULT_TIMEOUT.read, convert=float)
         self.__max_retries = _util.read_plugin_config(config, self.MAX_RETRIES_KEY, default=openai.DEFAULT_MAX_RETRIES, convert=int)
 
         self.__api_version = _util.read_plugin_config(config, self.API_VERSION_KEY, optional=True)
@@ -61,14 +69,27 @@ class OpenAIPlugin(_external.IExternalSystem):
         self.__azure_deployment = _util.read_plugin_config(config, self.AZURE_DEPLOYMENT_KEY, optional=True)
 
         if _util.has_plugin_config(config, self.API_KEY_KEY):
-            self.__api_key_func = lambda: _util.read_plugin_config(config, self.ORGANIZATION_KEY)
+            api_key = _util.read_plugin_config(config, self.API_KEY_KEY)
+            self.__api_key_func = lambda: api_key
         else:
             self.__api_key_func = None
 
         if _util.has_plugin_config(config, self.AZURE_AD_TOKEN_KEY):
-            self.__azure_ad_token_func = lambda: _util.read_plugin_config(config, self.AZURE_AD_TOKEN_KEY)
+            ad_token = _util.read_plugin_config(config, self.AZURE_AD_TOKEN_KEY)
+            self.__azure_ad_token_func = lambda: ad_token
         else:
             self.__azure_ad_token_func = None
+
+        self.__factory_queue = queue.Queue()
+        self.__factory_thread = threading.Thread(name="openai-factory", target=self.__factory_main, daemon=True)
+        self.__factory_thread.start()
+        self.__warmed_up = False
+
+        # Do not print info-level logs from the low-level frameworks
+        # HTTPX logs every request by default
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
+        logging.getLogger("openai").setLevel(logging.WARNING)
 
     def supported_types(self) -> list[type]:
 
@@ -87,6 +108,15 @@ class OpenAIPlugin(_external.IExternalSystem):
         }
 
     def create_client(self, client_type: type, **client_args) -> object:
+
+        future = fut.Future()
+        msg = (lambda: self._create_client_internal(client_type, **client_args), future)
+
+        self.__factory_queue.put(msg)
+
+        return future.result()
+
+    def _create_client_internal(self, client_type: type, **client_args) -> object:
 
         if client_type == openai.OpenAI:
             if self.__sub_protocol:
@@ -161,6 +191,46 @@ class OpenAIPlugin(_external.IExternalSystem):
     def close_client(self, client: object):
 
         client.close()  # noqa
+
+    def __factory_main(self):
+
+        # OpenAI uses asyncio under the hood, even for synchronous clients
+        # TRAC Actor threads have their own synchronization logic that interferes with AIO
+        # These issues can be avoided by creating OpenAI clients on a dedicated factory thread
+        # Initialization also happens on first use, so there has to be a warmup call as well
+
+        while True:
+
+            create_func, future = self.__factory_queue.get()
+            client = None
+
+            try:
+
+                self.__log.debug("Creating an OpenAI client...")
+
+                client = create_func()
+
+                if not self.__warmed_up:
+                    self.__warmup_client(client)
+                    self.__warmed_up = True
+
+                future.set_result(client)
+
+            except Exception as e:
+
+                if client is not None:
+                    client.close()
+
+                future.set_exception(e)
+
+    def __warmup_client(self, client):
+
+        self.__log.info("Warming up the OpenAI client...")
+
+        model_list = client.models.list()
+        model_count = len(model_list.data)
+
+        self.__log.info(f"Warmup complete: Found {model_count} models (there may be more)")
 
 
 if openai:
