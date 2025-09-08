@@ -39,14 +39,14 @@ Commercially supported deployments of TRAC are available separately from [finTRA
 
 ## Development Status
 
-[![Build and Test](https://github.com/finos/tracdap/actions/workflows/build.yml/badge.svg)](
-https://github.com/finos/tracdap/actions/workflows/build.yml)
-[![Integration](https://github.com/finos/tracdap/actions/workflows/integration.yml/badge.svg)](
-https://github.com/finos/tracdap/actions/workflows/integration.yml)
-[![Compliance](https://github.com/finos/tracdap/actions/workflows/compliance.yml/badge.svg)](
-https://github.com/finos/tracdap/actions/workflows/compliance.yml)
-[![Packaging](https://github.com/finos/tracdap/actions/workflows/packaging.yml/badge.svg)](
-https://github.com/finos/tracdap/actions/workflows/packaging.yml)
+[![Build and Test](https://github.com/finos/tracdap/actions/workflows/build.yaml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/build.yaml)
+[![Integration](https://github.com/finos/tracdap/actions/workflows/integration.yaml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/integration.yaml)
+[![Compliance](https://github.com/finos/tracdap/actions/workflows/compliance.yaml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/compliance.yaml)
+[![Packaging](https://github.com/finos/tracdap/actions/workflows/packaging.yaml/badge.svg)](
+https://github.com/finos/tracdap/actions/workflows/packaging.yaml)
 [![Documentation Status](https://readthedocs.org/projects/tracdap/badge/?version=stable)](
 https://tracdap.finos.org/en/stable/?badge=stable)
 
