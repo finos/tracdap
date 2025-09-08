@@ -5,8 +5,8 @@
 </h1>
 
 <p align="center">
-  <a href="https://pypi.org/project/tracdap-ext-http"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/tracdap-ext-http.svg?maxAge=86400" /></a>
-  <a href="https://pypi.org/project/tracdap-ext-http"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/tracdap-ext-http.svg?maxAge=86400" /></a>
+  <a href="https://pypi.org/project/tracdap-ext-http"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/tracdap-ext-http.svg?maxAge=3600" /></a>
+  <a href="https://pypi.org/project/tracdap-ext-http"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/tracdap-ext-http.svg?maxAge=3600" /></a>
   <a href="https://github.com/finos/tracdap/actions/workflows/packaging.yaml?query=branch%3Amain"><img alt="Packaging status" src="https://github.com/finos/tracdap/actions/workflows/packaging.yaml/badge.svg?branch:main&workflow:CI" /></a>
   <a href="https://github.com/finos/tracdap/actions/workflows/compliance.yaml?query=branch%3Amain"><img alt="Compliance status" src="https://github.com/finos/tracdap/actions/workflows/compliance.yaml/badge.svg?branch:main&workflow:CI" /></a>
   <a href="https://community.finos.org/docs/governance/software-projects/stages/incubating/"><img alt="FINOS - Incubating" src="https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg" /></a>
@@ -20,10 +20,9 @@ This extension allows TRAC models to make calls to external systems using HTTP a
 - Make HTTP endpoints available to models, to use directly in model code
 - Connection settings managed by TRAC for both local and deployed models
 - Supports http.client and urllib3
-- Supports
 
 Models that make external calls are not considered repeatable,
-and will be flagged as non-repeatable when they run on the TRAC platform.
+and will be flagged as not repeatable when they run on the TRAC platform.
 
 This extension is a pre-release and will be finalized inTRAC 0.10.
 
