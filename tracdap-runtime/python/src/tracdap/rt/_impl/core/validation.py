@@ -46,12 +46,16 @@ def check_type(expected_type: tp.Type, value: tp.Any) -> bool:
     return _TypeValidator.check_type(expected_type, value)
 
 
-def type_name(type_: tp.Type) -> str:
-    module = type_.__module__
+def check_type_hint(expected_type: tp.Type, hint_type: tp.Type):
+    return _TypeValidator.check_type_hint(expected_type, hint_type)
+
+
+def type_name(type_var: tp.Type) -> str:
+    module = type_var.__module__
     if module is None or module == str.__class__.__module__ or module == tp.__name__:
-        return _TypeValidator._type_name(type_, False)  # noqa
+        return _TypeValidator._type_name(type_var, False)  # noqa
     else:
-        return _TypeValidator._type_name(type, True)  # noqa
+        return _TypeValidator._type_name(type_var, True)  # noqa
 
 
 def quick_validate_model_def(model_def: meta.ModelDefinition):
@@ -179,6 +183,11 @@ class _TypeValidator:
     def check_type(cls, expected_type: tp.Type, value: tp.Any) -> bool:
 
         return cls._validate_type(expected_type, value)
+
+    @classmethod
+    def check_type_hint(cls, expected_type: tp.Type, hint_type: tp.Type) -> bool:
+
+        return cls._validate_type_hint(expected_type, hint_type)
 
     @classmethod
     def _select_arg(
@@ -359,6 +368,50 @@ class _TypeValidator:
         return isinstance(value, expected_type)
 
     @classmethod
+    def _validate_type_hint(cls, expected_type: tp.Type, hint_type: tp.Type) -> bool:
+
+        if hint_type == tp.Any:
+            return True
+
+        if hint_type == type(None) or hint_type == inspect._empty:
+            return expected_type == type(None) or expected_type == inspect._empty
+
+        if any(map(lambda _t: isinstance(hint_type, _t),  cls.__generic_metaclass)):
+
+            # Hint specifies, generic args, the expected type must do also
+            # Hint cannot be more specific than expected
+
+            if not any(map(lambda _t: isinstance(expected_type, _t),  cls.__generic_metaclass)):
+                return False
+
+            expected_origin = util.get_origin(expected_type)
+            expected_args = util.get_args(expected_type)
+
+            hint_origin = util.get_origin(expected_type)
+            hint_args = util.get_args(expected_type)
+
+            if not issubclass(expected_origin, hint_origin):
+                return False
+
+            if len(expected_args) != len(hint_args):
+                return False
+
+            for expected_arg, hint_arg in zip(expected_args, hint_args):
+                if not cls._validate_type_hint(expected_arg, hint_arg):
+                    return False
+
+            return True
+
+        elif any(map(lambda _t: isinstance(expected_type, _t),  cls.__generic_metaclass)):
+
+            expected_origin = util.get_origin(expected_type)
+            return issubclass(expected_origin, hint_type)
+
+        else:
+
+            return issubclass(expected_type, hint_type)
+
+    @classmethod
     def _type_name(cls, type_var: tp.Type, qualified: bool = False) -> str:
 
         if any(map(lambda _t: isinstance(type_var, _t),  cls.__generic_metaclass)):
@@ -379,6 +432,11 @@ class _TypeValidator:
             if origin is list:
                 list_type = cls._type_name(args[0])
                 return f"list[{list_type}]"
+
+            if origin is dict:
+                key_type = cls._type_name(args[0])
+                value_type = cls._type_name(args[1])
+                return f"dict[{key_type}, {value_type}]"
 
             if origin is type:
                 type_arg = cls._type_name(args[0])

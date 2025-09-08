@@ -20,12 +20,12 @@ from tracdap_test.rt.suites.file_storage_suite import *
 
 import tracdap.rt.config as cfg
 import tracdap.rt.metadata as meta
-import tracdap.rt.ext.plugins as plugins
+import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
 
 log.configure_logging()
-plugins.PluginManager.register_core_plugins()
+plugins.PluginManagerImpl.register_core_plugins()
 
 
 # TODO: Arrow native storage for Azure is not available in CI

@@ -25,14 +25,15 @@ import pathlib
 import tempfile
 import typing as tp
 
+import tracdap.rt as _rt
 import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt._impl.core.config_parser as _cparse
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
+import tracdap.rt._impl.core.plugins as _plugins
 import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
@@ -41,7 +42,6 @@ import tracdap.rt._impl.exec.actors as _actors
 import tracdap.rt._impl.exec.engine as _engine
 import tracdap.rt._impl.exec.dev_mode as _dev_mode
 import tracdap.rt._impl.static_api as _static_api
-import tracdap.rt._version as _version
 
 
 @dc.dataclass
@@ -69,7 +69,7 @@ class TracRuntime:
             plugin_packages: tp.List[str] = None,
             dev_mode: bool = False):
 
-        trac_version = _version.__version__
+        trac_version = _rt.__version__
         python_version = sys.version.replace("\n", "")
 
         sys_config_path = "[embedded]" if isinstance(sys_config, _cfg.RuntimeConfig) else sys_config
@@ -147,10 +147,11 @@ class TracRuntime:
             # Calling these methods multiple times is safe (e.g. for embedded or testing scenarios)
             # However, plugins are never un-registered for the lifetime of the processes
 
-            _plugins.PluginManager.register_core_plugins()
+            _plugins.PluginManagerImpl.register_core_plugins()
+            _plugins.PluginManagerImpl.register_trac_extensions()
 
             for plugin_package in self._plugin_packages:
-                _plugins.PluginManager.register_plugin_package(plugin_package)
+                _plugins.PluginManagerImpl.register_plugin_package(plugin_package)
 
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()

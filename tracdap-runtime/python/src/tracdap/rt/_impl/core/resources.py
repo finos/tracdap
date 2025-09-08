@@ -56,6 +56,7 @@ class ResourceManager:
 
                 config = _config.PluginConfig(
                     protocol=resource_def.protocol,
+                    subProtocol=resource_def.subProtocol,
                     publicProperties=resource_def.publicProperties,
                     properties=resource_def.properties,
                     secrets=resource_def.secrets)

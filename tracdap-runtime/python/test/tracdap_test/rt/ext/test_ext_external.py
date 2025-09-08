@@ -21,12 +21,12 @@ from http.client import HTTPConnection
 
 import tracdap.rt.api as trac
 import tracdap.rt.exceptions as ex
-import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.launch as launch
 import tracdap.rt.metadata as meta
 import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.core.config_parser as cfg  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
+import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.type_system as trac_types  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 
@@ -89,7 +89,7 @@ class ExtExternalSystemTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         log.configure_logging()
-        plugins.PluginManager.register_core_plugins()
+        plugins.PluginManagerImpl.register_core_plugins()
 
     def setUp(self) -> None:
 
@@ -113,7 +113,7 @@ class ExtExternalSystemTest(unittest.TestCase):
                 "port": "443"
             })
 
-        download_path = "https://raw.githubusercontent.com/finos/tracdap/refs/heads/main/README.md"
+        download_path = "/finos/tracdap/refs/heads/main/README.md"
         first_line = "# ![TRAC: The modern model platform](doc/_images/tracmmp_horizontal_400.png)"
 
         job_config = cfg.JobConfig(job=meta.JobDefinition(

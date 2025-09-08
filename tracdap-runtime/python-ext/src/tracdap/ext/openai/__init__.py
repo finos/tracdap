@@ -13,20 +13,5 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""
-TRAC model API for Python
-"""
-
 # AUTOVERSION_INSERT
 __version__ = "DEVELOPMENT"
-
-# Make metadata classes available to client code when importing the API package
-# Remove this import when generating docs, so metadata classes are only documented once
-from tracdap.rt.metadata import *  # noqa DOCGEN_REMOVE
-
-# static_api overrides some metadata types for backwards compatibility with pre-0.8 versions
-# Make sure it is last in the list
-from .constants import *
-from .model_api import *
-from .static_api import *
-

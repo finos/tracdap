@@ -50,25 +50,25 @@ class CsvStorageFormat(IDataFormat):
     __TRUE_VALUES = ['true', 't', 'yes' 'y', '1']
     __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
 
-    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
+    def __init__(self, properties: tp.Dict[str, tp.Any] = None):
 
         self._log = _helpers.logger_for_object(self)
 
-        self._format_options = format_options
+        self._format_options = properties
         self._use_lenient_parser = False
         self._date_format = None
         self._datetime_format = None
 
-        if format_options:
+        if properties:
 
-            if self.__LENIENT_CSV_PARSER in format_options:
-                self._use_lenient_parser = self._validate_lenient_flag(format_options[self.__LENIENT_CSV_PARSER])
+            if self.__LENIENT_CSV_PARSER in properties:
+                self._use_lenient_parser = self._validate_lenient_flag(properties[self.__LENIENT_CSV_PARSER])
 
-            if self.__DATE_FORMAT in format_options:
-                self._date_format = self._validate_date_format(format_options[self.__DATE_FORMAT])
+            if self.__DATE_FORMAT in properties:
+                self._date_format = self._validate_date_format(properties[self.__DATE_FORMAT])
 
-            if self.__DATETIME_FORMAT in format_options:
-                self._datetime_format = self._validate_datetime_format(format_options[self.__DATETIME_FORMAT])
+            if self.__DATETIME_FORMAT in properties:
+                self._datetime_format = self._validate_datetime_format(properties[self.__DATETIME_FORMAT])
 
     @classmethod
     def _validate_lenient_flag(cls, lenient_flag: tp.Any):

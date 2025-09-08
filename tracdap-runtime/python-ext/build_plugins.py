@@ -13,9 +13,19 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+# Re-use the main build_runtime.py script for building plugins
+# Using import instead of symlink avoids any issues on Windows
 
-# Do not change the version here!
-# For package builds, the package-ctrl script will fill in the version
-# Otherwise the version should always be set to DEVELOPMENT
+import pathlib
+import importlib.util
 
-__version__ = "DEVELOPMENT"
+script_path = pathlib.Path(__file__) \
+    .parent.parent \
+    .joinpath("python") \
+    .joinpath("build_runtime.py")
+
+spec = importlib.util.spec_from_file_location("build_runtime", script_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+module.main()

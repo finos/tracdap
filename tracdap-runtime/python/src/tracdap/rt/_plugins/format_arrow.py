@@ -34,8 +34,8 @@ class ArrowFileFormat(IDataFormat):
     FORMAT_CODE = "ARROW_FILE"
     FILE_EXTENSION = "arrow"
 
-    def __init__(self, format_options: tp.Dict[str, tp.Any] = None):
-        self._format_options = format_options
+    def __init__(self, properties: tp.Dict[str, tp.Any] = None):
+        self._format_options = properties
         self._log = _helpers.logger_for_object(self)
 
     def format_code(self) -> str:
