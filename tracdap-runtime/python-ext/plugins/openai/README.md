@@ -12,16 +12,21 @@
   <a href="https://community.finos.org/docs/governance/software-projects/stages/incubating/"><img alt="FINOS - Incubating" src="https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg" /></a>
 </p>
 
+
 # OpenAI Extension for the TRAC Model Runtime
 
 This extension makes the OpenAI Python SDK available to use from inside a TRAC model.
 
-- Use the native OpenAI client classes directly in TRAC code
+- Use the native OpenAI client classes directly in TRAC model code
 - Connection settings managed by TRAC for both local and deployed models
 - Supports both OpenAI and AzureOpenAI clients
 - Everything available in the OpenAI SDK, also works in TRAC
 
+Models that make external calls are not considered repeatable,
+and will be flagged as non-repeatable when they run on the TRAC platform.
+
 This extension is a pre-release and will be finalized inTRAC 0.10.
+
 
 ## Installing
 
@@ -95,7 +100,7 @@ resources:
       project: proj_xxxxxxxxxxxxx
 ```
 
-The following properties are supported:
+The following configuration properties are supported:
 
 - api_key, string, required
 - organization, string, optional
