@@ -106,7 +106,8 @@ and will receive an ``HTTPSConnection`` if tls = true.
 
 ## Using the urllib3 API
 
-Here is a minimum working example of a TRAC model using the urllib3 API:
+Here is a minimum working example of a TRAC model using the urllib3 API.
+In order to use this API, the urllib3 package must be installed.
 
 ```python
 import tracdap.rt.api as trac

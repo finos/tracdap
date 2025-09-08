@@ -1,2 +1,3 @@
 
+tracdap-runtime >= 0.10.0-dev.15
 openai ~= 1.0
