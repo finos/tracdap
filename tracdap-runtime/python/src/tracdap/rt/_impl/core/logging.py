@@ -114,7 +114,7 @@ def configure_logging(enable_debug=False):
 
         # Use is_bright=False for logs from the TRAC runtime, so model logs stand out
 
-        trac_logger = getLogger("tracdap.rt")
+        trac_logger = getLogger("tracdap")
 
         console_formatter = ColorFormatter(is_bright=False)
         console_handler = StreamHandler(_sys.stdout)
