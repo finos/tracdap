@@ -47,7 +47,9 @@ class OpenAIPlugin(_external.IExternalSystem):
     AZURE_DEPLOYMENT_KEY = "azure_deployment"
     AZURE_AD_TOKEN_KEY = "azure_ad_token"
 
-    AZURE_AD_TOKEN_PROVIDER = "azure_ad_token_provider"
+    OPENAI_API_KEY = "OPENAI_API_KEY"
+    AZURE_OPENAI_API_KEY = "AZURE_OPENAI_API_KEY"
+    AZURE_OPENAI_AD_TOKEN = "AZURE_OPENAI_AD_TOKEN"
 
     def __init__(self, resource_name: str, config: _cfg.PluginConfig):
 
@@ -144,16 +146,49 @@ class OpenAIPlugin(_external.IExternalSystem):
         azure_args = self._build_azure_args(**client_args)
         return openai.AzureOpenAI(**azure_args)
 
+    def _build_std_args(self, **client_args):
+
+        args = self._build_common_args(**client_args)
+
+        if self.__api_key_func:
+            api_key = self.__api_key_func()
+        else:
+            api_key = os.getenv(self.OPENAI_API_KEY)
+
+        if api_key:
+            args[self.API_KEY_KEY] = lambda: api_key
+
+        return args
+
+    def _build_azure_args(self, **client_args):
+
+        args = self._build_common_args(**client_args)
+
+        self._optional_arg(args, self.API_VERSION_KEY, self.__api_version)
+        self._optional_arg(args, self.AZURE_ENDPOINT_KEY, self.__azure_endpoint)
+        self._optional_arg(args, self.AZURE_DEPLOYMENT_KEY, self.__azure_deployment)
+
+        if self.__api_key_func:
+            api_key = self.__api_key_func()
+        else:
+            api_key = os.getenv(self.AZURE_OPENAI_API_KEY)
+
+        if api_key:
+            args[self.API_KEY_KEY] = api_key
+
+        if self.__azure_ad_token_func:
+            azure_ad_token = self.__azure_ad_token_func()
+        else:
+            azure_ad_token = os.getenv(self.AZURE_OPENAI_AD_TOKEN)
+
+        if azure_ad_token is not None:
+            args[self.AZURE_AD_TOKEN_KEY] = azure_ad_token
+
+        return args
+
     def _build_common_args(self, **client_args):
 
         args = dict()
-
-        if self.__api_key_func is not None:
-            args[self.API_KEY_KEY] = self.__api_key_func
-        else:
-            api_key = os.getenv("OPENAI_API_KEY")
-            if api_key is not None:
-                args[self.API_KEY_KEY] = lambda: api_key
 
         self._optional_arg(args, self.ORGANIZATION_KEY, self.__organization)
         self._optional_arg(args, self.PROJECT_KEY, self.__project)
@@ -168,17 +203,6 @@ class OpenAIPlugin(_external.IExternalSystem):
             args[self.MAX_RETRIES_KEY] = min(client_args[self.MAX_RETRIES_KEY], self.__max_retries)
         else:
             args[self.MAX_RETRIES_KEY] = self.__max_retries
-
-        return args
-
-    def _build_azure_args(self, **client_args):
-
-        args = self._build_common_args(**client_args)
-
-        self._optional_arg(args, self.API_VERSION_KEY, self.__api_version)
-        self._optional_arg(args, self.AZURE_ENDPOINT_KEY, self.__azure_endpoint)
-        self._optional_arg(args, self.AZURE_DEPLOYMENT_KEY, self.__azure_deployment)
-        self._optional_arg(args, self.AZURE_AD_TOKEN_PROVIDER, self.__azure_ad_token_func)
 
         return args
 
@@ -205,8 +229,6 @@ class OpenAIPlugin(_external.IExternalSystem):
             client = None
 
             try:
-
-                self.__log.debug("Creating an OpenAI client...")
 
                 client = create_func()
 
