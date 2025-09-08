@@ -37,7 +37,6 @@ jobs:
   # So, include publish to Maven as a conditional step in the build job
 
   platform_packages:
-    if: ${{ false }}
 
     runs-on: ubuntu-latest
 
@@ -207,7 +206,6 @@ jobs:
           retention-days: 7
 
   web_api_package:
-    if: ${{ false }}
 
     runs-on: ubuntu-latest
 
