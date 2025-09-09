@@ -73,7 +73,7 @@ def _resolve_config_file(
             return parent_config_path
 
         if model_dir is not None:
-            model_config_path = _search_parent_paths(cwd, config_path)
+            model_config_path = _search_parent_paths(model_dir, config_path)
             if model_config_path is not None:
                 return model_config_path
 
@@ -132,8 +132,11 @@ def launch_model(
     # Default to dev_mode = True for launch_model()
     dev_mode = launch_args["dev_mode"] if "dev_mode" in launch_args else True
 
-    model_file = _inspect.getfile(model_class)
-    model_dir = _pathlib.Path(model_file).parent
+    try:
+        model_file = _inspect.getfile(model_class)
+        model_dir = _pathlib.Path(model_file).parent
+    except OSError:
+        model_dir = None
 
     _sys_config = _resolve_config_file(sys_config, model_dir, dev_mode)
     _job_config = _resolve_config_file(job_config, model_dir, dev_mode)
