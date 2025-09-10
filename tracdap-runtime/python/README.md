@@ -45,7 +45,7 @@ For a complete guide to writing models in the TRAC framework, see the
 
 ## 📦 Requirements
 
-* **Python :**  3.10 or later
+* **Python :**  3.9 or later
 * **Tools :**   Any popular IDE (PyCharm, VS Code, etc.)
 * **Pandas :**  Version 1.2 and later are supported
 * **Polars :**  Version 1.0 and later are supported
