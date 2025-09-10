@@ -45,7 +45,7 @@ For a complete guide to writing models in the TRAC framework, see the
 
 ## 📦 Requirements
 
-* **Python :**  3.10 or later
+* **Python :**  3.9 or later
 * **Tools :**   Any popular IDE (PyCharm, VS Code, etc.)
 * **Pandas :**  Version 1.2 and later are supported
 * **Polars :**  Version 1.0 and later are supported
@@ -72,35 +72,35 @@ import tracdap.rt.api as trac
 class QuickStartModel(trac.TracModel):
 
     def define_parameters(self):
-        
+
         # Define any parameters the model will use
         return trac.define_parameters(
             trac.P("exchange_rate", trac.FLOAT, "EUR / GBP exchange rate")
         )
 
     def define_inputs(self):
-        
+
         # Define an input table with the columns and data types that the model needs
         customer_loans = trac.define_input_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_amount", trac.FLOAT, label="Principal loan amount"),
+            trac.F("loan_amount", trac.FLOAT, label="Principal loan amount (EUR)"),
             label="Customer loans data")
 
         return {"customer_loans": customer_loans}
 
     def define_outputs(self):
-        
+
         # Define an output table with the columns and data types that the model will produce
         loans_by_region = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_amount", trac.FLOAT, label="Principal loan amount"),
+            trac.F("total_lending", trac.FLOAT, label="Total lending (GBP)"),
             label="Loans by region")
 
         return {"loans_by_region": loans_by_region}
 
     def run_model(self, ctx: trac.TracContext):
-        
+
         # Parameters and inputs are loaded and validated by TRAC
         exchange_rate = ctx.get_parameter("exchange_rate")
         customer_loans = ctx.get_pandas_table("customer_loans")
@@ -109,11 +109,11 @@ class QuickStartModel(trac.TracModel):
         customer_loans["loan_amount_gbp"] = customer_loans["loan_amount"] * exchange_rate
 
         loans_by_region = customer_loans \
-            .groupby("region", as_index=False) \
-            .aggregate({"loan_amount": "sum"})
+            .groupby("region", observed=True, as_index=False) \
+            .aggregate(total_lending=("loan_amount_gbp", "sum"))
 
         # Logs written to ctx.log are captured by the platform
-        ctx.log().info("Aggregated loans for {} regions", len(loans_by_region))
+        ctx.log().info("Aggregated loans for %d regions", len(loans_by_region))
 
         # Outputs are handed back to TRAC for validation and saving
         ctx.put_pandas_table("loans_by_region", loans_by_region)
