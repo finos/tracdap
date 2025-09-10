@@ -100,7 +100,7 @@ class QuickStartModel(trac.TracModel):
         return {"loans_by_region": loans_by_region}
 
     def run_model(self, ctx: trac.TracContext):
-        
+
         # Parameters and inputs are loaded and validated by TRAC
         exchange_rate = ctx.get_parameter("exchange_rate")
         customer_loans = ctx.get_pandas_table("customer_loans")
@@ -117,7 +117,6 @@ class QuickStartModel(trac.TracModel):
 
         # Outputs are handed back to TRAC for validation and saving
         ctx.put_pandas_table("loans_by_region", loans_by_region)
-
 
 # Use the desktop launcher to run, test and debug models locally
 if __name__ == "__main__":
