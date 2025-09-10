@@ -72,29 +72,29 @@ import tracdap.rt.api as trac
 class QuickStartModel(trac.TracModel):
 
     def define_parameters(self):
-        
+
         # Define any parameters the model will use
         return trac.define_parameters(
             trac.P("exchange_rate", trac.FLOAT, "EUR / GBP exchange rate")
         )
 
     def define_inputs(self):
-        
+
         # Define an input table with the columns and data types that the model needs
         customer_loans = trac.define_input_table(
             trac.F("id", trac.STRING, label="Customer account ID", business_key=True),
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_amount", trac.FLOAT, label="Principal loan amount"),
+            trac.F("loan_amount", trac.FLOAT, label="Principal loan amount (EUR)"),
             label="Customer loans data")
 
         return {"customer_loans": customer_loans}
 
     def define_outputs(self):
-        
+
         # Define an output table with the columns and data types that the model will produce
         loans_by_region = trac.define_output_table(
             trac.F("region", trac.STRING, label="Customer home region", categorical=True),
-            trac.F("loan_amount", trac.FLOAT, label="Principal loan amount"),
+            trac.F("total_lending", trac.FLOAT, label="Total lending (GBP)"),
             label="Loans by region")
 
         return {"loans_by_region": loans_by_region}
@@ -109,14 +109,15 @@ class QuickStartModel(trac.TracModel):
         customer_loans["loan_amount_gbp"] = customer_loans["loan_amount"] * exchange_rate
 
         loans_by_region = customer_loans \
-            .groupby("region", as_index=False) \
-            .aggregate({"loan_amount": "sum"})
+            .groupby("region", observed=True, as_index=False) \
+            .aggregate(total_lending=("loan_amount_gbp", "sum"))
 
         # Logs written to ctx.log are captured by the platform
-        ctx.log().info("Aggregated loans for {} regions", len(loans_by_region))
+        ctx.log().info("Aggregated loans for %d regions", len(loans_by_region))
 
         # Outputs are handed back to TRAC for validation and saving
         ctx.put_pandas_table("loans_by_region", loans_by_region)
+
 
 # Use the desktop launcher to run, test and debug models locally
 if __name__ == "__main__":
