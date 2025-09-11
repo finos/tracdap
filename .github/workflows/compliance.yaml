@@ -20,6 +20,11 @@ on:
   workflow_dispatch:
 
 
+# Restrict workflow permissions
+permissions:
+  contents: read
+
+
 # Use latest supported language versions for compliance jobs
 env:
   JAVA_VERSION: "21"
@@ -233,6 +238,10 @@ jobs:
       - platform_compliance
       - python_runtime_compliance
       - web_api_compliance
+
+    # Permissions to upload artifacts
+    permissions:
+      contents: write
 
     steps:
 

@@ -26,6 +26,11 @@ on:
         type: boolean
 
 
+# Restrict workflow permissions
+permissions:
+  contents: read
+
+
 # Use latest supported language versions for integration testing
 env:
   JAVA_VERSION: "21"
@@ -50,6 +55,11 @@ jobs:
     # To use apt-get install, jobs must run in a container
     container:
       image: ubuntu:latest
+
+    # Permissions required for OIDC authentication
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
 
@@ -149,10 +159,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: integration
     timeout-minutes: 20
-
     # To use apt-get install, jobs must run in a container
     container:
       image: ubuntu:latest
+
+    # Permissions required for OIDC authentication
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
 

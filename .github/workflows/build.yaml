@@ -8,6 +8,11 @@ on:
   pull_request:
 
 
+# Restrict workflow permissions
+permissions:
+  contents: read
+
+
 env:
   JAVA_DISTRIBUTION: "zulu"
   PYTHON_VERSION: "3.13"
