@@ -22,6 +22,11 @@ on:
   workflow_dispatch:
 
 
+# Restrict workflow permissions
+permissions:
+  contents: read
+
+
 # Use latest supported language versions for packaging jobs
 env:
   JAVA_VERSION: "21"

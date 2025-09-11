@@ -26,6 +26,11 @@ on:
         type: boolean
 
 
+# Restrict workflow permissions
+permissions:
+  contents: read
+
+
 # Use latest supported language versions for integration testing
 env:
   JAVA_VERSION: "21"
