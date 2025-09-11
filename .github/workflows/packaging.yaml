@@ -267,6 +267,10 @@ jobs:
       - python_runtime_packages
       - web_api_package
 
+    # Permissions to upload artifacts
+    permissions:
+      contents: write
+
     steps:
 
       # fetch-depth = 0 is needed to get tags for version info
@@ -336,6 +340,7 @@ jobs:
     needs:
       - python_runtime_packages
 
+    # Permissions for OIDC auth with PyPI
     permissions:
       id-token: write
 

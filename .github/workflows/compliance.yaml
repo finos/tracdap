@@ -239,6 +239,10 @@ jobs:
       - python_runtime_compliance
       - web_api_compliance
 
+    # Permissions to upload artifacts
+    permissions:
+      contents: write
+
     steps:
 
       # fetch-depth = 0 is needed to get tags for version info
