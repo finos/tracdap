@@ -331,6 +331,10 @@ def cli_args():
         help="Specify a build location (defaults to ./build/python in the repo dir)")
 
     parser.add_argument(
+        "--work-dir", type=pathlib.Path, metavar="work_dir", required=False,
+        help="Specify a working location (defaults to ./build/python/work in the repo dir)")
+
+    parser.add_argument(
         "--dist-dir", type=pathlib.Path, metavar="dist_dir", required=False,
         help="Specify a distribution location (defaults to ./build/python/dist in the repo dir)")
 
@@ -424,15 +428,19 @@ def main():
 
     args = cli_args()
 
-    # Update BUILD_PATH if it is specified on the command line
-    global BUILD_PATH
-    if args.build_dir is not None:
-        BUILD_PATH = args.build_dir
+    # Update build paths if they are specified on the command line
+    global BUILD_PATH, WORK_PATH, DIST_PATH
 
-    # Update DIST_PATH if it is specified on the command line
-    global DIST_PATH
+    if args.build_dir is not None:
+        BUILD_PATH = args.build_dir.resolve()
+        WORK_PATH = BUILD_PATH.joinpath("work")
+        DIST_PATH = BUILD_PATH.joinpath("dist")
+
+    if args.work_dir is not None:
+        WORK_PATH = args.work_dir.resolve()
+
     if args.dist_dir is not None:
-        DIST_PATH = args.dist_dir
+        DIST_PATH = args.dist_dir.resolve()
 
     if any(map(lambda target: target in args.target, ["clean", "dist", "ext"])):
         reset_build_dir()
