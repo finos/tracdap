@@ -46,14 +46,14 @@ TRAC_PYTHON_BUILD_ISOLATION = os.environ.get("TRAC_PYTHON_BUILD_ISOLATION") or "
 BUILD_ISOLATION = TRAC_PYTHON_BUILD_ISOLATION.lower() in ["true", "yes", "1"]
 
 
-def reset_build_dir():
+def reset_build_dir(clean: bool = False):
 
-    if BUILD_PATH.exists():
+    if clean and BUILD_PATH.exists():
         shutil.rmtree(BUILD_PATH)
 
-    BUILD_PATH.mkdir(parents=True, exist_ok=False)
-    WORK_PATH.mkdir(parents=False, exist_ok=False)
-    DIST_PATH.mkdir(parents=False, exist_ok=False)
+    BUILD_PATH.mkdir(parents=True, exist_ok=True)
+    WORK_PATH.mkdir(parents=False, exist_ok=True)
+    DIST_PATH.mkdir(parents=False, exist_ok=True)
 
 
 def copy_project_files(plugin_path, plugin_package, project_root=RUNTIME_DIR):
@@ -442,8 +442,10 @@ def main():
     if args.dist_dir is not None:
         DIST_PATH = args.dist_dir.resolve()
 
-    if any(map(lambda target: target in args.target, ["clean", "dist", "ext"])):
-        reset_build_dir()
+    if "clean" in args.target:
+        reset_build_dir(True)
+    else:
+        reset_build_dir(False)
 
     if "codegen" in args.target:
         generate_from_proto(unpacked=True)
