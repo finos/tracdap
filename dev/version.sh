@@ -42,7 +42,7 @@ elif [ ${prior_version_found} = 0 ]; then
 
   prior_version=`echo ${prior_version_tag} | sed s/^v//`
 
-  if [ `echo "${prior_version}" | grep -E "^\d+\.\d+\.\d+$"` ]; then
+  if echo "${prior_version}" | grep -Eq "^\d+\.\d+\.\d+$"; then
       # Whole version number, bump patch for next patch version
       next_patch_version=`echo "${prior_version}" | awk -F. '{$NF=$NF+1; print}' OFS=.`
   else
@@ -51,7 +51,7 @@ elif [ ${prior_version_found} = 0 ]; then
   fi
 
   # Next patch version exists but is not in the revision history -> release branch exists
-  if [ `git tag | grep "^v${next_patch_version}$"` ]; then
+  if git tag | grep -q "^v${next_patch_version}$"; then
       next_minor_version=`echo "${next_patch_version}" | awk -F. '{$2=$2+1; $3=0; print}' OFS=.`
       version_number=${next_minor_version}-SNAPSHOT
   else
