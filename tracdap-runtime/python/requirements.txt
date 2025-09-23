@@ -29,8 +29,8 @@ certifi >= 2025.1.31
 # Python implementation of Git, for model loading
 dulwich == 0.23.2
 
-# Requests, used for downloading model packages
-requests == 2.32.4
+# Used for downloading model packages from PyPI
+urllib3 == 2.5.0
 
 
 # ----------------------------------------------------------------------------------------------------------------------
