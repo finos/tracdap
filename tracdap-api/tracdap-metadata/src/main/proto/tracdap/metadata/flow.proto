@@ -50,6 +50,12 @@ enum FlowNodeType {
    * (TRAC can infer parameters by name if they are not defined explicitly)
    */
   PARAMETER_NODE = 4;
+
+  /**
+   * Resource nodes allow explicit mapping of resources into models
+   * (TRAC can infer resources by name if they are not defined explicitly)
+   */
+  RESOURCE_NODE = 5;
 }
 
 /**
