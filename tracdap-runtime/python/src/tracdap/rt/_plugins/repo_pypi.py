@@ -21,8 +21,9 @@ import typing as tp
 import urllib.parse
 import zipfile
 import io
+import time
 
-import requests
+import urllib3
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
@@ -93,20 +94,28 @@ class PyPiRepository(IModelRepository):
         self._log.info(f"Downloading [{package_filename}]")
         self._log.info(f"GET: {_helpers.log_safe_url(package_url)}")
 
-        download_req = requests.get(package_url.geturl())
-        content = download_req.content
-        elapsed = download_req.elapsed
+        download = None
 
-        self._log.info(f"Downloaded [{len(content) / 1024:.1f}] KB in [{elapsed.total_seconds():.1f}] seconds")
+        try:
+            start = time.perf_counter()
+            download = urllib3.request("GET", package_url.geturl())
+            content = download.data
+            elapsed = time.perf_counter() -  start
 
-        safe_checkout_dir = _helpers.windows_unc_path(checkout_dir)
-        download_whl = zipfile.ZipFile(io.BytesIO(download_req.content))
-        download_whl.extractall(safe_checkout_dir)
+            self._log.info(f"Downloaded [{len(content) / 1024:.1f}] KB in [{elapsed:.1f}] seconds")
 
-        self._log.info(f"Unpacked [{len(download_whl.filelist)}] files")
-        self._log.info(f"PyPI checkout succeeded for {model_def.package} {model_def.version}")
+            safe_checkout_dir = _helpers.windows_unc_path(checkout_dir)
+            download_whl = zipfile.ZipFile(io.BytesIO(content))
+            download_whl.extractall(safe_checkout_dir)
 
-        return self.package_path(model_def, checkout_dir)
+            self._log.info(f"Unpacked [{len(download_whl.filelist)}] files")
+            self._log.info(f"PyPI checkout succeeded for {model_def.package} {model_def.version}")
+
+            return self.package_path(model_def, checkout_dir)
+
+        finally:
+            if download:
+                download.close()
 
     def _pypi_simple_query(self, model_def: meta.ModelDefinition):
 
@@ -123,22 +132,22 @@ class PyPiRepository(IModelRepository):
 
             self._log.info(f"Query package: [{model_def.package}]")
 
-            package_req = self._pypi_package_query(
+            package = self._pypi_package_query(
                 self.SIMPLE_PACKAGE_PATH, simple_root_url, simple_headers,
                 credentials, model_def)
 
             # Default content type is text/html
             # Content type can contain modifiers, e.g. text/html; charset=utf-8
             # We only want the mime type part
-            received_content_type = package_req.headers.get("content-type") or self.PIP_SIMPLE_TYPE_HTML
+            received_content_type = package.headers.get("content-type") or self.PIP_SIMPLE_TYPE_HTML
             received_mime_type = received_content_type.split(";")[0].strip()
 
             if received_mime_type == self.PIP_SIMPLE_TYPE_JSON:
-                filename, url = self._pypi_simple_parse_response(model_def, package_req.json())
+                filename, url = self._pypi_simple_parse_response(model_def, json.loads(package.data))
 
             elif received_mime_type == self.PIP_SIMPLE_TYPE_HTML:
-                package_parser = _PypiSimpleHtmlParser(model_def.package, package_req.url)
-                package_parser.feed(package_req.text)
+                package_parser = _PypiSimpleHtmlParser(model_def.package, package.url)
+                package_parser.feed(package.data.decode("utf-8"))
                 filename, url = self._pypi_simple_parse_response(model_def, package_parser.response)
 
             else:
@@ -219,11 +228,11 @@ class PyPiRepository(IModelRepository):
 
         self._log.info(f"Query package: [{model_def.package}], version = [{model_def.version}]")
 
-        package_req = self._pypi_package_query(
+        package = self._pypi_package_query(
             self.JSON_PACKAGE_PATH, json_root_url, json_headers,
             credentials, model_def)
 
-        package_obj = package_req.json()
+        package_obj = json.loads(package.data)
         package_info = package_obj.get("info") or {}
         summary = package_info.get("summary") or "(summary not available)"
 
@@ -257,14 +266,14 @@ class PyPiRepository(IModelRepository):
 
         self._log.info(f"GET: {_helpers.log_safe_url(package_url)}")
 
-        package_req = requests.get(package_url.geturl(), headers=headers)
+        package = urllib3.request("GET", package_url.geturl(), headers=headers)
 
-        if package_req.status_code != requests.codes.OK:
-            message = f"Package lookup failed: [{package_req.status_code}] {package_req.reason}"
+        if package.status != 200:
+            message = f"Package lookup failed: [{package.status}] {package.reason}"
             self._log.error(message)
             raise ex.EModelRepo(message)  # todo status code for access, not found etc
 
-        return package_req
+        return package
 
 
 class _PypiSimpleHtmlParser(html.parser.HTMLParser):
