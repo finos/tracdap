@@ -29,7 +29,6 @@ import tracdap.rt._impl.core.repos as repos  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 
 
-@unittest.skip
 class ModelRepositoriesTest(unittest.TestCase):
 
     @classmethod
@@ -73,7 +72,7 @@ class ModelRepositoriesTest(unittest.TestCase):
 
         local_repo_url = pathlib.Path(__file__) \
             .parent \
-            .joinpath("../../../../../..") \
+            .joinpath("../../../../../../..") \
             .resolve()
 
         sys_config = config.RuntimeConfig()
