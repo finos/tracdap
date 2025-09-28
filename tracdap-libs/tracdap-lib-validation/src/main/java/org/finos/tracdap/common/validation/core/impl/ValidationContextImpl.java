@@ -17,13 +17,13 @@
 
 package org.finos.tracdap.common.validation.core.impl;
 
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.MapEntry;
@@ -51,12 +51,12 @@ public class ValidationContextImpl implements ValidationContext {
     private final List<ValidationFailure> failures;
 
     private final MetadataBundle metadata;
-    private final TenantConfig tenantConfig;
+    private final ResourceBundle resources;
 
 
     private ValidationContextImpl(
             ValidationType validationType, ValidationLocation root, ValidationContextImpl priorCtx,
-            MetadataBundle metadata, TenantConfig tenantConfig) {
+            MetadataBundle metadata, ResourceBundle resources) {
 
         this.validationType = validationType;
         this.location = new Stack<>();
@@ -64,7 +64,7 @@ public class ValidationContextImpl implements ValidationContext {
 
         this.priorCtx = priorCtx;
         this.metadata = metadata;
-        this.tenantConfig = tenantConfig;
+        this.resources = resources;
 
         this.failures = new ArrayList<>();
     }
@@ -97,10 +97,10 @@ public class ValidationContextImpl implements ValidationContext {
         return new ValidationContextImpl(ValidationType.VERSION, currentRoot, priorCtx);
     }
 
-    public static ValidationContext forConsistency(Message msg, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public static ValidationContext forConsistency(Message msg, MetadataBundle metadata, ResourceBundle resources) {
 
         var root = new ValidationLocation(null, msg, null, null);
-        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, metadata, tenantConfig);
+        return new ValidationContextImpl(ValidationType.CONSISTENCY, root, null, metadata, resources);
     }
 
     @Override
@@ -109,8 +109,8 @@ public class ValidationContextImpl implements ValidationContext {
     }
 
     @Override
-    public TenantConfig getTenantConfig() {
-        return this.tenantConfig;
+    public ResourceBundle getResourceBundle() {
+        return this.resources;
     }
 
     @Override
