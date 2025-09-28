@@ -27,45 +27,52 @@ public class NodeMetadata {
     private final ModelParameter modelParameter;
     private final ModelInputSchema modelInputSchema;
     private final ModelOutputSchema modelOutputSchema;
+    private final ModelResource modelResource;
 
     private final ObjectDefinition runtimeObject;
     private final Value runtimeValue;
 
     public NodeMetadata(
-            FlowNode flowNode,
-            ModelParameter modelParameter, ModelInputSchema modelInputSchema, ModelOutputSchema modelOutputSchema,
+            FlowNode flowNode, ModelParameter modelParameter,
+            ModelInputSchema modelInputSchema, ModelOutputSchema modelOutputSchema,
+            ModelResource modelResource,
             ObjectDefinition runtimeObject, Value runtimeValue) {
 
         this.flowNode = flowNode;
         this.modelParameter = modelParameter;
         this.modelInputSchema = modelInputSchema;
         this.modelOutputSchema = modelOutputSchema;
+        this.modelResource = modelResource;
         this.runtimeObject = runtimeObject;
         this.runtimeValue = runtimeValue;
     }
 
     public NodeMetadata withFlowNode(FlowNode flowNode) {
-        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource, runtimeObject, runtimeValue);
     }
 
     public NodeMetadata withModelParameter(ModelParameter modelParameter) {
-        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource,runtimeObject, runtimeValue);
     }
 
     public NodeMetadata withModelInputSchema(ModelInputSchema modelInputSchema) {
-        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource,runtimeObject, runtimeValue);
     }
 
     public NodeMetadata withModelOutputSchema(ModelOutputSchema modelOutputSchema) {
-        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource,runtimeObject, runtimeValue);
+    }
+
+    public NodeMetadata withModelResource(ModelResource modelResource) {
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource, runtimeObject, runtimeValue);
     }
 
     public NodeMetadata withRuntimeObject(ObjectDefinition runtimeObject) {
-        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource,runtimeObject, runtimeValue);
     }
 
     public NodeMetadata withRuntimeValue(Value runtimeValue) {
-        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, runtimeObject, runtimeValue);
+        return new NodeMetadata(flowNode, modelParameter, modelInputSchema, modelOutputSchema, modelResource,runtimeObject, runtimeValue);
     }
 
     public FlowNode flowNode() {
@@ -82,6 +89,10 @@ public class NodeMetadata {
 
     public ModelOutputSchema modelOutputSchema() {
         return modelOutputSchema;
+    }
+
+    public ModelResource modelResource() {
+        return modelResource;
     }
 
     public ObjectType runtimeObjectType() {
