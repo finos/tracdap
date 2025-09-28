@@ -65,6 +65,9 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
                 .map(ModelDefinition::getRepository)
                 .forEach(resources::add);
 
+        // Add all target resources selected for the job
+        resources.addAll(job.getRunFlow().getResourcesMap().values());
+
         return new ArrayList<>(resources);
     }
 

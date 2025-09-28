@@ -59,6 +59,9 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
         var modelRepo = modelObj.getModel().getRepository();
         resources.add(modelRepo);
 
+        // Add all target resources selected for the job
+        resources.addAll(job.getRunModel().getResourcesMap().values());
+
         return new ArrayList<>(resources);
     }
 
