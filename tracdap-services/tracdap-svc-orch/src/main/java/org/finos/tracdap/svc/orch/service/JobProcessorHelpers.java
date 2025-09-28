@@ -137,15 +137,15 @@ public class JobProcessorHelpers {
             tags.put(objectKey, tag);
         }
 
-        jobState.objectMapping.putAll(objectMapping);
-        jobState.objects.putAll(objects);
-        jobState.tags.putAll(tags);
+        if (jobState.metadata == null)
+            jobState.metadata = new MetadataBundle(objectMapping, objects, tags);
+        else
+            jobState.metadata.addToBundle(objectMapping, objects, tags);
 
         var dependencies = loadMetadataDependencies(batchResponse.getTagList());
 
         var missingDependencies = dependencies.stream()
-                .filter(selector -> !jobState.objects.containsKey(MetadataUtil.objectKey(selector)))
-                .filter(selector -> !jobState.objectMapping.containsKey(MetadataUtil.objectKey(selector)))
+                .filter(selector -> !jobState.metadata.hasObject(selector))
                 .collect(Collectors.toList());
 
         if (!missingDependencies.isEmpty())
@@ -181,21 +181,54 @@ public class JobProcessorHelpers {
         return dependencies;
     }
 
+    public JobState loadResources(JobState jobState) {
+
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
+
+        // Include all resources explicitly required for the job
+        var resourceNames = jobLogic.requiredResources(jobState.definition, jobState.metadata);
+
+        // Always require the default storage resource
+        if (tenantConfig.containsProperties(ConfigKeys.STORAGE_DEFAULT_LOCATION)) {
+            var defaultStorage = tenantConfig.getPropertiesOrThrow(ConfigKeys.STORAGE_DEFAULT_LOCATION);
+            resourceNames.add(defaultStorage);
+        }
+
+        // Always require system resources
+        for (var resourceName : tenantConfig.getResourcesMap().keySet()) {
+            if (resourceName.startsWith(ConfigKeys.TRAC_PREFIX)) {
+                resourceNames.add(resourceName);
+            }
+        }
+
+        // Assemble all the required resources (ensures they are available)
+        var resources = new HashMap<String, ResourceDefinition>();
+
+        for (var resourceName : resourceNames) {
+            if (tenantConfig.containsResources(resourceName))
+                resources.put(resourceName, tenantConfig.getResourcesOrThrow(resourceName));
+            else {
+                var message = String.format("Required resource [%s] not available", resourceName);
+                log.error(message);
+                throw new EConsistencyValidation(message);
+            }
+        }
+
+        jobState.resources = new ResourceBundle(resources);
+
+        return jobState;
+    }
+
     JobState applyTransform(JobState jobState) {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
 
-        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
-        var resourceNames = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
-        var resources = ResourceBundle.filterResources(tenantConfig, resourceNames);
-
-        var updatedDefinition = jobLogic.applyJobTransform(jobState.definition, metadata, resources);
-        var updatedMetadata = jobLogic.applyMetadataTransform(updatedDefinition, metadata, resources);
+        var updatedDefinition = jobLogic.applyJobTransform(jobState.definition, jobState.metadata, jobState.resources);
+        var updatedMetadata = jobLogic.applyMetadataTransform(updatedDefinition, jobState.metadata, jobState.resources);
 
         jobState.definition = updatedDefinition;
-        jobState.objects = updatedMetadata.getObjects();
-        jobState.objectMapping = updatedMetadata.getObjectMapping();
+        jobState.metadata = updatedMetadata;
 
         return jobState;
     }
@@ -258,8 +291,7 @@ public class JobProcessorHelpers {
 
         // Add required IDs based on the job type
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
-        var requiredIds = jobLogic.expectedOutputs(jobState.definition, metadata);
+        var requiredIds = jobLogic.expectedOutputs(jobState.definition, jobState.metadata);
 
         for (var requirement : requiredIds.entrySet()) {
 
@@ -287,16 +319,14 @@ public class JobProcessorHelpers {
 
     JobState buildJobConfig(JobState jobState) {
 
-        var jobLogic  = JobLogic.forJobType(jobState.jobType);
-        var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
         var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
         var jobConfig = JobConfig.newBuilder()
                 .setJobId(jobState.jobId)
                 .setJob(jobState.definition)
-                .putAllObjectMapping(jobState.objectMapping)
-                .putAllObjects(jobState.objects)
-                .putAllTags(jobState.tags)
+                .putAllObjectMapping(jobState.metadata.getObjectMapping())
+                .putAllObjects(jobState.metadata.getObjects())
+                .putAllTags(jobState.metadata.getTags())
                 .setResultId(jobState.resultId)
                 .addAllPreallocatedIds(jobState.preallocatedIds);
 
@@ -315,32 +345,7 @@ public class JobProcessorHelpers {
 
         var sysConfig = RuntimeConfig.newBuilder();
         sysConfig.putAllProperties(tenantConfig.getPropertiesMap());
-
-        var requiredResources = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
-
-        for (var resourceKey : requiredResources) {
-
-            if (tenantConfig.containsResources(resourceKey)) {
-                var resourceConfig = tenantConfig.getResourcesOrThrow(resourceKey);
-                var resource = translateResourceConfig(resourceKey, resourceConfig, jobState);
-                sysConfig.putResources(resourceKey, resource);
-            }
-            else {
-                // This condition should already be picked up during job consistency validation
-                var message = String.format("Required resource [%s] not available in TRAC", resourceKey);
-                log.error(message);
-                throw new EConsistencyValidation(message);
-            }
-        }
-
-        // Always send system resources to the runtime
-        for (var resourceKey : tenantConfig.getResourcesMap().keySet()) {
-            if (resourceKey.startsWith(ConfigKeys.TRAC_PREFIX)) {
-                var resourceConfig = tenantConfig.getResourcesOrThrow(resourceKey);
-                var resource = translateResourceConfig(resourceKey, resourceConfig, jobState);
-                sysConfig.putResources(resourceKey, resource);
-            }
-        }
+        sysConfig.putAllResources(jobState.resources.getResources());
 
         var newState = jobState.clone();
         newState.sysConfig = sysConfig.build();
@@ -360,11 +365,25 @@ public class JobProcessorHelpers {
                 jobState.jobKey);
     }
 
-    private ResourceDefinition translateResourceConfig(String resourceKey, ResourceDefinition resource, JobState jobState) {
+    public RuntimeConfig translateSecrets(RuntimeConfig sysConfig, String tenant) {
+
+        var resourceNames = new ArrayList<>(sysConfig.getResourcesMap().keySet());
+        var translatedConfig = sysConfig.toBuilder();
+
+        for (var resourceName : resourceNames) {
+            var originalResource =  sysConfig.getResourcesOrThrow(resourceName);
+            var translatedResource = translateResourceSecrets(resourceName, originalResource, tenant);
+            translatedConfig.putResources(resourceName, translatedResource);
+        }
+
+        return translatedConfig.build();
+    }
+
+    private ResourceDefinition translateResourceSecrets(String resourceName, ResourceDefinition resource, String tenant) {
 
         var translated = resource.toBuilder();
 
-        var tenantScope = String.format("/%s/%s/", ConfigKeys.TENANT_SCOPE, jobState.tenant);
+        var tenantScope = String.format("/%s/%s/", ConfigKeys.TENANT_SCOPE, tenant);
 
         for (var secretEntry : translated.getSecretsMap().entrySet()) {
 
@@ -375,7 +394,7 @@ public class JobProcessorHelpers {
             // This handling provides more meaningful errors
             if (secretAlias.isBlank() || !secretAlias.startsWith(tenantScope)) {
 
-                var message = String.format("Resource configuration for [%s] is not valid", resourceKey);
+                var message = String.format("Resource configuration for [%s] is not valid", resourceName);
                 var detail = String.format("Inconsistent secret alias for [%s]", propertyName);
 
                 log.error("{}: {}", message, detail);

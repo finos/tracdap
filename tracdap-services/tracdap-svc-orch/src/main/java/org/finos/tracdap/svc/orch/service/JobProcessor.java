@@ -35,7 +35,6 @@ import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
-import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
@@ -59,7 +58,6 @@ public class JobProcessor {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
-    private final TenantConfigManager tenantState;
     private final GrpcConcern commonConcerns;
 
     private final InternalMetadataApiBlockingStub metaClient;
@@ -78,7 +76,6 @@ public class JobProcessor {
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
-        this.tenantState = tenantState;
         this.commonConcerns = commonConcerns;
 
         this.metaClient = registry.getSingleton(InternalMetadataApiBlockingStub.class);
@@ -138,14 +135,12 @@ public class JobProcessor {
 
         try {
 
-            var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
-
-            // Load in all the resources referenced by the job
+            // Load in all the objects and resources referenced by the job
             newState = lifecycle.loadMetadata(newState);
+            newState = lifecycle.loadResources(newState);
 
             // Semantic validation (job consistency)
-            var metadata = new MetadataBundle(newState.objectMapping, newState.objects, newState.tags);
-            validator.validateConsistency(newState.definition, metadata, tenantConfig);
+            validator.validateConsistency(newState.definition, newState.metadata, newState.resources);
 
             // Apply any transformations specific to the job type
             // Including this step during validation will catch more errors before jobs are submitted
@@ -220,11 +215,12 @@ public class JobProcessor {
 
         var jobExecutor = stronglyTypedExecutor();
 
+        // Translate secrets for runtime resources before sending to the runtime
+        // The resulting sys config is never saved to the job cache
+        var sysConfig = lifecycle.translateSecrets(jobState.sysConfig, jobState.tenant);
+
         // All jobs are submitted as one-shot for now
-        var executorState = jobExecutor.submitOneshotJob(
-                jobState.jobId,
-                jobState.jobConfig,
-                jobState.sysConfig);
+        var executorState = jobExecutor.submitOneshotJob(jobState.jobId, jobState.jobConfig, sysConfig);
 
         log.info("Job has been sent to the executor: [{}]", jobState.jobKey);
 
