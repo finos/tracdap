@@ -22,6 +22,7 @@ import org.finos.tracdap.common.graph.GraphBuilder;
 import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.TenantConfig;
@@ -72,14 +73,14 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         // No transformations currently required
         return job;
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         // Running the graph builder will apply any required auto-wiring and type inference to the flow
         // This creates a strictly consistent flow that can be sent to the runtime
@@ -87,7 +88,7 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
         var flowSelector = job.getRunFlow().getFlow();
 
         var jobNamespace = NodeNamespace.ROOT;
-        var builder = new GraphBuilder(jobNamespace, metadata);
+        var builder = new GraphBuilder(jobNamespace, metadata, resources);
         var graph = builder.buildJob(job);
 
         var strictFlow = builder.exportFlow(graph);

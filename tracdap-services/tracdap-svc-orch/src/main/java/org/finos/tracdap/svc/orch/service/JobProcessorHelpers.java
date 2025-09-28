@@ -27,6 +27,7 @@ import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
@@ -184,10 +185,13 @@ public class JobProcessorHelpers {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
         var metadata = new MetadataBundle(jobState.objectMapping, jobState.objects, jobState.tags);
-        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
-        var updatedDefinition = jobLogic.applyJobTransform(jobState.definition, metadata, tenantConfig);
-        var updatedMetadata = jobLogic.applyMetadataTransform(updatedDefinition, metadata, tenantConfig);
+        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
+        var resourceNames = jobLogic.requiredResources(jobState.definition, metadata, tenantConfig);
+        var resources = ResourceBundle.filterResources(tenantConfig, resourceNames);
+
+        var updatedDefinition = jobLogic.applyJobTransform(jobState.definition, metadata, resources);
+        var updatedMetadata = jobLogic.applyMetadataTransform(updatedDefinition, metadata, resources);
 
         jobState.definition = updatedDefinition;
         jobState.objects = updatedMetadata.getObjects();
@@ -323,7 +327,7 @@ public class JobProcessorHelpers {
             }
             else {
                 // This condition should already be picked up during job consistency validation
-                var message = String.format("Required resource [%s] not found", resourceKey);
+                var message = String.format("Required resource [%s] not available in TRAC", resourceKey);
                 log.error(message);
                 throw new EConsistencyValidation(message);
             }

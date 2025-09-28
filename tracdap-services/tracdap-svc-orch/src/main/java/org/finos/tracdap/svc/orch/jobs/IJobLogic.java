@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.TenantConfig;
@@ -59,20 +60,20 @@ public interface IJobLogic {
      *
      * @param job The original job definition, as supplied by the client
      * @param metadata A bundle containing the metadata referenced in the job definition
-     * @param tenantConfig Tenant configuration for the tenant the job will run under
+     * @param resources A bundle containing the resources required to run this job
      * @return The transformed job definition, which will be sent to the runtime for execution
      */
-    JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig);
+    JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources);
 
     /**
      * Apply transformations to the metadata bundle for a job before sending it to the executor.
      *
      * @param job The original job definition being considered
      * @param metadata A bundle containing the original metadata loaded from the metadata store
-     * @param tenantConfig Tenant configuration for the tenant the job will run under
+     * @param resources A bundle containing the resources required to run this job
      * @return The transformed metadata bundle, which will be sent to the runtime for execution
      */
-    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig);
+    MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources);
 
     /**
      * Provide a count of expected outputs for each object type (used to preallocate object IDs)

@@ -22,6 +22,7 @@ import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.JobResultAttrs;
@@ -59,7 +60,7 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         // Fill in package and packageGroup properties for models using Git repos
 
@@ -72,7 +73,7 @@ public class ImportModelJob implements IJobLogic {
 
         // Validation on resources is already performed by the job consistency validator
         var repoKey = job.getImportModel().getRepository();
-        var repoConfig = tenantConfig.getResourcesOrThrow(repoKey);
+        var repoConfig = resources.getResource(repoKey);
 
         if (!repoConfig.getProtocol().equalsIgnoreCase("git"))
             return job;
@@ -100,7 +101,7 @@ public class ImportModelJob implements IJobLogic {
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         return metadata;
     }
