@@ -18,11 +18,9 @@
 package org.finos.tracdap.common.metadata;
 
 import org.finos.tracdap.common.exception.EUnexpected;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.ResourceDefinition;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 
@@ -30,24 +28,16 @@ public class ResourceBundle {
 
     private final Map<String, ResourceDefinition> resources;
 
-    public static ResourceBundle allTenantResources(TenantConfig tenantConfig) {
-        return new ResourceBundle(tenantConfig.getResourcesMap());
-    }
-
-    public static ResourceBundle filterResources(TenantConfig tenantConfig, List<String> resourceNames) {
-
-        var resources = new HashMap<String, ResourceDefinition>();
-
-        for (var resourceName : resourceNames) {
-            if (tenantConfig.containsResources(resourceName))
-                resources.put(resourceName, tenantConfig.getResourcesOrThrow(resourceName));
-        }
-
-        return new ResourceBundle(resources);
+    public static ResourceBundle empty() {
+        return new ResourceBundle(new HashMap<>());
     }
 
     public ResourceBundle(Map<String, ResourceDefinition> resources) {
-        this.resources = resources;
+        this.resources = resources != null ? resources : new HashMap<>();
+    }
+
+    public Map<String, ResourceDefinition> getResources() {
+        return resources;
     }
 
     public boolean hasResource(String resourceName) {

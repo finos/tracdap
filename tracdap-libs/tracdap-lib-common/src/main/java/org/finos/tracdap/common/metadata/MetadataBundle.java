@@ -34,18 +34,32 @@ public class MetadataBundle {
             .setTagVersion(0)
             .build();
 
-    public final Map<String, TagHeader> objectMapping;
-    public final Map<String, ObjectDefinition> objects;
-    public final Map<String, Tag> tags;
+    private final Map<String, TagHeader> objectMapping;
+    private final Map<String, ObjectDefinition> objects;
+    private final Map<String, Tag> tags;
+
+    public static MetadataBundle empty() {
+        return new MetadataBundle(new HashMap<>(), new HashMap<>(), new HashMap<>());
+    }
 
     public MetadataBundle(
             Map<String, TagHeader> objectMapping,
             Map<String, ObjectDefinition> objects,
             Map<String, Tag> tags) {
 
-        this.objectMapping = objectMapping;
-        this.objects = objects;
-        this.tags = tags;
+        this.objectMapping = objectMapping != null ? objectMapping : new HashMap<>();
+        this.objects = objects != null ? objects : new HashMap<>();
+        this.tags = tags != null ? tags : new HashMap<>();
+    }
+
+    public void addToBundle(
+            Map<String, TagHeader> objectMapping,
+            Map<String, ObjectDefinition> objects,
+            Map<String, Tag> tags) {
+
+        this.objectMapping.putAll(objectMapping);
+        this.objects.putAll(objects);
+        this.tags.putAll(tags);
     }
 
     public Map<String, ObjectDefinition> getObjects() {
@@ -56,20 +70,22 @@ public class MetadataBundle {
         return objectMapping;
     }
 
+    public Map<String, Tag> getTags() {
+        return tags;
+    }
+
+    public boolean hasObject(TagSelector selector) {
+        var objectKey = resolveObjectKey(selector);
+        return objects.containsKey(objectKey);
+    }
+
     public ObjectDefinition getObject(TagSelector selector) {
         return getObject(selector, true);
     }
 
     public ObjectDefinition getObject(TagSelector selector, boolean required) {
 
-        var selectorKey = MetadataUtil.objectKey(selector);
-
-        // Selector mappings are optional, fall back on using the selector key
-        var objectId = objectMapping.getOrDefault(selectorKey, NO_MAPPING);
-        var objectKey = objectId == NO_MAPPING
-                ? selectorKey
-                : MetadataUtil.objectKey(objectId);
-
+        var objectKey = resolveObjectKey(selector);
         var object = objects.get(objectKey);
 
         if (object.getObjectType() != selector.getObjectType()) {
@@ -80,6 +96,18 @@ public class MetadataBundle {
         }
 
         return object;
+    }
+
+    private String resolveObjectKey(TagSelector selector) {
+
+        var selectorKey = MetadataUtil.objectKey(selector);
+
+        // Selector mappings are optional, fall back on using the selector key
+        var objectId = objectMapping.getOrDefault(selectorKey, NO_MAPPING);
+
+        return objectId == NO_MAPPING
+                ? selectorKey
+                : MetadataUtil.objectKey(objectId);
     }
 
     public MetadataBundle withUpdate(TagSelector selector, ObjectDefinition newObject) {
