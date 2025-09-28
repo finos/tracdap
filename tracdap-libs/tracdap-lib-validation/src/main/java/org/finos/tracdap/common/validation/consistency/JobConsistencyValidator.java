@@ -164,7 +164,7 @@ public class JobConsistencyValidator {
 
         // TODO: Build a meaningful namespace from the request context
         var namespace = NodeNamespace.ROOT;
-        var builder = new GraphBuilder(namespace, ctx.getMetadataBundle(), graphErrorHandler(ctx));
+        var builder = new GraphBuilder(namespace, ctx.getMetadataBundle(), ctx.getResourceBundle(), graphErrorHandler(ctx));
         var graph = builder.buildRunFlowJob(job);
 
         ctx.pushMap(RFJ_MODELS, RunFlowJob::getModelsMap)
