@@ -21,7 +21,6 @@ import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.List;
@@ -50,10 +49,9 @@ public interface IJobLogic {
      *
      * @param job The job definition to check metadata for
      * @param metadata A bundle containing the metadata referenced in the job definition
-     * @param tenantConfig Tenant configuration for the tenant the job will run under
      * @return A list of resource keys for the required runtime resources.
      */
-    List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig);
+    List<String> requiredResources(JobDefinition job, MetadataBundle metadata);
 
     /**
      * Apply transformations to the job definition before sending it to the executor.

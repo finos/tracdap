@@ -23,7 +23,6 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.*;
@@ -48,12 +47,12 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata) {
 
         var resources = new HashSet<String>();
 
         // Storage requirements are the same for model / flow jobs
-        addRequiredStorage(metadata, tenantConfig, resources);
+        addRequiredStorage(metadata, resources);
 
         // Include repo resource for the model
         var modelObj = metadata.getObject(job.getRunModel().getModel());

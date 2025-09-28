@@ -17,13 +17,11 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.JobResultAttrs;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -34,13 +32,7 @@ import java.util.*;
 
 public abstract class RunModelOrFlow {
 
-    protected void addRequiredStorage(MetadataBundle metadata, TenantConfig tenantConfig, Set<String> resources) {
-
-        // Default storage is always required for outputs
-        if (tenantConfig.containsProperties(ConfigKeys.STORAGE_DEFAULT_LOCATION)) {
-            var defaultStorage = tenantConfig.getPropertiesOrThrow(ConfigKeys.STORAGE_DEFAULT_LOCATION);
-            resources.add(defaultStorage);
-        }
+    protected void addRequiredStorage(MetadataBundle metadata, Set<String> resources) {
 
         // Add explicitly referenced storage locations
         metadata.getObjects().values().stream()
