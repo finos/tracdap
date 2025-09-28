@@ -19,8 +19,7 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EJobResult;
-import org.finos.tracdap.common.exception.ETracInternal;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.EValidationGap;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.JobResultAttrs;
@@ -78,7 +77,8 @@ public abstract class RunModelOrFlow {
                 requiredIds.compute(ObjectType.STORAGE, (key, value) -> value == null ? 1 : value + 1);
             }
             else {
-                throw new EUnexpected();  // TODO
+                // Should never happen - this is checked by the validator
+                throw new EValidationGap(String.format("Unsupported job output type [%s]", outputType.name()));
             }
         }
 
@@ -189,6 +189,7 @@ public abstract class RunModelOrFlow {
         if (outputDef.getObjectType() == ObjectType.FILE)
             return outputDef.getFile().getStorageId();
 
-        throw new ETracInternal(String.format("Unsupported job output type [%s]", outputDef.getObjectType().name()));
+        // Should never happen - this is checked by the validator
+        throw new EValidationGap(String.format("Unsupported job output type [%s]", outputDef.getObjectType().name()));
     }
 }
