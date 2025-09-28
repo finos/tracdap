@@ -183,11 +183,11 @@ public class JobProcessorHelpers {
 
     public JobState loadResources(JobState jobState) {
 
-        var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
+        var resourceNames = new ArrayList<String>();
 
-        // Include all resources explicitly required for the job
-        var resourceNames = jobLogic.requiredResources(jobState.definition, jobState.metadata);
+        // Universal handling for system resources
+        // Job logic does not reference the tenant config
+        var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
         // Always require the default storage resource
         if (tenantConfig.containsProperties(ConfigKeys.STORAGE_DEFAULT_LOCATION)) {
@@ -201,6 +201,12 @@ public class JobProcessorHelpers {
                 resourceNames.add(resourceName);
             }
         }
+
+        // Include all resources explicitly required for the job
+        var jobLogic = JobLogic.forJobType(jobState.jobType);
+        var jobResources = jobLogic.requiredResources(jobState.definition, jobState.metadata);
+
+        resourceNames.addAll(jobResources);
 
         // Assemble all the required resources (ensures they are available)
         var resources = new HashMap<String, ResourceDefinition>();

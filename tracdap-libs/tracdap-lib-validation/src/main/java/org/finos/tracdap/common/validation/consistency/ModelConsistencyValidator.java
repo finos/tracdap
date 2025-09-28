@@ -66,7 +66,7 @@ public class ModelConsistencyValidator {
 
         var resources = ctx.getResourceBundle();
 
-        if (resources.hasResource(repoName)) {
+        if (!resources.hasResource(repoName)) {
             var error = String.format("Model repository [%s] is not available in the TRAC platform", repoName);
             return ctx.error(error);
         }
