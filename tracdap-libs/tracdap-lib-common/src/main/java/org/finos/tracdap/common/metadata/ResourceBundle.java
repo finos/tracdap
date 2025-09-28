@@ -50,6 +50,10 @@ public class ResourceBundle {
         this.resources = resources;
     }
 
+    public boolean hasResource(String resourceName) {
+        return resources.containsKey(resourceName);
+    }
+
     public ResourceDefinition getResource(String resourceName) {
         return getResource(resourceName, true);
     }
