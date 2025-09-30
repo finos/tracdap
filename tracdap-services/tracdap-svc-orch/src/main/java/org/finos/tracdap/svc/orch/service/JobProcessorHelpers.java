@@ -83,6 +83,7 @@ public class JobProcessorHelpers {
 
         if (selectors.isEmpty()) {
             log.info("No additional metadata required");
+            jobState.metadata = MetadataBundle.empty();
             return jobState;
         }
 
