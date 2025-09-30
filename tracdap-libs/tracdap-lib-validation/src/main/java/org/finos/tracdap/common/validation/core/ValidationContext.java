@@ -214,7 +214,9 @@ public interface ValidationContext {
     <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass);
 
     ValidationContext applyIf(boolean condition, ValidationFunction.Basic validator);
+    ValidationContext applyIfElse(boolean condition, ValidationFunction.Basic ifValidator, ValidationFunction.Basic elseValidator);
     ValidationContext applyIf(boolean condition, ValidationFunction.Typed<String> validator);
+    ValidationContext applyIfElse(boolean condition, ValidationFunction.Typed<String> ifValidator, ValidationFunction.Typed<String> elseValidator);
     <T> ValidationContext applyIf(boolean condition, ValidationFunction.Typed<T> validator, Class<T> targetClass);
     <T, U> ValidationContext applyIf(boolean condition, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
     <T> ValidationContext applyIf(boolean condition, ValidationFunction.Version<T> validator, Class<T> targetClass);

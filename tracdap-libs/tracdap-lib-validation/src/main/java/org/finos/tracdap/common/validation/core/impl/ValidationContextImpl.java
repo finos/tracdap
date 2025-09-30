@@ -536,47 +536,37 @@ public class ValidationContextImpl implements ValidationContext {
 
     public ValidationContext
     applyIf(boolean condition, ValidationFunction.Basic validator) {
+        return condition ? apply(validator) : this;
+    }
 
-        if (!condition)
-            return this;
-
-        return apply(validator);
+    public ValidationContext
+    applyIfElse(boolean condition, ValidationFunction.Basic ifValidator, ValidationFunction.Basic elseValidator) {
+        return condition ? apply(ifValidator) : apply(elseValidator);
     }
 
     public ValidationContext
     applyIf(boolean condition, ValidationFunction.Typed<String> validator) {
+        return condition ? apply(validator) : this;
+    }
 
-        if (!condition)
-            return this;
-
-        return apply(validator);
+    public ValidationContext
+    applyIfElse(boolean condition, ValidationFunction.Typed<String> ifValidator, ValidationFunction.Typed<String> elseValidator) {
+        return condition ? apply(ifValidator) : apply(elseValidator);
     }
 
     public <T> ValidationContext
     applyIf(boolean condition, ValidationFunction.Typed<T> validator, Class<T> targetClass) {
-
-        if (!condition)
-            return this;
-
-        return apply(validator, targetClass);
+        return condition ? apply(validator, targetClass) : this;
     }
 
     public <T, U> ValidationContext
     applyIf(boolean condition, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg) {
-
-        if (!condition)
-            return this;
-
-        return apply(validator, targetClass, arg);
+        return condition ? apply(validator, targetClass, arg) : this;
     }
 
     public <T> ValidationContext
     applyIf(boolean condition, ValidationFunction.Version<T> validator, Class<T> targetClass) {
-
-        if (!condition)
-            return this;
-
-        return apply(validator, targetClass);
+        return condition ? apply(validator, targetClass) : this;
     }
 
     public ValidationContext
