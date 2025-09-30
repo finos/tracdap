@@ -17,14 +17,8 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
-
-import org.finos.tracdap.api.JobRequest;
-import org.finos.tracdap.api.MetadataReadRequest;
-import org.finos.tracdap.api.MetadataSearchRequest;
 import org.finos.tracdap.common.metadata.MetadataCodec;
-import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
@@ -39,8 +33,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-
-import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
 
 
 @Tag("integration")
@@ -104,7 +96,7 @@ public abstract class ImportModelTest {
                 .setValue(MetadataCodec.encodeValue("import_model:schema_files"))
                 .build());
 
-        var modelTag = doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelTag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
 
         var modelDef = modelTag.getDefinition().getModel();
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
@@ -118,60 +110,5 @@ public abstract class ImportModelTest {
 
     // Let other tests in this suite use this to import models
 
-    public static org.finos.tracdap.metadata.Tag doImportModel(
-            PlatformTest platform, String tenant, ModelDefinition stubModel,
-            List<TagUpdate> modelAttrs, List<TagUpdate> jobAttrs) {
 
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
-        var importModel = ImportModelJob.newBuilder()
-                .setLanguage(stubModel.getLanguage())
-                .setRepository(stubModel.getRepository())
-                .setPath(stubModel.getPath())
-                .setEntryPoint(stubModel.getEntryPoint())
-                .setVersion(stubModel.getVersion())
-                .addAllModelAttrs(modelAttrs)
-                .build();
-
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(tenant)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.IMPORT_MODEL)
-                        .setImportModel(importModel))
-                .addAllJobAttrs(jobAttrs)
-                .build();
-
-        // Developer note: This test will fail running locally if the latest commit is not pushed to GitHub
-        // It doesn't need to be merged, but the commit must exist on your origin / fork
-
-        var jobStatus = runJob(orchClient, jobRequest);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var modelSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(tenant)
-                .setSearchParams(SearchParameters.newBuilder()
-                        .setObjectType(ObjectType.MODEL)
-                        .setSearch(SearchExpression.newBuilder()
-                                .setTerm(SearchTerm.newBuilder()
-                                        .setAttrName("trac_create_job")
-                                        .setAttrType(BasicType.STRING)
-                                        .setOperator(SearchOperator.EQ)
-                                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
-                .build();
-
-        var modelSearchResult = metaClient.search(modelSearch);
-
-        Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
-
-        var searchResult = modelSearchResult.getSearchResult(0);
-        var modelReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
-                .build();
-
-        return metaClient.readObject(modelReq);
-    }
 }
