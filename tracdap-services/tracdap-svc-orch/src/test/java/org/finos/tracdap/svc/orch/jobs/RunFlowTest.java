@@ -827,7 +827,7 @@ public class RunFlowTest {
                 .setValue(MetadataCodec.encodeValue("run_flow:struct_import_model"))
                 .build());
 
-        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelTag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
         var modelDef = modelTag.getDefinition().getModel();
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
 
