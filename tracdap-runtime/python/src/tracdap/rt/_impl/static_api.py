@@ -277,7 +277,7 @@ class StaticApiImpl(_StaticApiHook):
         return _meta.ModelResource(
             resourceType=_meta.ResourceType.EXTERNAL_SYSTEM,
             protocol=protocol, subProtocol=sub_protocol,
-            system=_meta.ModelSystemDetails(client_type=client_type_name))
+            system=_meta.ModelSystemDetails(clientType=client_type_name))
 
     @staticmethod
     def _build_named_dict(

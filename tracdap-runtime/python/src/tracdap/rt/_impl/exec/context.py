@@ -1161,7 +1161,7 @@ class TracContextValidator(TracContextErrorReporter):
     def check_external_system_client_type(self, system_name, system, client_type):
 
         model_system = self.__model_def.resources.get(system_name)
-        model_type_name = model_system.system.client_type if model_system and model_system.system else None
+        model_type_name = model_system.system.clientType if model_system and model_system.system else None
         client_type_name = _util.qualified_type_name(client_type)
 
         if client_type_name != model_type_name:

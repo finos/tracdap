@@ -609,9 +609,9 @@ class StaticValidator:
             if resource.resourceType == meta.ResourceType.EXTERNAL_SYSTEM:
                 if resource.protocol is None or len(resource.protocol) == 0:
                     cls._fail(f"Invalid model resource: [{resource_name}] protocol is missing")
-                if resource.system.client_type is None or len(resource.system.client_type) == 0:
+                if resource.system.clientType is None or len(resource.system.clientType) == 0:
                     cls._fail(f"Invalid model resource: [{resource_name}] client type is missing")
-                if not cls.__qualified_identifier_pattern.match(resource.system.client_type):
+                if not cls.__qualified_identifier_pattern.match(resource.system.clientType):
                     cls._fail(f"Invalid model resource: [{resource_name}] client type is not a valid Python type")
 
             else:
