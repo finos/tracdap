@@ -81,8 +81,8 @@ public class GraphBuilder {
 
     public GraphSection<NodeMetadata> buildRunFlowJob(RunFlowJob job) {
 
-        if (metadataBundle == null)
-            throw new ETracInternal("Metadata bundle is needed to build a job graph");
+        if (metadataBundle == null || resourceBundle == null)
+            throw new ETracInternal("Metadata and resource bundles are needed to build a job graph");
 
         var flowObj = metadataBundle.getObject(job.getFlow());
 
@@ -468,8 +468,13 @@ public class GraphBuilder {
                 }
             }
 
-            var updatedMetadata = nodeMetadata.withFlowNode(flowNode.build());
-            var updatedNode = node.withPayload(updatedMetadata);
+            var updatedMetadata = nodeMetadata
+                    .withFlowNode(flowNode.build());
+
+            var updatedNode = node
+                    .withDependencies(dependencies)
+                    .withPayload(updatedMetadata);
+
             nodes.put(node.nodeId(), updatedNode);
         }
 
