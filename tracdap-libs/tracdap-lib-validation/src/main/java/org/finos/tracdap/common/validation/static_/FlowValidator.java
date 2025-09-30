@@ -182,8 +182,9 @@ public class FlowValidator {
                 .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_OUTPUTS.getName()))
                 .pop();
 
+        // Resources are optional, model nodes with no resources are allowed
         ctx = ctx.pushRepeated(FN_RESOURCES)
-                .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
+                .apply(CommonValidators.onlyIf(isModelNode, isModelNodeQualifier))
                 .applyRepeated(CommonValidators::identifier, String.class)
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
