@@ -1187,7 +1187,7 @@ public class RunModelTest {
 
         Assertions.assertEquals(List.of("repo_owner","repo_name","description","license","last_push"), csvHeaders);
 
-        // Check the dynamic filter was applied successfully
+        // Look for expected words in the output data
 
         Assertions.assertTrue(csvText.contains("tracdap"));
         Assertions.assertTrue(csvText.contains("Apache License 2.0"));
