@@ -645,7 +645,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
                 var venvPath = workingDir.resolve("venv");
                 var venvPb = new ProcessBuilder();
-                venvPb.command("python", "-m", "venv", venvPath.toString());
+                venvPb.command("python3", "-m", "venv", venvPath.toString());
 
                 var venvP = venvPb.start();
                 venvP.waitFor(60, TimeUnit.SECONDS);
