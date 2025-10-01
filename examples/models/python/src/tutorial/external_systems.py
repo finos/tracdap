@@ -13,8 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as _tp
-
 import tracdap.rt.api.experimental as trac
 import pandas as pd
 import http.client as hc
@@ -24,11 +22,11 @@ import datetime as dt
 
 class ExternalCall(trac.TracModel):
 
-    def define_parameters(self) -> _tp.Dict[str, trac.ModelParameter]:
+    def define_parameters(self) -> dict[str, trac.ModelParameter]:
 
         pass
 
-    def define_inputs(self) -> _tp.Dict[str, trac.ModelInputSchema]:
+    def define_inputs(self) -> dict[str, trac.ModelInputSchema]:
 
         repo_list_schema = trac.define_input_table(
             trac.F("repo_owner", trac.STRING, "Repository owner (individual or organization)"),
@@ -36,7 +34,7 @@ class ExternalCall(trac.TracModel):
 
         return { "repo_list": repo_list_schema }
 
-    def define_outputs(self) -> _tp.Dict[str, trac.ModelOutputSchema]:
+    def define_outputs(self) -> dict[str, trac.ModelOutputSchema]:
 
         repo_details_schema = trac.define_output_table(
             trac.F("repo_owner", trac.STRING, "Repository owner (individual or organization)"),
@@ -47,7 +45,7 @@ class ExternalCall(trac.TracModel):
 
         return { "repo_details": repo_details_schema }
 
-    def define_resources(self) -> _tp.Dict[str, trac.ModelResource]:
+    def define_resources(self) -> dict[str, trac.ModelResource]:
 
         return { "github_api": trac.define_external_system("http", hc.HTTPSConnection) }
 
