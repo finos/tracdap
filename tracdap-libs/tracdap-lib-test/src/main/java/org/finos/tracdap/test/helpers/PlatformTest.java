@@ -66,6 +66,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
@@ -658,15 +660,20 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                         .toString();
 
                 var tracRtDistDir = tracRepoDir.resolve(TRAC_RUNTIME_DIST_DIR);
-                var tracRtWhl = Files.find(tracRtDistDir, 1, (file, attrs) -> file.toString().endsWith(".whl"))
-                        .findFirst();
 
-                if (tracRtWhl.isEmpty())
-                    throw new RuntimeException("Could not find TRAC runtime wheel");
+                var corePackages = List.of(pythonExe, "-m", "pip", "install", "pandas", "polars");
+                var pipInstall = new ArrayList<>(corePackages);
+
+                try (var tracRtWheels = Files.find(tracRtDistDir, 1, (file, attrs) -> file.toString().endsWith(".whl"))) {
+                    tracRtWheels.map(Path::toString).forEach(pipInstall::add);
+                }
+
+                if (pipInstall.size() <= corePackages.size())
+                    throw new RuntimeException("Could not find TRAC runtime wheels");
 
                 // Include optional packages needed for end-to-end testing
                 var pipPB = new ProcessBuilder();
-                pipPB.command(pythonExe, "-m", "pip", "install", tracRtWhl.get().toString(), "pandas", "polars");
+                pipPB.command(pipInstall);
                 pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
 
                 var pipP = pipPB.start();
