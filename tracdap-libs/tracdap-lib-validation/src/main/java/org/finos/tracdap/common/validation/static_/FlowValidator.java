@@ -410,25 +410,36 @@ public class FlowValidator {
             else if (socket.hasField(FS_SOCKET))
                 ctx.error(String.format("Source node [%s] is a Resource node, do not specify a [socket]", socket.getNode()));
         }
-        else {
-
-            var inputOrOutput = ctx.field().equals(FE_SOURCE) ? "output" : "input";
-            var modelSockets = ctx.field().equals(FE_SOURCE)
-                    ? node.getOutputsList()
-                    : node.getInputsList();
+        else if (node.getNodeType() == FlowNodeType.MODEL_NODE) {
 
             if (!socket.hasField(FS_SOCKET)) {
 
                 ctx.error(String.format(
                         "%s node [%s] is a model node, specify a [socket] to connect to a model %s",
-                        socketType, socket.getNode(), inputOrOutput));
+                        socketType, socket.getNode(), ctx.field().equals(FE_SOURCE) ? "output" : "input"));
             }
-            else if (!modelSockets.contains(socket.getSocket())) {
+            else if (ctx.field().equals(FE_SOURCE)) {
+                if (!node.getOutputsList().contains(socket.getSocket())) {
 
-                ctx.error(String.format(
-                        "Socket [%s] is not an %s of node [%s]",
-                        socket.getSocket(), inputOrOutput, socket.getNode()));
+                    ctx.error(String.format(
+                            "Socket [%s] is not an output of node [%s]",
+                            socket.getSocket(), socket.getNode()));
+                }
             }
+            else {
+                if (!node.getParametersList().contains(socket.getSocket()) &&
+                    !node.getInputsList().contains(socket.getSocket()) &&
+                    !node.getResourcesList().contains(socket.getSocket())) {
+
+                    ctx.error(String.format(
+                            "Socket [%s] is not a parameter, input or resource of node [%s]",
+                            socket.getSocket(), socket.getNode()));
+                }
+            }
+        }
+        else {
+            // Unknown node type
+            throw new EUnexpected();
         }
 
         return ctx;
@@ -524,7 +535,8 @@ public class FlowValidator {
         // Initial set of reachable flow nodes is just the input nodes
         for (var node : remainingNodes.entrySet()) {
             if (node.getValue().getNodeType() == FlowNodeType.PARAMETER_NODE ||
-                node.getValue().getNodeType() == FlowNodeType.INPUT_NODE) {
+                node.getValue().getNodeType() == FlowNodeType.INPUT_NODE ||
+                node.getValue().getNodeType() == FlowNodeType.RESOURCE_NODE) {
                 reachableNodes.put(node.getKey(), node.getValue());
             }
         }

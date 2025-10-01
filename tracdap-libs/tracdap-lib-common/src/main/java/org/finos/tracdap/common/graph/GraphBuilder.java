@@ -360,6 +360,7 @@ public class GraphBuilder {
                 case RESOURCE_NODE:
                     var resourceNode = addRuntimeResource(node, resources);
                     updatedNodes.put(node.nodeId(), resourceNode);
+                    break;
 
                 default:
                     throw new EUnexpected();
