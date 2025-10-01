@@ -118,6 +118,10 @@ class OpenAIPlugin(_external.IExternalSystem):
 
         return future.result()
 
+    def close_client(self, client: object):
+
+        client.close()  # noqa
+
     def _create_client_internal(self, client_type: type, **client_args) -> object:
 
         if client_type == openai.OpenAI:
@@ -211,10 +215,6 @@ class OpenAIPlugin(_external.IExternalSystem):
 
         if value is not None:
             args[key] = value
-
-    def close_client(self, client: object):
-
-        client.close()  # noqa
 
     def __factory_main(self):
 
