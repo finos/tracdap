@@ -96,4 +96,4 @@ class GitHubProjectDetails(trac.TracModel):
 
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(GitHubProjectDetails, "config/external_systems.yaml", "config/sys_config.yaml")
+    launch.launch_model(GitHubProjectDetails, "config/external_systems.yaml", "config/sys_config_ext.yaml")

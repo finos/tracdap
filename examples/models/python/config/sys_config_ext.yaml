@@ -25,3 +25,11 @@ resources:
     protocol: LOCAL
     properties:
       rootPath: ../data/exports
+
+  github_api:
+    resourceType: EXTERNAL_SYSTEM
+    protocol: http
+    properties:
+      host: api.github.com
+      port: 443
+      tls: true
