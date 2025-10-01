@@ -45,3 +45,11 @@ tenants:
         protocol: git
         properties:
           repoUrl: ${TRAC_GIT_REPO}
+
+      github_api:
+        resourceType: EXTERNAL_SYSTEM
+        protocol: http
+        properties:
+          host: api.github.com
+          port: 443
+          tls: true

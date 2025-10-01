@@ -56,6 +56,7 @@ public class RunModelTest {
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
     private static final String INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String STRUCT_INPUT_PATH = "examples/models/python/data/inputs/structured_run_config.json";
+    private static final String EXT_SYS_INPUT_PATH = "examples/models/python/data/inputs/repo_list.csv";
 
     // Only test E2E run model using the local repo
     // E2E model loading with different repo types is tested in ImportModelTest
@@ -96,11 +97,17 @@ public class RunModelTest {
     static TagHeader structInputDataId;
     static TagHeader structOutputDataId;
 
+    static TagHeader externalSystemsModelId;
+    static SchemaDefinition externalSystemsInputSchema;
+    static TagHeader externalSystemsDataId;
+    static TagHeader externalSystemsOutputId;
+
     static TagHeader jobId_importModel;
     static TagHeader jobId_importModel_optionalIO;
     static TagHeader jobId_importModel_dynamicIO;
     static TagHeader jobId_importModel_fileIO;
     static TagHeader jobId_importModel_struct;
+    static TagHeader jobId_importModel_externalSystems;
 
     static TagHeader jobId_runModel;
     static TagHeader jobId_runModel_optionalIO;
@@ -108,6 +115,7 @@ public class RunModelTest {
     static TagHeader jobId_runModel_fileIO;
     static TagHeader jobId_runModel_fileIO_stream;
     static TagHeader jobId_runModel_struct;
+    static TagHeader jobId_runModel_externalSystems;
 
     @Test @Order(101)
     void importModel() throws Exception {
@@ -322,6 +330,51 @@ public class RunModelTest {
         structModelInputSchema = modelDef.getInputsOrThrow("run_config").getSchema();
     }
 
+    @Test @Order(106)
+    void importModel_externalSystems() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for external systems...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.external_systems.GitHubProjectDetails")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_model:external_systems"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_model:external_systems_import_model"))
+                .build());
+
+        jobId_importModel_externalSystems = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+    }
+
+    @Test @Order(206)
+    void importModel_externalSystems_result() {
+
+        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_externalSystems);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_model:external_systems", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.external_systems.GitHubProjectDetails", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.containsInputs("repo_list"));
+        Assertions.assertTrue(modelDef.containsOutputs("repo_details"));
+        Assertions.assertTrue(modelDef.containsResources("github_api"));
+
+        externalSystemsModelId = modelTag.getHeader();
+        externalSystemsInputSchema = modelDef.getInputsOrThrow("repo_list").getSchema();
+    }
+
+
     @Test @Order(301)
     void loadInputData() throws Exception {
 
@@ -471,6 +524,47 @@ public class RunModelTest {
         Assertions.assertEquals(4, datasetSchema.getStruct().getFieldsCount());
 
         log.info("Struct input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
+    }
+
+    @Test @Order(303)
+    void loadInputData_externalSystems() throws Exception {
+
+        log.info("Loading external systems input data...");
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var inputPath = platform.tracRepoDir().resolve(EXT_SYS_INPUT_PATH);
+        var inputBytes = Files.readAllBytes(inputPath);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(externalSystemsInputSchema)
+                .setFormat("text/csv")
+                .setContent(ByteString.copyFrom(inputBytes))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_dataset")
+                        .setValue(MetadataCodec.encodeValue("run_model:repo_list")))
+                .build();
+
+        externalSystemsDataId = dataClient.createSmallDataset(writeRequest);
+
+        var dataSelector = MetadataUtil.selectorFor(externalSystemsDataId);
+        var dataRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(dataSelector)
+                .build();
+
+        var dataTag = metaClient.readObject(dataRequest);
+
+        var datasetAttr = dataTag.getAttrsOrThrow("e2e_test_dataset");
+        var datasetSchema = dataTag.getDefinition().getData().getSchema();
+
+        Assertions.assertEquals("run_model:repo_list", MetadataCodec.decodeStringValue(datasetAttr));
+        Assertions.assertEquals(SchemaType.TABLE_SCHEMA, datasetSchema.getSchemaType());
+        Assertions.assertEquals(2, datasetSchema.getTable().getFieldsCount());
+
+        log.info("External systems input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
     }
 
     @Test @Order(401)
@@ -865,6 +959,76 @@ public class RunModelTest {
         structOutputDataId = dataTag.getHeader();
     }
 
+    @Test @Order(406)
+    void runModel_externalSystems() {
+
+        var orchClient = platform.orchClientBlocking();
+
+        var runModel = RunModelJob.newBuilder()
+                .setModel(MetadataUtil.selectorFor(externalSystemsModelId))
+                .putInputs("repo_list", MetadataUtil.selectorFor(externalSystemsDataId))
+                .putResources("github_api", "github_api")
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_model:repo_details")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setRunModel(runModel))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_model:external_systems")))
+                .build();
+
+        jobId_runModel_externalSystems = Helpers.startJob(orchClient, jobRequest).getJobId();
+    }
+
+    @Test @Order(506)
+    void runModel_externalSystems_result() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_runModel_externalSystems);
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var searchResult = dataSearchResult.getSearchResult(0);
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_model:repo_details", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        externalSystemsOutputId = dataTag.getHeader();
+    }
+
     @Test @Order(601)
     void checkOutputData() {
 
@@ -996,5 +1160,36 @@ public class RunModelTest {
 
         // Model should have added this scenario, just look for its name
         Assertions.assertTrue(jsonText.contains("hpi_shock"));
+    }
+
+    @Test @Order(606)
+    void checkOutputData_externalSystems() {
+
+        log.info("Checking external systems output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(externalSystemsOutputId))
+                .setFormat("text/csv")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("repo_owner","repo_name","description","license","last_push"), csvHeaders);
+
+        // Check the dynamic filter was applied successfully
+
+        Assertions.assertTrue(csvText.contains("tracdap"));
+        Assertions.assertTrue(csvText.contains("Apache License 2.0"));
     }
 }
