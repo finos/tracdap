@@ -13,18 +13,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import tracdap.rt.api.experimental as trac
+import tracdap.rt.api as trac
 import pandas as pd
 import http.client as hc
 import json
 import datetime as dt
 
 
-class ExternalCall(trac.TracModel):
+class GitHubProjectDetails(trac.TracModel):
 
     def define_parameters(self) -> dict[str, trac.ModelParameter]:
 
-        pass
+        return {}
 
     def define_inputs(self) -> dict[str, trac.ModelInputSchema]:
 
@@ -63,22 +63,27 @@ class ExternalCall(trac.TracModel):
                 details = self.get_repo_details(github_api, row["repo_owner"], row["repo_name"])
                 repo_details.append(details)
 
-                ctx.log.info(repo_details)
+                ctx.log.info(f"{details['repo_name']}: {details['description']}")
 
         ctx.put_pandas_table("repo_details", pd.DataFrame(repo_details))
 
     @staticmethod
     def get_repo_details(github_api: hc.HTTPSConnection, repo_owner, repo_name):
 
+        headers = {"user-agent": "TRAC Modelling Examples", "accept": "application/json"}
         repo_url = f"/repos/{repo_owner}/{repo_name}"
-        github_api.request("GET", repo_url)
+        github_api.request("GET", repo_url, headers=headers)
 
         repo_response = github_api.getresponse()
-        repo_details = json.load(repo_response)
 
-        description = repo_details["description"]
+        if repo_response.status != 200:
+            raise RuntimeError(f"Failed to get repo details: {repo_response.reason} ({repo_response.status})")
+
+        repo_details = json.loads(repo_response.read())
+
+        description = repo_details.get("description")
         license_ = repo_details["license"]["name"]
-        last_push = dt.datetime.fromisoformat(repo_details["pushed_at"])
+        last_push = dt.datetime.fromisoformat(repo_details["pushed_at"]).replace(tzinfo=None)
 
         return {
             "repo_owner": repo_owner,
@@ -87,3 +92,8 @@ class ExternalCall(trac.TracModel):
             "license": license_,
             "last_push": last_push
         }
+
+
+if __name__ == "__main__":
+    import tracdap.rt.launch as launch
+    launch.launch_model(GitHubProjectDetails, "config/external_systems.yaml", "config/sys_config.yaml")
