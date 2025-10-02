@@ -1190,6 +1190,7 @@ class NodeLogger:
         PUSH_POP = 2
         SIMPLE_MAPPING = 3
         MODEL = 4
+        RESOURCE = 5
 
     def log_node_start(self, node: _EngineNode):
 
@@ -1203,6 +1204,9 @@ class NodeLogger:
         elif logging_type in [self.LoggingType.SIMPLE_MAPPING]:
             self._log.info(f"MAP {self._value_type(node)} [{self._mapping_source(node)}] -> [{node_name}] / {namespace}")
 
+        elif logging_type == self.LoggingType.RESOURCE:
+            self._log.info(f"USE {self._func_type(node)} [{node_name}] / {namespace}")
+
         else:
             self._log.info(f"START {self._func_type(node)} [{node_name}] / {namespace}")
 
@@ -1212,7 +1216,7 @@ class NodeLogger:
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        if logging_type in [self.LoggingType.STATIC_VALUE, self.LoggingType.SIMPLE_MAPPING]:
+        if logging_type in [self.LoggingType.STATIC_VALUE, self.LoggingType.SIMPLE_MAPPING, self.LoggingType.RESOURCE]:
             return
 
         if logging_type == self.LoggingType.PUSH_POP:
@@ -1237,7 +1241,7 @@ class NodeLogger:
         node_name = node.node.id.name
         namespace = node.node.id.namespace
 
-        if logging_type in [self.LoggingType.STATIC_VALUE, self.LoggingType.SIMPLE_MAPPING]:
+        if logging_type in [self.LoggingType.STATIC_VALUE, self.LoggingType.SIMPLE_MAPPING, self.LoggingType.RESOURCE]:
             return
 
         self._log.info(f"EVICT {self._func_type(node)} [{node_name}] / {namespace}")
@@ -1275,6 +1279,9 @@ class NodeLogger:
 
         if isinstance(node.node, _graph.RunModelNode):
             return cls.LoggingType.MODEL
+
+        if isinstance(node.node, _graph.ResourceNode):
+            return cls.LoggingType.RESOURCE
 
         return cls.LoggingType.DEFAULT
 
