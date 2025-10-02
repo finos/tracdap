@@ -162,7 +162,6 @@ class GraphContext:
     ctx_namespace: NodeNamespace
 
     sys_config: _cfg.RuntimeConfig
-    resource_mapping: _tp.Dict[str, str]
 
 
 @_dc.dataclass(frozen=True)
@@ -286,6 +285,17 @@ class ContextPopNode(Node[Bundle[_tp.Any]]):
         return {nid: DependencyType.HARD for nid in self.mapping.keys()}
 
 
+# RESOURCES
+
+
+@_node_type
+class ResourceNode(Node[_tp.Any]):
+
+    resource_key: str
+    resource_type: _meta.ResourceType
+    model_resource: _tp.Optional[_meta.ModelResource] = None
+
+
 # DATA HANDLING
 
 
@@ -381,6 +391,7 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     model_def: _meta.ModelDefinition
     model_scope: str
 
+    resource_ids: _tp.FrozenSet[NodeId]
     parameter_ids: _tp.FrozenSet[NodeId]
     input_ids: _tp.FrozenSet[NodeId]
 
@@ -390,7 +401,7 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     graph_context: _tp.Optional[GraphContext] = None
 
     def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
-        return {dep_id: DependencyType.HARD for dep_id in [*self.parameter_ids, *self.input_ids]}
+        return {dep_id: DependencyType.HARD for dep_id in [*self.resource_ids, *self.parameter_ids, *self.input_ids]}
 
 
 # RESULTS PROCESSING
