@@ -529,9 +529,11 @@ public class RunFlowTest {
 
         var metaClient = platform.metaClientBlocking();
 
+        // Use a different name for the resource node, to test flow wiring
+
         var flowDef = FlowDefinition.newBuilder()
                 .putNodes("repo_list", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNodes("github_api", FlowNode.newBuilder().setNodeType(FlowNodeType.RESOURCE_NODE).build())
+                .putNodes("github_api_mapped", FlowNode.newBuilder().setNodeType(FlowNodeType.RESOURCE_NODE).build())
                 .putNodes("github_projects", FlowNode.newBuilder()
                         .setNodeType(FlowNodeType.MODEL_NODE)
                         .addInputs("repo_list")
@@ -545,7 +547,7 @@ public class RunFlowTest {
                         .setSource(FlowSocket.newBuilder().setNode("repo_list"))
                         .setTarget(FlowSocket.newBuilder().setNode("github_projects").setSocket("repo_list")))
                 .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("github_api"))
+                        .setSource(FlowSocket.newBuilder().setNode("github_api_mapped"))
                         .setTarget(FlowSocket.newBuilder().setNode("github_projects").setSocket("github_api")))
                 .addEdges(FlowEdge.newBuilder()
                         .setSource(FlowSocket.newBuilder().setNode("github_projects").setSocket("repo_details"))
@@ -942,7 +944,7 @@ public class RunFlowTest {
         var runFlow = RunFlowJob.newBuilder()
                 .setFlow(MetadataUtil.selectorFor(externalSystemsFlowId))
                 .putInputs("repo_list", MetadataUtil.selectorFor(externalSystemsInputDataId))
-                .putResources("github_api", "github_api")
+                .putResources("github_api_mapped", "github_api")
                 .putModels("github_projects", MetadataUtil.selectorFor(externalSystemsModelId))
                 .addOutputAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_data")
