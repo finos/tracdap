@@ -17,6 +17,7 @@ import typing as _tp
 import dataclasses as _dc
 
 import tracdap.rt._impl.core.data as _data
+import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 
@@ -289,7 +290,7 @@ class ContextPopNode(Node[Bundle[_tp.Any]]):
 
 
 @_node_type
-class ResourceNode(Node[_tp.Any]):
+class ResourceNode(Node[_resources.Resource]):
 
     resource_key: str
     resource_type: _meta.ResourceType

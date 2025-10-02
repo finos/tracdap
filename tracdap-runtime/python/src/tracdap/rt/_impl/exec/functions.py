@@ -220,12 +220,12 @@ class ContextPopFunc(_ContextPushPopFunc):
 
 class ResourceFunc(NodeFunction):
 
-    def __init__(self, node: ResourceNode, resource: tp.Any):
+    def __init__(self, node: ResourceNode, resource: _resources.Resource):
         super().__init__()
         self.node = node
         self.resource = resource
 
-    def _execute(self, ctx: NodeContext) -> tp.Any:
+    def _execute(self, ctx: NodeContext) -> _resources.Resource:
         return self.resource
 
 

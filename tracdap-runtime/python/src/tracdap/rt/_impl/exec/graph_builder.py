@@ -20,6 +20,7 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data
+import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.type_system as _type_system
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt.api as _api
@@ -385,7 +386,7 @@ class GraphBuilder:
                 self._error(_ex.EJobValidation(f"Missing required resource: [{resource_name}]"))
                 continue
 
-            resource_id = NodeId(resource_name, self._job_namespace, _tp.Any)
+            resource_id = NodeId(resource_name, self._job_namespace, _resources.Resource)
             resource_node = ResourceNode(
                 resource_id, resource_key,
                 resource_type, model_resource,
@@ -713,7 +714,7 @@ class GraphBuilder:
         self.check_model_type(model_def, job_def)
 
         def resource_id(resource_name):
-            return NodeId(resource_name, namespace, _tp.Any)
+            return NodeId(resource_name, namespace, _resources.Resource)
 
         def param_id(node_name):
             return NodeId(node_name, namespace, _meta.Value)
@@ -862,7 +863,7 @@ class GraphBuilder:
             return socket_id(edge.source.node, edge.source.socket, result_type)
 
         if node.nodeType == _meta.FlowNodeType.RESOURCE_NODE:
-            return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=_tp.Any)})
+            return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=_resources.Resource)})
 
         if node.nodeType == _meta.FlowNodeType.PARAMETER_NODE:
             return GraphSection({}, inputs={NodeId(node_name, namespace, result_type=_meta.Value)})
@@ -877,7 +878,7 @@ class GraphBuilder:
 
         if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
 
-            resource_mapping = {socket: edge_mapping(node_name, socket, _tp.Any) for socket in node.resources}
+            resource_mapping = {socket: edge_mapping(node_name, socket, _resources.Resource) for socket in node.resources}
             param_mapping = {socket: edge_mapping(node_name, socket, _meta.Value) for socket in node.parameters}
             input_mapping = {socket: edge_mapping(node_name, socket, _data.DataView) for socket in node.inputs}
             output_mapping = {socket: socket_id(node_name, socket, _data.DataView) for socket in node.outputs}
