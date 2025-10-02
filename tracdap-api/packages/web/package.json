@@ -23,7 +23,7 @@
   "main": "tracdap.js",
   "dependencies": {
     "grpc-web": "~2.0.2",
-    "protobufjs": "~7.5.4"
+    "protobufjs": "~7.4.0"
   },
   "devDependencies": {
     "protobufjs-cli": "~1.1.3",
