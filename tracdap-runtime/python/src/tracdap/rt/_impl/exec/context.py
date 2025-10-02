@@ -122,9 +122,8 @@ class TracContextImpl(_api.TracContext):
 
     :param model_def: Definition object for the model that will run in this context
     :param model_class: Type for the model that will run in this context
-    :param local_ctx: Dictionary of all parameters, inputs and outputs that will be available to the model
-            Parameters are supplied as python native types.
-            Output views will contain schemas but no data.
+    :param local_ctx: Dictionary of all parameters, inputs, outputs and resources that will be available to the model.
+            Parameters are supplied as python native types. Output views will contain schemas but no data.
     """
 
     def __init__(self,
@@ -132,7 +131,6 @@ class TracContextImpl(_api.TracContext):
                  model_class: _api.TracModel.__class__,
                  local_ctx: tp.Dict[str, tp.Any],
                  dynamic_outputs: tp.List[str] = None,
-                 resources: tp.Dict[str, tp.Any] = None,
                  log_provider: _logging.LogProvider = None,
                  checkout_directory: pathlib.Path = None):
 
@@ -147,14 +145,12 @@ class TracContextImpl(_api.TracContext):
         self.__model_class = model_class
         self.__local_ctx = local_ctx if local_ctx is not None else {}
         self.__dynamic_outputs = dynamic_outputs if dynamic_outputs is not None else []
-        self.__resources = resources if resources is not None else {}
         self.__rct = _util.RuntimeContextTracking()
 
         self.__val = TracContextValidator(
             self.__ctx_log,
             self.__model_def,
             self.__local_ctx,
-            self.__resources,
             self.__dynamic_outputs,
             checkout_directory)
 
@@ -327,7 +323,7 @@ class TracContextImpl(_api.TracContext):
         self.__val.check_item_defined_in_model(system_name, TracContextValidator.SYSTEM)
         self.__val.check_item_available_in_context(system_name, TracContextValidator.SYSTEM)
 
-        system = self.__resources.get(system_name)
+        system = self.__local_ctx.get(system_name)
 
         self.__val.check_context_object_type(system_name, system, TracExternalSystemWrapper)
         self.__val.check_external_system_client_type(system_name, system, client_type)
@@ -547,7 +543,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
             storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage, _eapi.TracDataStorage]],
             log_provider: _logging.LogProvider = None, checkout_directory: pathlib.Path = None):
 
-        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, storage_map, log_provider, checkout_directory)
+        super().__init__(model_def, model_class, local_ctx, dynamic_outputs, log_provider, checkout_directory)
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
@@ -939,7 +935,6 @@ class TracContextValidator(TracContextErrorReporter):
             self, log: logging.Logger,
             model_def: _meta.ModelDefinition,
             local_ctx: tp.Dict[str, tp.Any],
-            resources: tp.Dict[str, tp.Any],
             dynamic_outputs: tp.List[str],
             checkout_directory: pathlib.Path):
 
@@ -947,7 +942,6 @@ class TracContextValidator(TracContextErrorReporter):
 
         self.__model_def = model_def
         self.__local_ctx = local_ctx
-        self.__resources = resources
         self.__dynamic_outputs = dynamic_outputs
 
     def check_item_valid_identifier(self, item_name: str, item_type: str):
@@ -985,16 +979,12 @@ class TracContextValidator(TracContextErrorReporter):
 
     def check_item_available_in_context(self, item_name: str, item_type: str):
 
-        ctx = self.__resources if item_type in [self.SYSTEM] else self.__local_ctx
-
-        if item_name not in ctx:
+        if item_name not in self.__local_ctx:
             self._report_error(f"{item_type} {item_name} is not available in the current context")
 
     def check_item_not_available_in_context(self, item_name: str, item_type: str):
 
-        ctx = self.__resources if item_type in [self.SYSTEM] else self.__local_ctx
-
-        if item_name in ctx:
+        if item_name in self.__local_ctx:
             self._report_error(f"{item_type} {item_name} already exists in the current context")
 
     def check_dataset_is_dynamic_output(self, dataset_name: str):
