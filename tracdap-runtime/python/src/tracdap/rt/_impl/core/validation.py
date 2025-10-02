@@ -86,14 +86,21 @@ def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -
 
         def __init__(self, delegate: T_PLUGIN):
             self.__delegate = delegate
+            self.__cache = dict()
 
         def __getattr__(self, name: str) -> tp.Any:
+
+            # Do not create a new wrapped method object on every call
+            cache_method = self.__cache.get(name)
+            if cache_method:
+                return cache_method
 
             # Use abstract method to validate (concrete plugin may have bad annotations)
             abstract_method = getattr(plugin_api, name)
             concrete_method = getattr(self.__delegate, name)
 
             if abstract_method is None or not callable(abstract_method):
+                self.__cache[name] = concrete_method
                 return concrete_method
 
             def wrapped_method(*args, **kwargs):
@@ -108,6 +115,7 @@ def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -
                     message = f"Invalid plugin: [{util.qualified_type_name(type(plugin))}] {detail}"
                     raise ex.EPluginConformance(message) from e
 
+            self.__cache[name] = wrapped_method
             return wrapped_method
 
     plugin_validation_wrapper.__registrations[plugin_api] = PluginValidationWrapper
