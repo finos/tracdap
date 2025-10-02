@@ -25,6 +25,7 @@ import org.finos.tracdap.metadata.*;
 import com.google.protobuf.Descriptors;
 
 import java.util.HashMap;
+import java.util.List;
 
 import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_ENTRY_POINT;
 import static org.finos.tracdap.common.validation.ValidationConstants.MODEL_VERSION;
@@ -43,6 +44,7 @@ public class ModelValidator {
     private static final Descriptors.FieldDescriptor MD_PARAMETERS;
     private static final Descriptors.FieldDescriptor MD_INPUTS;
     private static final Descriptors.FieldDescriptor MD_OUTPUTS;
+    private static final Descriptors.FieldDescriptor MD_RESOURCES;
 
     private static final Descriptors.Descriptor MODEL_PARAMETER;
     private static final Descriptors.FieldDescriptor MP_PARAM_TYPE;
@@ -68,6 +70,15 @@ public class ModelValidator {
     private static final Descriptors.FieldDescriptor MOS_DYNAMIC;
     private static final Descriptors.FieldDescriptor MOS_OUTPUT_PROPS;
 
+    private static final Descriptors.Descriptor MODEL_RESOURCE;
+    private static final Descriptors.FieldDescriptor MR_RESOURCE_TYPE;
+    private static final Descriptors.FieldDescriptor MR_PROTOCOL;
+    private static final Descriptors.FieldDescriptor MR_SUB_PROTOCOL;
+    private static final Descriptors.FieldDescriptor MR_SYSTEM;
+
+    private static final Descriptors.Descriptor MODEL_SYSTEM_DETAILS;
+    private static final Descriptors.FieldDescriptor MSD_CLIENT_TYPE;
+
     static {
 
         MODEL_DEFINITION = ModelDefinition.getDescriptor();
@@ -79,6 +90,7 @@ public class ModelValidator {
         MD_PARAMETERS = field(MODEL_DEFINITION, ModelDefinition.PARAMETERS_FIELD_NUMBER);
         MD_INPUTS = field(MODEL_DEFINITION, ModelDefinition.INPUTS_FIELD_NUMBER);
         MD_OUTPUTS = field(MODEL_DEFINITION, ModelDefinition.OUTPUTS_FIELD_NUMBER);
+        MD_RESOURCES = field(MODEL_DEFINITION, ModelDefinition.RESOURCES_FIELD_NUMBER);
 
         MODEL_PARAMETER = ModelParameter.getDescriptor();
         MP_PARAM_TYPE = field(MODEL_PARAMETER, ModelParameter.PARAMTYPE_FIELD_NUMBER);
@@ -103,6 +115,15 @@ public class ModelValidator {
         MOS_OPTIONAL = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.OPTIONAL_FIELD_NUMBER);
         MOS_DYNAMIC = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.DYNAMIC_FIELD_NUMBER);
         MOS_OUTPUT_PROPS = field(MODEL_OUTPUT_SCHEMA, ModelOutputSchema.OUTPUTPROPS_FIELD_NUMBER);
+
+        MODEL_RESOURCE = ModelResource.getDescriptor();
+        MR_RESOURCE_TYPE = field(MODEL_RESOURCE, ModelResource.RESOURCETYPE_FIELD_NUMBER);
+        MR_PROTOCOL = field(MODEL_RESOURCE, ModelResource.PROTOCOL_FIELD_NUMBER);
+        MR_SUB_PROTOCOL = field(MODEL_RESOURCE, ModelResource.SUBPROTOCOL_FIELD_NUMBER);
+        MR_SYSTEM = field(MODEL_RESOURCE, ModelResource.SYSTEM_FIELD_NUMBER);
+
+        MODEL_SYSTEM_DETAILS = ModelSystemDetails.getDescriptor();
+        MSD_CLIENT_TYPE = field(MODEL_SYSTEM_DETAILS, ModelSystemDetails.CLIENTTYPE_FIELD_NUMBER);
     }
 
     @Validator
@@ -110,7 +131,7 @@ public class ModelValidator {
 
         ctx = modelDetails(MD_LANGUAGE, MD_REPOSITORY, MD_PATH, MD_ENTRY_POINT, MD_VERSION, ctx);
 
-        ctx = modelSchema(MD_PARAMETERS, MD_INPUTS, MD_OUTPUTS, ctx);
+        ctx = modelSchema(MD_PARAMETERS, MD_INPUTS, MD_OUTPUTS, MD_RESOURCES, ctx);
 
         return ctx;
     }
@@ -155,6 +176,7 @@ public class ModelValidator {
             Descriptors.FieldDescriptor paramsField,
             Descriptors.FieldDescriptor inputsField,
             Descriptors.FieldDescriptor outputsField,
+            Descriptors.FieldDescriptor resourcesField,
             ValidationContext ctx) {
 
         var knownIdentifiers = new HashMap<String, String>();
@@ -181,6 +203,14 @@ public class ModelValidator {
                 .apply(CommonValidators::caseInsensitiveDuplicates)
                 .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, outputsField.getName()))
                 .applyMapValues(ModelValidator::modelOutputSchema, ModelOutputSchema.class)
+                .pop();
+
+        ctx = ctx.pushMap(resourcesField)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, resourcesField.getName()))
+                .applyMapValues(ModelValidator::modelResource, ModelResource.class)
                 .pop();
 
         return ctx;
@@ -300,6 +330,53 @@ public class ModelValidator {
                 .pop();
 
         return ctx;
+    }
+
+    @Validator
+    public static ValidationContext modelResource(ModelResource msg, ValidationContext ctx) {
+
+        var MODEL_RESOURCE_TYPES = List.of(
+                ResourceType.EXTERNAL_STORAGE, ResourceType.EXTERNAL_SYSTEM);
+
+        ctx = ctx.push(MR_RESOURCE_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ResourceType.class)
+                .apply(CommonValidators::allowedEnums, ResourceType.class, MODEL_RESOURCE_TYPES)
+                .pop();
+
+        ctx = ctx.push(MR_PROTOCOL)
+                .applyIfElse(msg.getResourceType() == ResourceType.EXTERNAL_SYSTEM,
+                        CommonValidators::required,
+                        CommonValidators::optional)
+                .apply(CommonValidators::identifier)
+                .apply(CommonValidators::notTracReserved)
+                .pop();
+
+        ctx = ctx.push(MR_SUB_PROTOCOL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::identifier)
+                .apply(CommonValidators::notTracReserved)
+                .pop();
+
+        ctx = ctx.push(MR_SYSTEM)
+                .applyIfElse(msg.getResourceType() == ResourceType.EXTERNAL_SYSTEM,
+                        CommonValidators::required,
+                        CommonValidators::omitted)
+                .apply(ModelValidator::modelSystemDetails, ModelSystemDetails.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext modelSystemDetails(ModelSystemDetails msg, ValidationContext ctx) {
+
+        // Client type is a qualified class name, required when MSD is present
+
+        return ctx.push(MSD_CLIENT_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::qualifiedIdentifier)
+                .pop();
     }
 
     public static ValidationContext modelEntryPoint(String modelEntryPoint, ValidationContext ctx) {

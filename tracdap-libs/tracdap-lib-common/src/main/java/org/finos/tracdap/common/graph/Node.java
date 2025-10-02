@@ -34,6 +34,14 @@ public class Node<TPayload> {
         this.payload = payload;
     }
 
+    public Node<TPayload> withDependencies(Map<String, SocketId> dependencies) {
+        return new Node<>(nodeId, dependencies, outputs, payload);
+    }
+
+    public Node<TPayload> withPayload(TPayload payload) {
+        return new Node<>(nodeId, dependencies, outputs, payload);
+    }
+
     public NodeId nodeId() {
         return nodeId;
     }

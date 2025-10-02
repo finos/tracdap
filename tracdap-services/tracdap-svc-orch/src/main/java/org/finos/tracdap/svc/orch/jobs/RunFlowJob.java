@@ -22,9 +22,9 @@ import org.finos.tracdap.common.graph.GraphBuilder;
 import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.*;
@@ -51,12 +51,12 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata) {
 
         var resources = new HashSet<String>();
 
         // Storage requirements are the same for model / flow jobs
-        addRequiredStorage(metadata, tenantConfig, resources);
+        addRequiredStorage(metadata, resources);
 
         // Add repos for all referenced models
         metadata.getObjects().values().stream()
@@ -65,18 +65,21 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
                 .map(ModelDefinition::getRepository)
                 .forEach(resources::add);
 
+        // Add all target resources selected for the job
+        resources.addAll(job.getRunFlow().getResourcesMap().values());
+
         return new ArrayList<>(resources);
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         // No transformations currently required
         return job;
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         // Running the graph builder will apply any required auto-wiring and type inference to the flow
         // This creates a strictly consistent flow that can be sent to the runtime
@@ -84,7 +87,7 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
         var flowSelector = job.getRunFlow().getFlow();
 
         var jobNamespace = NodeNamespace.ROOT;
-        var builder = new GraphBuilder(jobNamespace, metadata);
+        var builder = new GraphBuilder(jobNamespace, metadata, resources);
         var graph = builder.buildJob(job);
 
         var strictFlow = builder.exportFlow(graph);

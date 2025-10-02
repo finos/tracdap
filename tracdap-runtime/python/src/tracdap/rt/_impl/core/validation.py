@@ -68,24 +68,39 @@ def is_primitive_type(basic_type: meta.BasicType) -> bool:
 
 T_PLUGIN = tp.TypeVar("T_PLUGIN")
 
+
 def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -> T_PLUGIN:
 
     # Create a wrapper that validates return values from plugin API calls
-    # A dynamic type would give better type similarity, but is more fiddly to set up
+    # Use ABC registration to pass isinstance() checks, only register each wrapper type once
     # Since plugins are not exposed directly to client code, this approach should suffice
+
+    if not hasattr(plugin_validation_wrapper, "__registrations"):
+        plugin_validation_wrapper.__registrations = {}
+
+    if plugin_api in plugin_validation_wrapper.__registrations:
+        wrapper_class = plugin_validation_wrapper.__registrations[plugin_api]
+        return wrapper_class(plugin)
 
     class PluginValidationWrapper:
 
         def __init__(self, delegate: T_PLUGIN):
             self.__delegate = delegate
+            self.__cache = dict()
 
         def __getattr__(self, name: str) -> tp.Any:
+
+            # Do not create a new wrapped method object on every call
+            cache_method = self.__cache.get(name)
+            if cache_method:
+                return cache_method
 
             # Use abstract method to validate (concrete plugin may have bad annotations)
             abstract_method = getattr(plugin_api, name)
             concrete_method = getattr(self.__delegate, name)
 
             if abstract_method is None or not callable(abstract_method):
+                self.__cache[name] = concrete_method
                 return concrete_method
 
             def wrapped_method(*args, **kwargs):
@@ -100,13 +115,11 @@ def plugin_validation_wrapper(plugin_api: tp.Type[T_PLUGIN], plugin: T_PLUGIN) -
                     message = f"Invalid plugin: [{util.qualified_type_name(type(plugin))}] {detail}"
                     raise ex.EPluginConformance(message) from e
 
+            self.__cache[name] = wrapped_method
             return wrapped_method
 
-        def __instancecheck__(self, instance: tp.Any) -> bool:
-            return isinstance(instance, plugin_api)
-
-        def __subclasscheck__(self, subclass: tp.Any) -> bool:
-            return issubclass(subclass, self._interface)
+    plugin_validation_wrapper.__registrations[plugin_api] = PluginValidationWrapper
+    plugin_api.register(PluginValidationWrapper)
 
     return PluginValidationWrapper(plugin)
 
@@ -609,9 +622,9 @@ class StaticValidator:
             if resource.resourceType == meta.ResourceType.EXTERNAL_SYSTEM:
                 if resource.protocol is None or len(resource.protocol) == 0:
                     cls._fail(f"Invalid model resource: [{resource_name}] protocol is missing")
-                if resource.system.client_type is None or len(resource.system.client_type) == 0:
+                if resource.system.clientType is None or len(resource.system.clientType) == 0:
                     cls._fail(f"Invalid model resource: [{resource_name}] client type is missing")
-                if not cls.__qualified_identifier_pattern.match(resource.system.client_type):
+                if not cls.__qualified_identifier_pattern.match(resource.system.clientType):
                     cls._fail(f"Invalid model resource: [{resource_name}] client type is not a valid Python type")
 
             else:

@@ -139,7 +139,7 @@ message ModelResource {
  */
 message ModelSystemDetails {
 
-    string client_type = 1;
+    string clientType = 1;
 }
 
 

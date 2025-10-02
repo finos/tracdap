@@ -50,6 +50,12 @@ enum FlowNodeType {
    * (TRAC can infer parameters by name if they are not defined explicitly)
    */
   PARAMETER_NODE = 4;
+
+  /**
+   * Resource nodes allow explicit mapping of resources into models
+   * (TRAC can infer resources by name if they are not defined explicitly)
+   */
+  RESOURCE_NODE = 5;
 }
 
 /**
@@ -64,6 +70,7 @@ message FlowNode {
   repeated string parameters = 7;
   repeated string inputs = 2;
   repeated string outputs = 3;
+  repeated string resources = 9;
 
   SearchExpression nodeSearch = 4;
   repeated TagUpdate nodeAttrs = 5;
@@ -117,4 +124,5 @@ message FlowDefinition {
   map<string, ModelParameter> parameters = 3;
   map<string, ModelInputSchema> inputs = 4;
   map<string, ModelOutputSchema> outputs = 5;
+  map<string, ModelResource> resources = 6;
 }

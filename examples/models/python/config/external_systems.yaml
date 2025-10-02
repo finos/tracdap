@@ -1,0 +1,12 @@
+
+job:
+  runModel:
+
+    resources:
+      github_api: github_api
+
+    inputs:
+      repo_list: "inputs/repo_list.csv"
+
+    outputs:
+      repo_details: "outputs/external_systems/repo_details.csv"

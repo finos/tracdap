@@ -551,7 +551,7 @@ class DevModeTranslator:
                 errors[target_key] = f"Flow target {target_name} is not provided by any node"
 
         for node_name, node in flow.nodes.items():
-            if node.nodeType == _meta.FlowNodeType.INPUT_NODE or node.nodeType == _meta.FlowNodeType.PARAMETER_NODE:
+            if node.nodeType in [_meta.FlowNodeType.INPUT_NODE, _meta.FlowNodeType.PARAMETER_NODE, _meta.FlowNodeType.RESOURCE_NODE]:
                 add_source(node_name, _meta.FlowSocket(node_name))
             if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
                 for model_output in node.outputs:
@@ -574,6 +574,8 @@ class DevModeTranslator:
                     add_edge(_meta.FlowSocket(node_name, model_input))
                 for model_param in node.parameters:
                     add_edge(_meta.FlowSocket(node_name, model_param))
+                for model_resource in node.resources:
+                    add_edge(_meta.FlowSocket(node_name, model_resource))
 
         if any(errors):
 
@@ -613,6 +615,11 @@ class DevModeTranslator:
 
         for node_name, node in flow.nodes.items():
 
+            if node.nodeType == _meta.FlowNodeType.RESOURCE_NODE and node_name not in flow.resources:
+                targets = edges_by_source.get(node_name) or []
+                model_resource = cls._infer_resource(node_name, targets, job_def, job_config)
+                updated_flow.resources[node_name] = model_resource
+
             if node.nodeType == _meta.FlowNodeType.PARAMETER_NODE and node_name not in flow.parameters:
                 targets = edges_by_source.get(node_name) or []
                 model_parameter = cls._infer_parameter(node_name, targets, job_def, job_config)
@@ -631,28 +638,56 @@ class DevModeTranslator:
         return updated_flow
 
     @classmethod
+    def _infer_resource(
+            cls, resource_name: str, targets: tp.List[_meta.FlowSocket],
+            job_def: _meta.JobDefinition, job_config: _cfg.JobConfig) \
+            -> _meta.ModelResource:
+
+        model_resources = cls._infer_targets(
+            resource_name, targets, lambda model: model.resources,
+            job_def, job_config)
+
+        model_resource: _meta.ModelResource = model_resources[0]
+
+        for i in range(1, len(targets)):
+
+            next_resource: _meta.ModelResource = model_resources[i]
+
+            if next_resource.resourceType != model_resource.resourceType:
+                err = f"Resource is ambiguous for [{resource_name}]: " + \
+                      f"Resource types are different for [{cls._socket_key(targets[0])}] and [{cls._socket_key(targets[i])}]"
+                raise _ex.EJobValidation(err)
+
+            if model_resource.protocol is None:
+                model_resource.protocol = next_resource.protocol
+            elif model_resource.protocol != next_resource.protocol:
+                err = f"Resource is ambiguous for [{resource_name}]: " + \
+                      f"Protocols are different for [{cls._socket_key(targets[0])}] and [{cls._socket_key(targets[i])}]"
+                raise _ex.EJobValidation(err)
+
+            if model_resource.subProtocol is None:
+                model_resource.subProtocol = next_resource.subProtocol
+            elif model_resource.subProtocol != next_resource.subProtocol:
+                err = f"Resource is ambiguous for [{resource_name}]: " + \
+                      f"Sub protocols are different for [{cls._socket_key(targets[0])}] and [{cls._socket_key(targets[i])}]"
+                raise _ex.EJobValidation(err)
+
+            # System details are informational, safe to remove if they are not a match
+            if model_resource.system is not None and next_resource.system is not None:
+                if model_resource.system != next_resource.system:
+                    model_resource.system = None
+
+        return model_resource
+
+    @classmethod
     def _infer_parameter(
             cls, param_name: str, targets: tp.List[_meta.FlowSocket],
             job_def: _meta.JobDefinition, job_config: _cfg.JobConfig) \
             -> _meta.ModelParameter:
 
-        model_params = []
-
-        for target in targets:
-
-            model_selector = job_def.runFlow.models.get(target.node)
-            model_obj = _util.get_job_metadata(model_selector, job_config)
-            model_param = model_obj.model.parameters.get(target.socket)
-            model_params.append(model_param)
-
-        if len(model_params) == 0:
-            err = f"Flow parameter [{param_name}] is not connected to any models, type information cannot be inferred" \
-                  + f" (either remove the parameter or connect it to a model)"
-            cls._log.error(err)
-            raise _ex.EJobValidation(err)
-
-        if len(model_params) == 1:
-            return model_params[0]
+        model_params = cls._infer_targets(
+            param_name, targets, lambda model: model.parameters,
+            job_def, job_config)
 
         model_param = model_params[0]
 
@@ -673,23 +708,9 @@ class DevModeTranslator:
             job_def: _meta.JobDefinition, job_config: _cfg.JobConfig) \
             -> _meta.ModelInputSchema:
 
-        model_inputs = []
-
-        for target in targets:
-
-            model_selector = job_def.runFlow.models.get(target.node)
-            model_obj = _util.get_job_metadata(model_selector, job_config)
-            model_input = model_obj.model.inputs.get(target.socket)
-            model_inputs.append(model_input)
-
-        if len(model_inputs) == 0:
-            err = f"Flow input [{input_name}] is not connected to any models, schema cannot be inferred" \
-                  + f" (either remove the input or connect it to a model)"
-            cls._log.error(err)
-            raise _ex.EJobValidation(err)
-
-        if len(model_inputs) == 1:
-            return model_inputs[0]
+        model_inputs = cls._infer_targets(
+            input_name, targets, lambda model: model.inputs,
+            job_def, job_config)
 
         model_input = model_inputs[0]
 
@@ -708,28 +729,43 @@ class DevModeTranslator:
             job_def: _meta.JobDefinition, job_config: _cfg.JobConfig) \
             -> _meta.ModelOutputSchema:
 
-        model_outputs = []
-
-        for source in sources:
-
-            model_selector = job_def.runFlow.models.get(source.node)
-            model_obj = _util.get_job_metadata(model_selector, job_config)
-            model_input = model_obj.model.outputs.get(source.socket)
-            model_outputs.append(model_input)
-
-        if len(model_outputs) == 0:
-            err = f"Flow output [{output_name}] is not connected to any models, schema cannot be inferred" \
-                  + f" (either remove the output or connect it to a model)"
-            cls._log.error(err)
-            raise _ex.EJobValidation(err)
+        # Lookup logic is the same for source and target sockets
+        model_outputs = cls._infer_targets(
+            output_name, sources, lambda model: model.outputs,
+            job_def, job_config)
 
         if len(model_outputs) > 1:
-            err = f"Flow output [{output_name}] is not to multiple models" \
+            err = f"Flow output [{output_name}] is connected to multiple models" \
                   + f" (only one model can supply one output)"
             cls._log.error(err)
             raise _ex.EJobValidation(err)
 
         return model_outputs[0]
+
+    @classmethod
+    def _infer_targets(
+            cls, node_name: str, targets, target_func: tp.Callable[[_meta.ModelDefinition], dict],
+            job_def: _meta.JobDefinition, job_config: _cfg.JobConfig):
+
+        # Common logic to look up inference targets
+
+        target_objects = []
+
+        for targets in targets:
+
+            model_selector = job_def.runFlow.models.get(targets.node)
+            model_obj = _util.get_job_metadata(model_selector, job_config)
+            target_map = target_func(model_obj.model)
+            target_obj = target_map.get(targets.socket)
+            target_objects.append(target_obj)
+
+        if len(target_objects) == 0:
+            err = f"Flow node [{node_name}] is not connected to any models, type inference is not possible" \
+                  + f" (either remove this node or connect it to a model)"
+            cls._log.error(err)
+            raise _ex.EJobValidation(err)
+
+        return target_objects
 
     @classmethod
     def _socket_key(cls, socket):

@@ -1,0 +1,35 @@
+
+
+properties:
+
+  storage.default.location: example_data
+  storage.default.format: CSV
+
+
+resources:
+
+  example_data:
+    resourceType: INTERNAL_STORAGE
+    protocol: LOCAL
+    properties:
+      rootPath: ../data
+
+  staging_data:
+    resourceType: EXTERNAL_STORAGE
+    protocol: LOCAL
+    properties:
+      rootPath: ../data/inputs/staging
+
+  exported_data:
+    resourceType: EXTERNAL_STORAGE
+    protocol: LOCAL
+    properties:
+      rootPath: ../data/exports
+
+  github_api:
+    resourceType: EXTERNAL_SYSTEM
+    protocol: http
+    properties:
+      host: api.github.com
+      port: 443
+      tls: true

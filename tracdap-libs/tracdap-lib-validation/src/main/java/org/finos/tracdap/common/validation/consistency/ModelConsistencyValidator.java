@@ -64,18 +64,18 @@ public class ModelConsistencyValidator {
 
     public static ValidationContext isKnownModelRepo(String repoName, ValidationContext ctx) {
 
-        var tenantConfig = ctx.getTenantConfig();
+        var resources = ctx.getResourceBundle();
 
-        if (!tenantConfig.containsResources(repoName)) {
+        if (!resources.hasResource(repoName)) {
             var error = String.format("Model repository [%s] is not available in the TRAC platform", repoName);
             return ctx.error(error);
         }
 
-        var repoResource = tenantConfig.getResourcesOrThrow(repoName);
+        var repoResource = resources.getResource(repoName);
 
         if (repoResource.getResourceType() != ResourceType.MODEL_REPOSITORY) {
             var error = String.format(
-                    "Model repository [%s] is not a valid repository (this resource is configured as a [%s]",
+                    "Model repository [%s] is not a valid repository (this resource is configured as type [%s])",
                     repoName, repoResource.getResourceType());
             return ctx.error(error);
         }

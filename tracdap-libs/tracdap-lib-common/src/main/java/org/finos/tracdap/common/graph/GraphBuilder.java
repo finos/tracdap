@@ -20,6 +20,7 @@ package org.finos.tracdap.common.graph;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.metadata.*;
 
 import org.slf4j.Logger;
@@ -51,20 +52,23 @@ public class GraphBuilder {
 
     private final NodeNamespace namespace;
     private final MetadataBundle metadataBundle;
+    private final ResourceBundle resourceBundle;
     private final ErrorHandler errorHandler;
 
-    public GraphBuilder(NodeNamespace namespace, MetadataBundle metadataBundle, ErrorHandler errorHandler) {
+    public GraphBuilder(
+            NodeNamespace namespace,
+            MetadataBundle metadataBundle,
+            ResourceBundle resourceBundle,
+            ErrorHandler errorHandler) {
+
         this.namespace = namespace;
         this.metadataBundle = metadataBundle;
+        this.resourceBundle = resourceBundle;
         this.errorHandler = errorHandler;
     }
 
-    public GraphBuilder(NodeNamespace namespace, MetadataBundle metadataBundle) {
-        this(namespace, metadataBundle, DEFAULT_ERROR_HANDLER);
-    }
-
-    public GraphBuilder(NodeNamespace namespace) {
-        this(namespace, null, DEFAULT_ERROR_HANDLER);
+    public GraphBuilder(NodeNamespace namespace, MetadataBundle metadataBundle, ResourceBundle resourceBundle) {
+        this(namespace, metadataBundle, resourceBundle, DEFAULT_ERROR_HANDLER);
     }
 
     public GraphSection<NodeMetadata> buildJob(JobDefinition job) {
@@ -77,8 +81,8 @@ public class GraphBuilder {
 
     public GraphSection<NodeMetadata> buildRunFlowJob(RunFlowJob job) {
 
-        if (metadataBundle == null)
-            throw new ETracInternal("Metadata bundle is needed to build a job graph");
+        if (metadataBundle == null || resourceBundle == null)
+            throw new ETracInternal("Metadata and resource bundles are needed to build a job graph");
 
         var flowObj = metadataBundle.getObject(job.getFlow());
 
@@ -133,7 +137,10 @@ public class GraphBuilder {
         var reachableNodes = new HashMap<String, FlowNode>();
 
         for (var node : flow.getNodesMap().entrySet()) {
-            if (node.getValue().getNodeType() == FlowNodeType.INPUT_NODE || node.getValue().getNodeType() == FlowNodeType.PARAMETER_NODE) {
+            if (node.getValue().getNodeType() == FlowNodeType.INPUT_NODE ||
+                node.getValue().getNodeType() == FlowNodeType.PARAMETER_NODE ||
+                node.getValue().getNodeType() == FlowNodeType.RESOURCE_NODE) {
+
                 reachableNodes.put(node.getKey(), node.getValue());
                 remainingNodes.remove(node.getKey());
             }
@@ -206,26 +213,28 @@ public class GraphBuilder {
         var modelParam = flowNode.getNodeType() == FlowNodeType.PARAMETER_NODE ? flow.getParametersOrDefault(nodeId.name(), null) : null;
         var modelInput = flowNode.getNodeType() == FlowNodeType.INPUT_NODE ? flow.getInputsOrDefault(nodeId.name(), null) : null;
         var modelOutput = flowNode.getNodeType() == FlowNodeType.OUTPUT_NODE ? flow.getOutputsOrDefault(nodeId.name(), null) : null;
+        var modelResource = flowNode.getNodeType() == FlowNodeType.RESOURCE_NODE ? flow.getResourcesOrDefault(nodeId.name(), null) : null;
 
         // Runtime object / value is not part of the flow, these will always be null
-        var nodeMetadata = new NodeMetadata(flowNode, modelParam, modelInput, modelOutput, null, null);
+        var nodeMetadata = new NodeMetadata(flowNode, modelParam, modelInput, modelOutput, modelResource, null, null);
 
         // Check and report any unsatisfied dependencies
         // The dependencies that are present are already validated
         var missing = missingDependencies(dependencies, flowNode);
         for (var dependency : missing) {
             var socketName = dependency.equals(SINGLE_INPUT) ? nodeId.name() : nodeId.name() + "." + dependency;
-            errorHandler.error(nodeId, String.format("Target [%s] is not supplied by any edge", socketName));
+            errorHandler.error(nodeId, String.format("Socket [%s] is not supplied by any edge", socketName));
         }
 
         switch (flowNode.getNodeType()) {
 
             case PARAMETER_NODE:
             case INPUT_NODE:
+            case RESOURCE_NODE:
                 return new Node<>(nodeId, dependencies, SINGLE_OUTPUT, nodeMetadata);
 
             case OUTPUT_NODE:
-                return new Node<>(nodeId, dependencies, NO_OUTPUTS, nodeMetadata);
+                return new Node<>(nodeId, dependencies,  NO_OUTPUTS, nodeMetadata);
 
             case MODEL_NODE:
                 return new Node<>(nodeId, dependencies, flowNode.getOutputsList(), nodeMetadata);
@@ -258,7 +267,7 @@ public class GraphBuilder {
 
     private List<String> missingDependencies(Map<String, SocketId> dependencies, FlowNode flowNode) {
 
-        if (dependencies.size() == flowNode.getParametersCount() + flowNode.getInputsCount())
+        if (dependencies.size() == flowNode.getParametersCount() + flowNode.getInputsCount() +  flowNode.getResourcesCount())
             return NO_OUTPUTS;
 
         var missing = new ArrayList<String>();
@@ -270,6 +279,10 @@ public class GraphBuilder {
         for (var input : flowNode.getInputsList())
             if (!dependencies.containsKey(input))
                 missing.add(input);
+
+        for (var resource : flowNode.getResourcesList())
+            if (!dependencies.containsKey(resource))
+                missing.add(resource);
 
         return missing;
     }
@@ -288,8 +301,9 @@ public class GraphBuilder {
         var inputs = job.getInputsMap();
         var outputs = job.getPriorOutputsMap();
         var models = Map.of(MODEL_NODE_NAME, job.getModel());
+        var resources = job.getResourcesMap();
 
-        return addJobMetadata(graph, params, inputs, outputs, models);
+        return addJobMetadata(graph, params, inputs, outputs, models, resources);
     }
 
     public GraphSection<NodeMetadata> addJobMetadata(GraphSection<NodeMetadata> graph, RunFlowJob job) {
@@ -298,8 +312,9 @@ public class GraphBuilder {
         var inputs = job.getInputsMap();
         var outputs = job.getPriorOutputsMap();
         var models = job.getModelsMap();
+        var resources = job.getResourcesMap();
 
-        return addJobMetadata(graph, params, inputs, outputs, models);
+        return addJobMetadata(graph, params, inputs, outputs, models, resources);
     }
 
     public GraphSection<NodeMetadata> addJobMetadata(
@@ -307,7 +322,8 @@ public class GraphBuilder {
             Map<String, Value> params,
             Map<String, TagSelector> inputs,
             Map<String, TagSelector> outputs,
-            Map<String, TagSelector> models) {
+            Map<String, TagSelector> models,
+            Map<String, String> resources) {
 
         if (metadataBundle == null)
             throw new ETracInternal("No metadata bundle supplied, job metadata cannot be added to the graph");
@@ -341,6 +357,11 @@ public class GraphBuilder {
                     updatedNodes.put(node.nodeId(), modelNode);
                     break;
 
+                case RESOURCE_NODE:
+                    var resourceNode = addRuntimeResource(node, resources);
+                    updatedNodes.put(node.nodeId(), resourceNode);
+                    break;
+
                 default:
                     throw new EUnexpected();
             }
@@ -357,7 +378,7 @@ public class GraphBuilder {
             return node;
 
         var metadata = node.payload().withRuntimeValue(runtimeValue);
-        return new Node<>(node.nodeId(), node.dependencies(), node.outputs(), metadata);
+        return node.withPayload(metadata);
     }
 
     private Node<NodeMetadata> addRuntimeObject(Node<NodeMetadata> node, Map<String, TagSelector> runtimeObjects) {
@@ -373,7 +394,28 @@ public class GraphBuilder {
             return node;
 
         var metadata = node.payload().withRuntimeObject(runtimeObject);
-        return new Node<>(node.nodeId(), node.dependencies(), node.outputs(), metadata);
+        return node.withPayload(metadata);
+    }
+
+    private Node<NodeMetadata> addRuntimeResource(Node<NodeMetadata> node, Map<String, String> runtimeResources) {
+
+        var resourceName = runtimeResources.get(node.nodeId().name());
+
+        if (resourceName == null)
+            return node;
+
+        var runtimeResource = resourceBundle.getResource(resourceName);
+
+        if (runtimeResource == null)
+            return node;
+
+        var runtimeObject = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.RESOURCE)
+                .setResource(runtimeResource)
+                .build();
+
+        var metadata = node.payload().withRuntimeObject(runtimeObject);
+        return node.withPayload(metadata);
     }
 
     public GraphSection<NodeMetadata> autowireFlowParameters(GraphSection<NodeMetadata> graph, FlowDefinition flow, RunFlowJob job) {
@@ -427,8 +469,13 @@ public class GraphBuilder {
                 }
             }
 
-            var updatedMetadata = nodeMetadata.withFlowNode(flowNode.build());
-            var updatedNode = new Node<>(node.nodeId(), dependencies, node.outputs(), updatedMetadata);
+            var updatedMetadata = nodeMetadata
+                    .withFlowNode(flowNode.build());
+
+            var updatedNode = node
+                    .withDependencies(dependencies)
+                    .withPayload(updatedMetadata);
+
             nodes.put(node.nodeId(), updatedNode);
         }
 
@@ -444,7 +491,7 @@ public class GraphBuilder {
         var paramName = paramId.name();
         var modelParameter = flow.getParametersOrDefault(paramName, null);
         var runtimeValue = job.getParametersOrDefault(paramName, null);
-        var nodeMetadata = new NodeMetadata(flowNode, modelParameter, null, null, null, runtimeValue);
+        var nodeMetadata = new NodeMetadata(flowNode, modelParameter, null, null, null, null, runtimeValue);
 
         return new Node<>(paramId, NO_DEPENDENCIES, SINGLE_OUTPUT, nodeMetadata);
     }
@@ -477,7 +524,7 @@ public class GraphBuilder {
                 var targets = dependents.getOrDefault(node.nodeId(), List.of());
                 var parameter = inferParameter(node.nodeId(), targets, graph);
                 var inferredMetadata = nodeMetadata.withModelParameter(parameter);
-                var inferredNode = new Node<>(node.nodeId(), node.dependencies(), node.outputs(), inferredMetadata);
+                var inferredNode = node.withPayload(inferredMetadata);
 
                 nodes.put(node.nodeId(), inferredNode);
             }
@@ -487,7 +534,7 @@ public class GraphBuilder {
                 var targets = dependents.getOrDefault(node.nodeId(), List.of());
                 var inputSchema = inferInputSchema(node.nodeId(), targets, graph);
                 var inferredMetadata = nodeMetadata.withModelInputSchema(inputSchema);
-                var inferredNode = new Node<>(node.nodeId(), node.dependencies(), node.outputs(), inferredMetadata);
+                var inferredNode = node.withPayload(inferredMetadata);
 
                 nodes.put(node.nodeId(), inferredNode);
             }
@@ -500,7 +547,17 @@ public class GraphBuilder {
                 var source = node.dependencies().values().iterator().next();
                 var outputSchema = inferOutputSchema(source, graph);
                 var inferredMetadata = nodeMetadata.withModelOutputSchema(outputSchema);
-                var inferredNode = new Node<>(node.nodeId(), node.dependencies(), node.outputs(), inferredMetadata);
+                var inferredNode = node.withPayload(inferredMetadata);
+
+                nodes.put(node.nodeId(), inferredNode);
+            }
+
+            if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.RESOURCE_NODE && nodeMetadata.modelResource() == null) {
+
+                var targets = dependents.getOrDefault(node.nodeId(), List.of());
+                var resource = inferResource(node.nodeId(), targets, graph);
+                var inferredMetadata = nodeMetadata.withModelResource(resource);
+                var inferredNode = node.withPayload(inferredMetadata);
 
                 nodes.put(node.nodeId(), inferredNode);
             }
@@ -725,6 +782,99 @@ public class GraphBuilder {
         return null;
     }
 
+    private ModelResource inferResource(NodeId resourceId, List<SocketId> targets, GraphSection<NodeMetadata> graph) {
+
+        var targetResources = new ArrayList<Map.Entry<SocketId, ModelResource>>(targets.size());
+
+        for (var target : targets) {
+
+            var targetNode = graph.nodes().get(target.nodeId());
+
+            if (targetNode == null || targetNode.payload().runtimeObjectType() != ObjectType.MODEL)
+                continue;
+
+            var targetModel = targetNode.payload().runtimeObject().getModel();
+
+            if (targetModel.containsResources(target.socket())) {
+                var modelResource = targetModel.getResourcesOrThrow(target.socket());
+                targetResources.add(Map.entry(target, modelResource));
+            }
+        }
+
+        // Resource not used (there may be consistency errors)
+        if(targetResources.isEmpty())
+            return null;
+
+        // Resource only used once
+        if (targetResources.size() == 1)
+            return targetResources.get(0).getValue();
+
+        var resource = targetResources.get(0).getValue().toBuilder();
+        var resourceTarget = targetResources.get(0).getKey();
+
+        for (int i = 1; i < targetResources.size(); i++) {
+
+            var nextResource = targetResources.get(i).getValue();
+            var nextResourceTarget = targetResources.get(i).getKey();
+
+            resource = combineResource(resource, nextResource);
+
+            if (resource == null) {
+
+                var message = String.format("Resource is ambiguous for [%s]: Resources are not compatible for [%s.%s] and [%s.%s]",
+                        resourceId.name(),
+                        resourceTarget.nodeId().name(), resourceTarget.socket(),
+                        nextResourceTarget.nodeId().name(), nextResourceTarget.socket());
+
+                errorHandler.error(resourceId, message);
+
+                return null;
+            }
+        }
+
+        return resource.build();
+    }
+
+    private ModelResource.Builder combineResource(ModelResource.Builder resource, ModelResource nextResource) {
+
+        if (resource.getResourceType() != nextResource.getResourceType()) {
+            return null;  // Resources must be the same type
+        }
+
+        if (resource.hasProtocol() && nextResource.hasProtocol()) {
+            if (!resource.getProtocol().equals(nextResource.getProtocol()))
+                return null;
+        }
+        else if (nextResource.hasProtocol()) {
+            resource.setProtocol(nextResource.getProtocol());
+        }
+
+        if (resource.hasSubProtocol() && nextResource.hasSubProtocol()) {
+            if (!resource.getSubProtocol().equals(nextResource.getSubProtocol()))
+                return null;
+        }
+        else if (nextResource.hasSubProtocol()) {
+            resource.setSubProtocol(nextResource.getSubProtocol());
+        }
+
+        // If system details do not agree, just remove them from the top level model resource
+        // So long as protocol / sub-protocol match, any supported client should be usable
+        if (resource.hasSystem() && nextResource.hasSystem()) {
+
+            var system =  resource.getSystem();
+            var nextSystem = nextResource.getSystem();
+
+            if (!system.equals(nextSystem)){
+                resource.setSystem(ModelSystemDetails.newBuilder());
+            }
+        }
+        else if (nextResource.hasSystem()) {
+            resource.setSystem(nextResource.getSystem());
+        }
+
+        return resource;
+    }
+
     public FlowDefinition exportFlow(GraphSection<NodeMetadata> graph) {
 
         var flow = FlowDefinition.newBuilder();
@@ -763,6 +913,9 @@ public class GraphBuilder {
 
             if (flowNode.getNodeType() == FlowNodeType.OUTPUT_NODE && metadata.modelOutputSchema() != null)
                 flow.putOutputs(nodeName, metadata.modelOutputSchema());
+
+            if (flowNode.getNodeType() == FlowNodeType.RESOURCE_NODE && metadata.modelResource() != null)
+                flow.putResources(nodeName, metadata.modelResource());
         }
 
         return flow.build();

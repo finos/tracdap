@@ -21,7 +21,6 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.apache.arrow.vector.ipc.ArrowFileWriter;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.data.ArrowVsrContext;
-import org.finos.tracdap.common.data.ArrowVsrSchema;
 import org.finos.tracdap.common.data.SchemaMapping;
 import org.finos.tracdap.common.data.util.Bytes;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -49,6 +48,10 @@ import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.parallel.Execution;
+import org.junit.jupiter.api.parallel.ExecutionMode;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,18 +67,18 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
-
 
 @Tag("integration")
 @Tag("int-e2e")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public abstract class DataRoundTripTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
+
+    // The data frameworks to test with a round trip
+    private static final String[] DATA_FRAMEWORKS = {"pandas", "polars"};
 
     // Pandas / NumPy native dates and timestamps are encoded as 64-bit nanoseconds around the Unix epoch
     private static final LocalDateTime MIN_PANDAS_TIMESTAMP = LocalDateTime
@@ -86,52 +89,49 @@ public abstract class DataRoundTripTest {
             .ofEpochSecond(0, 0, ZoneOffset.UTC)
             .plusNanos(Long.MAX_VALUE);
 
-    // Python native min/max dates and timestamps are for the years 1 and 9999 CE
-    private static final LocalDateTime MIN_PYTHON_TIMESTAMP = LocalDateTime.of(1, 1, 1, 0, 0, 0);
-    private static final LocalDateTime MAX_PYTHON_TIMESTAMP = LocalDateTime.of(9999, 12, 31, 23, 59, 59, 999999000);
-
-
-    protected abstract String storageFormat();
-    protected abstract String dataFramework();
-
+    protected static PlatformTest platform;
 
     public static class CsvFormatTest extends DataRoundTripTest {
-        protected String storageFormat() { return "CSV"; }
-        protected String dataFramework() { return "pandas"; }
+        @RegisterExtension private static final
+        PlatformTest platformTest = DataRoundTripTest.createPlatformTest("CSV");
+        static { platform = platformTest; }
     }
 
     public static class ArrowFormatTest extends DataRoundTripTest {
-        protected String storageFormat() { return "ARROW_FILE"; }
-        protected String dataFramework() { return "pandas"; }
-    }
-
-    public static class PolarsTest extends DataRoundTripTest {
-        protected String storageFormat() { return "ARROW_FILE"; }
-        protected String dataFramework() { return "polars"; }
+        @RegisterExtension private static final
+        PlatformTest platformTest = DataRoundTripTest.createPlatformTest("ARROW_FILE");
+        static { platform = platformTest; }
     }
 
     private static final Logger log = LoggerFactory.getLogger(DataRoundTripTest.class);
 
-    @RegisterExtension
-    public final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
-            .runDbDeploy(true)
-            .runCacheDeploy(true)
-            .addTenant(TEST_TENANT)
-            .storageFormat(storageFormat())
-            .prepareLocalExecutor(true)
-            .startService(TracMetadataService.class)
-            .startService(TracDataService.class)
-            .startService(TracOrchestratorService.class)
-            .startService(TracAdminService.class)
-            .build();
+    private static PlatformTest createPlatformTest(String storageFormat) {
+
+        return PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
+                .runDbDeploy(true)
+                .runCacheDeploy(true)
+                .addTenant(TEST_TENANT)
+                .storageFormat(storageFormat)
+                .prepareLocalExecutor(true)
+                .startService(TracMetadataService.class)
+                .startService(TracDataService.class)
+                .startService(TracOrchestratorService.class)
+                .startService(TracAdminService.class)
+                .build();
+    }
+
+    private static Stream<String> dataFrameworks() {
+        return Stream.of(DATA_FRAMEWORKS);
+    }
 
     static BufferAllocator ALLOCATOR;
     static TagHeader modelId;
 
     @BeforeAll
-    static void setUp() {
+    static void setUp() throws Exception {
 
         ALLOCATOR = MemoryTestHelpers.testAllocator(false);
+        importModel();
     }
 
     @AfterAll
@@ -141,8 +141,7 @@ public abstract class DataRoundTripTest {
         ALLOCATOR.close();
     }
 
-    @Test @Order(1)
-    void importModel() throws Exception {
+    static void importModel() throws Exception {
 
         log.info("Running IMPORT_MODEL job...");
 
@@ -172,7 +171,7 @@ public abstract class DataRoundTripTest {
                         .setValue(MetadataCodec.encodeValue("round_trip:import_model")))
                 .build();
 
-        var jobStatus = runJob(orchClient, jobRequest);
+        var jobStatus = Helpers.runJob(orchClient, jobRequest);
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         var modelSearch = MetadataSearchRequest.newBuilder()
@@ -194,19 +193,21 @@ public abstract class DataRoundTripTest {
         modelId = modelSearchResult.getSearchResult(0).getHeader();
     }
 
-    @Test
-    void basicData() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void basicData(String dataFramework) throws Exception {
 
-        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
-        doRoundTrip(schema, data, "basicData", dataFramework());
+        doRoundTrip(data, "basicData", dataFramework);
     }
 
-    @Test
-    void nullFirstRow() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void nullFirstRow(String dataFramework) throws Exception {
 
-        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
         // This is a quick way of nulling a value in an Arrow vector
@@ -221,13 +222,14 @@ public abstract class DataRoundTripTest {
             Assertions.assertNull(vector.getObject(0));
         }
 
-        doRoundTrip(schema, data, "nullDataItems", dataFramework());
+        doRoundTrip(data, "nullDataItems", dataFramework);
     }
 
-    @Test
-    void nullEntireTable() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void nullEntireTable(String dataFramework) throws Exception {
 
-        var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.generateBasicData(ALLOCATOR);
 
         // This is a quick way of nulling an entire vector, by setting the validity buffer to zero
@@ -238,28 +240,34 @@ public abstract class DataRoundTripTest {
             Assertions.assertEquals(vector.getValueCount(), vector.getNullCount());
         }
 
-        doRoundTrip(schema, data, "nullDataItems", dataFramework());
+        doRoundTrip(data, "nullDataItems", dataFramework);
     }
 
-    @Test
-    void emptyTable() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void emptyTable(String dataFramework) throws Exception {
 
         var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.convertData(schema, List.of(), ALLOCATOR);
 
-        doRoundTrip(schema, data, "emptyTable", dataFramework());
+        doRoundTrip(data, "emptyTable", dataFramework);
     }
 
-    @Test
-    void edgeCaseIntegers() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void edgeCaseIntegers(String dataFramework) throws Exception {
 
         List<Object> edgeCases = List.of(0, Long.MIN_VALUE, Long.MAX_VALUE);
 
-        doEdgeCaseTest("integer_field", edgeCases);
+        doEdgeCaseTest("integer_field", edgeCases, dataFramework);
     }
 
-    @Test
-    void edgeCaseFloats() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void edgeCaseFloats(String dataFramework) throws Exception {
 
         // In Java, Double.NaN == Double.NaN is true, so NaN can be checked as a regular float edge case
 
@@ -270,11 +278,13 @@ public abstract class DataRoundTripTest {
                 Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY,
                 Double.NaN);
 
-        doEdgeCaseTest("float_field", edgeCases);
+        doEdgeCaseTest("float_field", edgeCases, dataFramework);
     }
 
-    @Test
-    void edgeCaseDecimals() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void edgeCaseDecimals(String dataFramework) throws Exception {
 
         var d0 = BigDecimal.ZERO;
         var d1 = BigDecimal.TEN.pow(25);
@@ -289,11 +299,13 @@ public abstract class DataRoundTripTest {
                 .map(d -> d.setScale(12, RoundingMode.UNNECESSARY))
                 .collect(Collectors.toList());
 
-        doEdgeCaseTest("decimal_field", edgeCases);
+        doEdgeCaseTest("decimal_field", edgeCases, dataFramework);
     }
 
-    @Test
-    void edgeCaseStrings() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void edgeCaseStrings(String dataFramework) throws Exception {
 
         List<Object>  edgeCases = List.of(
                 "", " ", "  ", "\t", "\r\n", "  \r\n   ",
@@ -301,11 +313,13 @@ public abstract class DataRoundTripTest {
                 "Olá Mundo", "你好，世界", "Привет, мир", "नमस्ते दुनिया",
                 "𝜌 = ∑ 𝑃𝜓 | 𝜓 ⟩ ⟨ 𝜓 |");
 
-        doEdgeCaseTest("string_field", edgeCases);
+        doEdgeCaseTest("string_field", edgeCases, dataFramework);
     }
 
-    @Test
-    void edgeCaseDates() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void edgeCaseDates(String dataFramework) throws Exception {
 
         List<Object> edgeCases = List.of(
                 LocalDate.EPOCH,
@@ -317,11 +331,13 @@ public abstract class DataRoundTripTest {
                 MAX_PANDAS_TIMESTAMP.toLocalDate()
         );
 
-        doEdgeCaseTest("date_field", edgeCases);
+        doEdgeCaseTest("date_field", edgeCases, dataFramework);
     }
 
-    @Test
-    void edgeCaseDateTimes() throws Exception {
+    @ParameterizedTest
+    @MethodSource("dataFrameworks")
+    @Execution(ExecutionMode.CONCURRENT)
+    void edgeCaseDateTimes(String dataFramework) throws Exception {
 
         List<Object> edgeCases = List.of(
                 LocalDateTime.ofEpochSecond(0, 0, ZoneOffset.UTC),
@@ -338,10 +354,10 @@ public abstract class DataRoundTripTest {
                 MAX_PANDAS_TIMESTAMP
         );
 
-        doEdgeCaseTest("datetime_field", edgeCases);
+        doEdgeCaseTest("datetime_field", edgeCases, dataFramework);
     }
 
-    void doEdgeCaseTest(String fieldName, List<Object> edgeCases) throws Exception {
+    void doEdgeCaseTest(String fieldName, List<Object> edgeCases, String dataFramework) throws Exception {
 
         var javaData = new ArrayList<Map<String, Object>>();
 
@@ -366,10 +382,10 @@ public abstract class DataRoundTripTest {
         var schema = SchemaMapping.tracToArrow(SampleData.BASIC_TABLE_SCHEMA);
         var data = SampleData.convertData(schema, javaData,  ALLOCATOR);
 
-        doRoundTrip(schema, data, "edgeCase:" + fieldName, dataFramework());
+        doRoundTrip(data, "edgeCase:" + fieldName, dataFramework);
     }
 
-    void doRoundTrip(ArrowVsrSchema schema, ArrowVsrContext inputData, String testName, String dataFramework) throws Exception {
+    void doRoundTrip(ArrowVsrContext inputData, String testName, String dataFramework) throws Exception {
 
         ArrowVsrContext outputData = null;
 
@@ -449,7 +465,7 @@ public abstract class DataRoundTripTest {
                 .setValue(MetadataCodec.encodeValue(testName + ":run_model")))
                 .build();
 
-        var jobStatus = runJob(orchClient, jobRequest);
+        var jobStatus = Helpers.runJob(orchClient, jobRequest);
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());

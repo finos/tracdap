@@ -207,7 +207,7 @@ jobs:
       - name: Python - Build runtime package
         env:
           TRAC_PYTHON_BUILD_ISOLATION: false
-        run: python tracdap-runtime/python/build_runtime.py --target dist
+        run: python tracdap-runtime/python/build_runtime.py --target dist ext
 
       - name: Run end to end tests
         run: ./gradlew integration -DintegrationTags="int-e2e"

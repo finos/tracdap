@@ -636,6 +636,22 @@ public class CommonValidators {
         return ctx;
     }
 
+    public static ValidationContext allowedEnums(
+            ProtocolMessageEnum protoEnum,
+            List<? extends ProtocolMessageEnum> allowedValues,
+            ValidationContext ctx) {
+
+        if (!allowedValues.contains(protoEnum)) {
+
+            var err = String.format("Value not allowed for [%s]: [%s]",
+                    ctx.fieldName(), protoEnum.getValueDescriptor().getName());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     public static ValidationContext listNotEmpty(ValidationContext ctx) {
 
         if (!ctx.field().isRepeated() || ctx.field().isMapField())

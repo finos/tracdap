@@ -55,6 +55,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RMJ_INPUTS;
     private static final Descriptors.FieldDescriptor RMJ_OUTPUTS;
     private static final Descriptors.FieldDescriptor RMJ_PRIOR_OUTPUTS;
+    private static final Descriptors.FieldDescriptor RMJ_RESOURCES;
 
     private static final Descriptors.Descriptor RUN_FLOW_JOB;
     private static final Descriptors.FieldDescriptor RFJ_FLOW;
@@ -63,6 +64,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RFJ_INPUTS;
     private static final Descriptors.FieldDescriptor RFJ_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
+    private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
 
     static {
 
@@ -79,6 +81,7 @@ public class JobConsistencyValidator {
         RMJ_INPUTS = field(RUN_MODEL_JOB, RunModelJob.INPUTS_FIELD_NUMBER);
         RMJ_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.OUTPUTS_FIELD_NUMBER);
         RMJ_PRIOR_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.PRIOROUTPUTS_FIELD_NUMBER);
+        RMJ_RESOURCES = field(RUN_MODEL_JOB, RunModelJob.RESOURCES_FIELD_NUMBER);
 
         RUN_FLOW_JOB = RunFlowJob.getDescriptor();
         RFJ_FLOW = field(RUN_FLOW_JOB, RunFlowJob.FLOW_FIELD_NUMBER);
@@ -87,6 +90,7 @@ public class JobConsistencyValidator {
         RFJ_INPUTS = field(RUN_FLOW_JOB, RunFlowJob.INPUTS_FIELD_NUMBER);
         RFJ_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTS_FIELD_NUMBER);
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
+        RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
     }
 
     @Validator
@@ -139,6 +143,10 @@ public class JobConsistencyValidator {
                 .apply(JobConsistencyValidator::runModelPriorOutputs, Map.class, modelDef.getOutputsMap())
                 .pop();
 
+        ctx.pushMap(RMJ_RESOURCES, RunModelJob::getResourcesMap)
+                .apply(JobConsistencyValidator::runModelResources, Map.class, modelDef.getResourcesMap())
+                .pop();
+
         // Do not validate final outputs at all
         // Consistency check is applied before outputs are populated
         // Outputs can take whatever schema / type is required
@@ -164,7 +172,7 @@ public class JobConsistencyValidator {
 
         // TODO: Build a meaningful namespace from the request context
         var namespace = NodeNamespace.ROOT;
-        var builder = new GraphBuilder(namespace, ctx.getMetadataBundle(), graphErrorHandler(ctx));
+        var builder = new GraphBuilder(namespace, ctx.getMetadataBundle(), ctx.getResourceBundle(), graphErrorHandler(ctx));
         var graph = builder.buildRunFlowJob(job);
 
         ctx.pushMap(RFJ_MODELS, RunFlowJob::getModelsMap)
@@ -181,6 +189,10 @@ public class JobConsistencyValidator {
 
         ctx.pushMap(RFJ_PRIOR_OUTPUTS, RunFlowJob::getPriorOutputsMap)
                 .apply(JobConsistencyValidator::runFlowPriorOutputs, Map.class, graph)
+                .pop();
+
+        ctx.pushMap(RFJ_RESOURCES, RunFlowJob::getResourcesMap)
+                .apply(JobConsistencyValidator::runFlowResources, Map.class, graph)
                 .pop();
 
         // For flows, we need to check graph consistency for the output nodes
@@ -316,6 +328,24 @@ public class JobConsistencyValidator {
         return ctx;
     }
 
+    private static ValidationContext runFlowResources(Map<String, String> resourceMapping, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        var resourceNodes = graph.nodes().values().stream()
+                .filter(node -> node.payload().flowNode().getNodeType() == FlowNodeType.RESOURCE_NODE)
+                .collect(Collectors.toMap(n -> n.nodeId().name(), n -> n));
+
+        return alignedMapValidation(
+                "resource", JobConsistencyValidator::resourceMatchesSchema, false,
+                resourceMapping, resourceNodes, ctx);
+    }
+
+    private static ValidationContext runModelResources(Map<String, String> resourceMapping, Map<String, ModelResource> requiredResources, ValidationContext ctx) {
+
+        return alignedMapValidation(
+                "resource", JobConsistencyValidator::resourceMatchesSchema, false,
+                resourceMapping, requiredResources, ctx);
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     //   Checks for individual params, inputs and outputs
@@ -382,6 +412,50 @@ public class JobConsistencyValidator {
 
         return ctx;
     }
+
+    // Resource comes from the job definition
+    private static ValidationContext resourceMatchesSchema(String resourceName, String targetName, Node<NodeMetadata> resourceNode, ValidationContext ctx) {
+
+        // Do not attempt to check param type if type inference failed
+        if (resourceNode.payload().modelResource() == null)
+            return ctx.error("Type inference failed for resource [" + resourceName + "]");
+
+        return resourceMatchesSchema(resourceName, targetName, resourceNode.payload().modelResource(), ctx);
+    }
+
+    // Param comes from the job definition
+    private static ValidationContext resourceMatchesSchema(String resourceName, String targetName, ModelResource modelResource, ValidationContext ctx) {
+
+        var targetResource = ctx.getResourceBundle().getResource(targetName, false);
+
+        if (targetResource == null) {
+
+            return ctx.error(String.format(
+                    "Resource is not available for [%s] (%s)",
+                    resourceName, targetName));
+        }
+
+        if (modelResource.getResourceType() != targetResource.getResourceType()) {
+            return ctx.error(String.format(
+                    "Resource [%s] is the wrong type (expected %s, got %s",
+                    modelResource, modelResource.getResourceType(), targetResource.getResourceType()));
+        }
+
+        if (modelResource.hasProtocol() &&  ! modelResource.getProtocol().equals(targetResource.getProtocol())) {
+            return ctx.error(String.format(
+                    "Resource [%s] has the wrong protocol (expected %s, got %s",
+                    modelResource, modelResource.getProtocol(), targetResource.getProtocol()));
+        }
+
+        if (modelResource.hasSubProtocol() &&  ! modelResource.getSubProtocol().equals(targetResource.getSubProtocol())) {
+            return ctx.error(String.format(
+                    "Resource [%s] has the wrong protocol (expected %s, got %s",
+                    modelResource, modelResource.getSubProtocol(), targetResource.getSubProtocol()));
+        }
+
+        return ctx;
+    }
+
 
     // Input comes from the job definition
     private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, Node<NodeMetadata> inputNode, ValidationContext ctx) {
@@ -730,14 +804,14 @@ public class JobConsistencyValidator {
         throw new EUnexpected();
     }
 
-    private static SchemaDefinition findSchema(DataDefinition dataset, MetadataBundle resources) {
+    private static SchemaDefinition findSchema(DataDefinition dataset, MetadataBundle metadata) {
 
         if (dataset.hasSchema())
             return dataset.getSchema();
 
         if (dataset.hasSchemaId()) {
 
-            var schema = resources.getObject(dataset.getSchemaId());
+            var schema = metadata.getObject(dataset.getSchemaId());
 
             // Metadata should be loaded before the validator runs (partial validation not available at present)
             if (schema == null)
@@ -815,8 +889,9 @@ public class JobConsistencyValidator {
         var paramsCheck = compareKeys(nodeMetadata.flowNode().getParametersList(), modelDef.getParametersMap().keySet());
         var inputsCheck = compareKeys(nodeMetadata.flowNode().getInputsList(), modelDef.getInputsMap().keySet());
         var outputsCheck = compareKeys(nodeMetadata.flowNode().getOutputsList(), modelDef.getOutputsMap().keySet());
+        var resourcesCheck = compareKeys(nodeMetadata.flowNode().getResourcesList(), modelDef.getResourcesMap().keySet());
 
-        if (paramsCheck.anyErrors() || inputsCheck.anyErrors() || outputsCheck.anyErrors()) {
+        if (paramsCheck.anyErrors() || inputsCheck.anyErrors() || outputsCheck.anyErrors() ||  resourcesCheck.anyErrors()) {
 
             // TODO: Allow details to be recorded separately for more readable error messages
 
@@ -827,6 +902,8 @@ public class JobConsistencyValidator {
             modelNodeKeyErrors("extra inputs: ", inputsCheck.extraKeys, details);
             modelNodeKeyErrors("missing outputs: ", outputsCheck.missingKeys, details);
             modelNodeKeyErrors("extra outputs: ", outputsCheck.extraKeys, details);
+            modelNodeKeyErrors("missing resources: ", resourcesCheck.missingKeys, details);
+            modelNodeKeyErrors("extra resources: ", resourcesCheck.extraKeys, details);
 
             var message = "Model is not compatible with the flow (" + String.join(", ", details) + ")";
             return ctx.error(message);
@@ -840,6 +917,9 @@ public class JobConsistencyValidator {
 
         for (var input : modelDef.getInputsMap().entrySet())
             ctx = JobConsistencyValidator.modelInput(node, graph, input.getKey(), input.getValue(), ctx);
+
+        for (var resource : modelDef.getResourcesMap().entrySet())
+            ctx = JobConsistencyValidator.modelResource(node, graph, resource.getKey(), resource.getValue(), ctx);
 
         return ctx;
     }
@@ -926,6 +1006,53 @@ public class JobConsistencyValidator {
                     "Input [%s] cannot be supplied from [%s] (%s)",
                     inputName, sourceNodeName, sourceNodeType));
         }
+    }
+
+    private static ValidationContext modelResource(
+            Node<NodeMetadata> node, GraphSection<NodeMetadata> graph,
+            String resourceName, ModelResource modelResource,
+            ValidationContext ctx) {
+
+        var sourceSocket = node.dependencies().get(resourceName);
+
+        if (sourceSocket == null)
+            return ctx.error(String.format("Resource [%s] is not connected in the flow", resourceName));
+
+        var sourceNode = graph.nodes().get(sourceSocket.nodeId());
+        var sourceMetadata = sourceNode.payload();
+        var sourceNodeName = sourceSocket.nodeId().name();
+        var sourceNodeType = sourceMetadata.flowNode().getNodeType();
+
+        if (sourceNodeType != FlowNodeType.RESOURCE_NODE) {
+            return ctx.error(String.format(
+                    "Resource [%s] cannot be supplied from [%s] (%s)",
+                    resourceName, sourceNodeName, sourceNodeType));
+        }
+
+        if (sourceMetadata.modelResource() == null)
+            return ctx.error(String.format("No details available for connected resource [%s]", sourceNodeName));
+
+        var sourceResource = sourceMetadata.modelResource();
+
+        if (modelResource.getResourceType() != sourceResource.getResourceType()) {
+            return ctx.error(String.format(
+                    "Resource [%s] is the wrong type (expected %s, got %s",
+                    sourceNodeName, modelResource.getResourceType(), sourceResource.getResourceType()));
+        }
+
+        if (modelResource.hasProtocol() &&  ! modelResource.getProtocol().equals(sourceResource.getProtocol())) {
+            return ctx.error(String.format(
+                    "Resource [%s] has the wrong protocol (expected %s, got %s",
+                    sourceNodeName, modelResource.getProtocol(), sourceResource.getProtocol()));
+        }
+
+        if (modelResource.hasSubProtocol() &&  ! modelResource.getSubProtocol().equals(sourceResource.getSubProtocol())) {
+            return ctx.error(String.format(
+                    "Resource [%s] has the wrong protocol (expected %s, got %s",
+                    sourceNodeName, modelResource.getSubProtocol(), sourceResource.getSubProtocol()));
+        }
+
+        return ctx;
     }
 
     private static ValidationContext outputNode(String outputName, Node<NodeMetadata> node, GraphSection<NodeMetadata> graph, ValidationContext ctx) {

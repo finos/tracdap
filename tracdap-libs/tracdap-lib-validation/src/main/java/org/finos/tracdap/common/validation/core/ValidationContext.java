@@ -17,11 +17,11 @@
 
 package org.finos.tracdap.common.validation.core;
 
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.common.validation.core.impl.ValidationContextImpl;
 import org.finos.tracdap.common.validation.core.impl.ValidationFailure;
 import org.finos.tracdap.common.validation.core.impl.ValidationKey;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 
 import com.google.protobuf.Descriptors;
 import com.google.protobuf.Message;
@@ -47,9 +47,9 @@ public interface ValidationContext {
         return ValidationContextImpl.forVersion(current, prior);
     }
 
-    static ValidationContext forConsistency(Message msg, MetadataBundle metadata, TenantConfig tenantConfig) {
+    static ValidationContext forConsistency(Message msg, MetadataBundle metadata, ResourceBundle resources) {
 
-        return ValidationContextImpl.forConsistency(msg, metadata, tenantConfig);
+        return ValidationContextImpl.forConsistency(msg, metadata, resources);
     }
 
     /**
@@ -60,11 +60,11 @@ public interface ValidationContext {
     MetadataBundle getMetadataBundle();
 
     /**
-     * Get the tenant config associated with this validation context
+     * Get the resource bundle associated with this validation context
      *
-     * @return The tenant config for the current configuration
+     * @return The resource bundle associated with this validation context
      */
-    TenantConfig getTenantConfig();
+    ResourceBundle getResourceBundle();
 
     /**
      * Push a member field of the current object onto the validation stack
@@ -214,7 +214,9 @@ public interface ValidationContext {
     <T> ValidationContext apply(ValidationFunction.Version<T> validator, Class<T> targetClass);
 
     ValidationContext applyIf(boolean condition, ValidationFunction.Basic validator);
+    ValidationContext applyIfElse(boolean condition, ValidationFunction.Basic ifValidator, ValidationFunction.Basic elseValidator);
     ValidationContext applyIf(boolean condition, ValidationFunction.Typed<String> validator);
+    ValidationContext applyIfElse(boolean condition, ValidationFunction.Typed<String> ifValidator, ValidationFunction.Typed<String> elseValidator);
     <T> ValidationContext applyIf(boolean condition, ValidationFunction.Typed<T> validator, Class<T> targetClass);
     <T, U> ValidationContext applyIf(boolean condition, ValidationFunction.TypedArg<T, U> validator, Class<T> targetClass, U arg);
     <T> ValidationContext applyIf(boolean condition, ValidationFunction.Version<T> validator, Class<T> targetClass);

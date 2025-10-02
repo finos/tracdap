@@ -44,12 +44,14 @@ public class FlowValidator {
     private static final Descriptors.FieldDescriptor FD_PARAMETERS;
     private static final Descriptors.FieldDescriptor FD_INPUTS;
     private static final Descriptors.FieldDescriptor FD_OUTPUTS;
+    private static final Descriptors.FieldDescriptor FD_RESOURCES;
 
     private static final Descriptors.Descriptor FLOW_NODE;
     private static final Descriptors.FieldDescriptor FN_NODE_TYPE;
     private static final Descriptors.FieldDescriptor FN_PARAMETERS;
     private static final Descriptors.FieldDescriptor FN_INPUTS;
     private static final Descriptors.FieldDescriptor FN_OUTPUTS;
+    private static final Descriptors.FieldDescriptor FN_RESOURCES;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
     private static final Descriptors.FieldDescriptor FN_NODE_ATTRS;
     private static final Descriptors.FieldDescriptor FN_NODE_PROPS;
@@ -71,12 +73,14 @@ public class FlowValidator {
         FD_PARAMETERS = field(FLOW_DEFINITION, FlowDefinition.PARAMETERS_FIELD_NUMBER);
         FD_INPUTS = field(FLOW_DEFINITION, FlowDefinition.INPUTS_FIELD_NUMBER);
         FD_OUTPUTS = field(FLOW_DEFINITION, FlowDefinition.OUTPUTS_FIELD_NUMBER);
+        FD_RESOURCES = field(FLOW_DEFINITION, FlowDefinition.RESOURCES_FIELD_NUMBER);
 
         FLOW_NODE = FlowNode.getDescriptor();
         FN_NODE_TYPE = field(FLOW_NODE, FlowNode.NODETYPE_FIELD_NUMBER);
         FN_PARAMETERS = field(FLOW_NODE, FlowNode.PARAMETERS_FIELD_NUMBER);
         FN_INPUTS = field(FLOW_NODE, FlowNode.INPUTS_FIELD_NUMBER);
         FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
+        FN_RESOURCES = field(FLOW_NODE, FlowNode.RESOURCES_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
         FN_NODE_ATTRS = field(FLOW_NODE, FlowNode.NODEATTRS_FIELD_NUMBER);
         FN_NODE_PROPS = field(FLOW_NODE, FlowNode.NODEPROPS_FIELD_NUMBER);
@@ -118,15 +122,15 @@ public class FlowValidator {
             ctx = ctx.apply(FlowValidator::flowConsistency, FlowDefinition.class);
 
         // If the flow declares an explicit schema this must be validated as well
-        // Parameters, inputs & outputs on a flow have the same structure as a model
-        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0)
-            ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, ctx);
+        // Parameters, inputs, outputs & resources on a flow have the same structure as a model
+        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0 || flow.getResourcesCount() > 0)
+            ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, FD_RESOURCES, ctx);
 
-        // If inputs and outputs are declared, they must match what is declared in the nodes
-        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0)
+        // If inputs, outputs and resources are declared, they must match what is declared in the nodes
+        if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getResourcesCount() > 0)
             ctx = ctx.apply(FlowValidator::flowSchemaMatch, FlowDefinition.class);
 
-        // If parameters are declared, they must not conflict with the flow nodes
+        // Parameters get separate treatment, if declared they must not conflict with the flow nodes
         if (flow.getParametersCount() > 0)
             ctx = ctx.apply(FlowValidator::flowParametersMatch, FlowDefinition.class);
 
@@ -176,6 +180,15 @@ public class FlowValidator {
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
                 .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_OUTPUTS.getName()))
+                .pop();
+
+        // Resources are optional, model nodes with no resources are allowed
+        ctx = ctx.pushRepeated(FN_RESOURCES)
+                .apply(CommonValidators.onlyIf(isModelNode, isModelNodeQualifier))
+                .applyRepeated(CommonValidators::identifier, String.class)
+                .applyRepeated(CommonValidators::notTracReserved, String.class)
+                .apply(CommonValidators::caseInsensitiveDuplicates)
+                .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_RESOURCES.getName()))
                 .pop();
 
         ctx = ctx.push(FN_NODE_SEARCH)
@@ -241,6 +254,7 @@ public class FlowValidator {
 
         var schemaInputs = new HashSet<>(flow.getInputsMap().keySet());
         var schemaOutputs = new HashSet<>(flow.getOutputsMap().keySet());
+        var schemaResources = new HashSet<>(flow.getResourcesMap().keySet());
 
         // First check that every input and output node is declared explicitly
 
@@ -262,6 +276,13 @@ public class FlowValidator {
                     ctx = ctx.error(String.format("Output node [%s] is missing from flow explicit outputs", nodeName));
 
             }
+
+            if (node.getNodeType() == FlowNodeType.RESOURCE_NODE) {
+                var matched = schemaResources.remove(nodeName);
+                if (!matched)
+                    ctx = ctx.error(String.format("Resource node [%s] is missing from flow explicit outputs", nodeName));
+
+            }
         }
 
         // Resport any additional inputs / outputs that do not correspond to nodes
@@ -271,6 +292,9 @@ public class FlowValidator {
 
         for (var outputName : schemaOutputs)
             ctx = ctx.error(String.format("Flow explicit output [%s] does not correspond to an output node", outputName));
+
+        for (var resourceName : schemaResources)
+            ctx = ctx.error(String.format("Flow explicit resource [%s] does not correspond to a resource node", resourceName));
 
         return ctx;
     }
@@ -328,12 +352,18 @@ public class FlowValidator {
         var sourceNode = nodes.getOrDefault(edge.getSource().getNode(), null);
         var targetNode = nodes.getOrDefault(edge.getTarget().getNode(), null);
 
-        if (sourceNode != null && sourceNode.getNodeType() == FlowNodeType.INPUT_NODE &&
-            targetNode != null && targetNode.getNodeType() == FlowNodeType.OUTPUT_NODE) {
+        if (sourceNode != null && targetNode != null && targetNode.getNodeType() == FlowNodeType.OUTPUT_NODE) {
 
-            ctx.error(String.format(
-                    "Input node [%s] is connected directly to output node [%s]",
-                    edge.getSource().getNode(), edge.getTarget().getNode()));
+            var sourceNodeType = sourceNode.getNodeType();
+
+            if (sourceNodeType == FlowNodeType.PARAMETER_NODE ||
+                sourceNodeType == FlowNodeType.INPUT_NODE ||
+                sourceNodeType == FlowNodeType.RESOURCE_NODE) {
+
+                ctx.error(String.format(
+                        "Node [%s] (%s) is connected directly to output node [%s]",
+                        edge.getSource().getNode(), sourceNodeType.name(), edge.getTarget().getNode()));
+            }
         }
 
         return ctx;
@@ -364,7 +394,6 @@ public class FlowValidator {
             else if (socket.hasField(FS_SOCKET))
                 ctx.error(String.format("Source node [%s] is an input node, do not specify a [socket]", socket.getNode()));
         }
-
         else if (node.getNodeType() == FlowNodeType.PARAMETER_NODE) {
 
             if (ctx.field().equals(FE_TARGET))
@@ -373,25 +402,44 @@ public class FlowValidator {
             else if (socket.hasField(FS_SOCKET))
                 ctx.error(String.format("Source node [%s] is a parameter node, do not specify a [socket]", socket.getNode()));
         }
-        else {
+        else if (node.getNodeType() == FlowNodeType.RESOURCE_NODE) {
 
-            var inputOrOutput = ctx.field().equals(FE_SOURCE) ? "output" : "input";
-            var modelSockets = ctx.field().equals(FE_SOURCE)
-                    ? node.getOutputsList()
-                    : node.getInputsList();
+            if (ctx.field().equals(FE_TARGET))
+                ctx.error(String.format("Resource node [%s] cannot be used as a target", socket.getNode()));
+
+            else if (socket.hasField(FS_SOCKET))
+                ctx.error(String.format("Source node [%s] is a Resource node, do not specify a [socket]", socket.getNode()));
+        }
+        else if (node.getNodeType() == FlowNodeType.MODEL_NODE) {
 
             if (!socket.hasField(FS_SOCKET)) {
 
                 ctx.error(String.format(
                         "%s node [%s] is a model node, specify a [socket] to connect to a model %s",
-                        socketType, socket.getNode(), inputOrOutput));
+                        socketType, socket.getNode(), ctx.field().equals(FE_SOURCE) ? "output" : "input"));
             }
-            else if (!modelSockets.contains(socket.getSocket())) {
+            else if (ctx.field().equals(FE_SOURCE)) {
+                if (!node.getOutputsList().contains(socket.getSocket())) {
 
-                ctx.error(String.format(
-                        "Socket [%s] is not an %s of node [%s]",
-                        socket.getSocket(), inputOrOutput, socket.getNode()));
+                    ctx.error(String.format(
+                            "Socket [%s] is not an output of node [%s]",
+                            socket.getSocket(), socket.getNode()));
+                }
             }
+            else {
+                if (!node.getParametersList().contains(socket.getSocket()) &&
+                    !node.getInputsList().contains(socket.getSocket()) &&
+                    !node.getResourcesList().contains(socket.getSocket())) {
+
+                    ctx.error(String.format(
+                            "Socket [%s] is not a parameter, input or resource of node [%s]",
+                            socket.getSocket(), socket.getNode()));
+                }
+            }
+        }
+        else {
+            // Unknown node type
+            throw new EUnexpected();
         }
 
         return ctx;
@@ -451,6 +499,9 @@ public class FlowValidator {
 
             if (node.getNodeType() == FlowNodeType.MODEL_NODE && !usedNodes.contains(nodeName))
                 ctx = ctx.error(String.format("The outputs of model node [%s] are not used", nodeName));
+
+            if (node.getNodeType() == FlowNodeType.RESOURCE_NODE && !usedNodes.contains(nodeName))
+                ctx = ctx.error(String.format("Resource node [%s] is not used", nodeName));
         }
 
         return ctx;
@@ -484,7 +535,8 @@ public class FlowValidator {
         // Initial set of reachable flow nodes is just the input nodes
         for (var node : remainingNodes.entrySet()) {
             if (node.getValue().getNodeType() == FlowNodeType.PARAMETER_NODE ||
-                node.getValue().getNodeType() == FlowNodeType.INPUT_NODE) {
+                node.getValue().getNodeType() == FlowNodeType.INPUT_NODE ||
+                node.getValue().getNodeType() == FlowNodeType.RESOURCE_NODE) {
                 reachableNodes.put(node.getKey(), node.getValue());
             }
         }
@@ -541,6 +593,7 @@ public class FlowValidator {
 
             case PARAMETER_NODE:
             case INPUT_NODE:
+            case RESOURCE_NODE:
                 return List.of();
 
             case OUTPUT_NODE:

@@ -20,9 +20,9 @@ package org.finos.tracdap.svc.orch.jobs;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
-import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
 import java.util.*;
@@ -47,30 +47,33 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
     }
 
     @Override
-    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public List<String> requiredResources(JobDefinition job, MetadataBundle metadata) {
 
         var resources = new HashSet<String>();
 
         // Storage requirements are the same for model / flow jobs
-        addRequiredStorage(metadata, tenantConfig, resources);
+        addRequiredStorage(metadata, resources);
 
         // Include repo resource for the model
         var modelObj = metadata.getObject(job.getRunModel().getModel());
         var modelRepo = modelObj.getModel().getRepository();
         resources.add(modelRepo);
 
+        // Add all target resources selected for the job
+        resources.addAll(job.getRunModel().getResourcesMap().values());
+
         return new ArrayList<>(resources);
     }
 
     @Override
-    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         // No transformations currently required
         return job;
     }
 
     @Override
-    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, TenantConfig tenantConfig) {
+    public MetadataBundle applyMetadataTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
         return metadata;
     }

@@ -21,7 +21,6 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.metadata.RunFlowJob;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
@@ -45,8 +44,6 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static org.finos.tracdap.svc.orch.jobs.Helpers.runJob;
-
 
 @Tag("integration")
 @Tag("int-e2e")
@@ -63,6 +60,7 @@ public class RunFlowTest {
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String ACCOUNT_FILTER_INPUT_PATH = "examples/models/python/data/inputs/account_filter.csv";
     private static final String STRUCT_INPUT_PATH = "examples/models/python/data/inputs/structured_run_config.json";
+    private static final String REPO_LIST_INPUT_PATH = "examples/models/python/data/inputs/repo_list.csv";
     public static final String ANALYSIS_TYPE = "analysis_type";
 
     // Only test E2E run model using the local repo
@@ -91,7 +89,6 @@ public class RunFlowTest {
     static TagHeader loansDataId;
     static TagHeader filterModelId;
     static TagHeader aggregationModelId;
-    static TagHeader jobId;
     static TagHeader outputDataId;
 
     static TagHeader flowId2;
@@ -108,7 +105,200 @@ public class RunFlowTest {
     static TagHeader structInputDataId;
     static TagHeader structOutputDataId;
 
-    @Test @Order(1)
+    static TagHeader externalSystemsFlowId;
+    static TagHeader externalSystemsModelId;
+    static SchemaDefinition externalSystemsInputSchema;
+    static TagHeader externalSystemsInputDataId;
+    static TagHeader externalSystemsOutputDataId;
+
+    static TagHeader jobId_importModel_aggregation;
+    static TagHeader jobId_importModel_filter;
+    static TagHeader jobId_importModel_dynamicIO;
+    static TagHeader jobId_importModel_optionalIO;
+    static TagHeader jobId_importModel_struct;
+    static TagHeader jobId_importModel_externalSystems;
+
+
+    static TagHeader jobId_runFlow;
+    static TagHeader jobId_runFlow_dynamicOptional;
+    static TagHeader jobId_runFlow_struct;
+    static TagHeader jobId_runFlow_externalSystem;
+
+
+    @Test @Order(101)
+    void importModels() throws Exception {
+
+        log.info("Running IMPORT_MODEL job...");
+
+        var model1EntryPoint = "tutorial.using_data.PnlAggregation";
+        var model1Attrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_1"))
+                .build());
+        var model1JobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_1"))
+                .build());
+
+        var model2EntryPoint = "tutorial.chaining.CustomerDataFilter";
+        var model2Attrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_2"))
+                .build());
+        var model2JobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_2"))
+                .build());
+
+        jobId_importModel_aggregation = Helpers.startModelImport(platform, TEST_TENANT, modelStub(model1EntryPoint), model1Attrs, model1JobAttrs);
+        jobId_importModel_filter = Helpers.startModelImport(platform, TEST_TENANT, modelStub(model2EntryPoint), model2Attrs, model2JobAttrs);
+    }
+
+    @Test @Order(201)
+    void importModels_result() {
+
+        aggregationModelId = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_aggregation).getHeader();
+        filterModelId = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_filter).getHeader();
+    }
+
+    @Test @Order(102)
+    void importModels_dynamicAndOptional() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for dynamic / optional...");
+
+        var model1EntryPoint = "tutorial.dynamic_io.DynamicDataFilter";
+        var model1Attrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:chaining:dynamic_io"))
+                .build());
+        var model1JobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:import_model:dynamic_io"))
+                .build());
+
+        var model2EntryPoint = "tutorial.optional_io.OptionalIOModel";
+        var model2Attrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:chaining:optional_io"))
+                .build());
+        var model2JobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:import_model:optional_io"))
+                .build());
+
+        jobId_importModel_dynamicIO = Helpers.startModelImport(platform, TEST_TENANT, modelStub(model1EntryPoint), model1Attrs, model1JobAttrs);
+        jobId_importModel_optionalIO = Helpers.startModelImport(platform, TEST_TENANT, modelStub(model2EntryPoint), model2Attrs, model2JobAttrs);
+    }
+
+    @Test @Order(202)
+    void importModels_dynamicAndOptional_result() {
+
+        dynamicFilterModelId = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_dynamicIO).getHeader();
+        pnlAggregationModelId = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_optionalIO).getHeader();
+    }
+
+    @Test @Order(103)
+    void importModels_struct() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for struct...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.structured_objects.StructModel")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:struct"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:struct_import_model"))
+                .build());
+
+        jobId_importModel_struct = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+    }
+
+    @Test @Order(203)
+    void importModels_struct_result() {
+
+        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_struct);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_flow:struct", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.structured_objects.StructModel", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.getInputsMap().containsKey("run_config"));
+        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("modified_config"));
+
+        structModelId = modelTag.getHeader();
+        structModelInputSchema = modelDef.getInputsOrThrow("run_config").getSchema();
+    }
+
+    @Test @Order(104)
+    void importModels_externalSystems() throws Exception {
+
+        log.info("Running IMPORT_MODEL job for external systems...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.external_systems.GitHubProjectDetails")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("run_flow:external_systems"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("run_flow:external_systems_import_model"))
+                .build());
+
+        jobId_importModel_externalSystems = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+    }
+
+    @Test @Order(204)
+    void importModels_externalSystems_result() {
+
+        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importModel_externalSystems);
+        var modelDef = modelTag.getDefinition().getModel();
+        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+
+        Assertions.assertEquals("run_flow:external_systems", MetadataCodec.decodeStringValue(modelAttr));
+        Assertions.assertEquals("tutorial.external_systems.GitHubProjectDetails", modelDef.getEntryPoint());
+        Assertions.assertTrue(modelDef.containsInputs("repo_list"));
+        Assertions.assertTrue(modelDef.containsOutputs("repo_details"));
+        Assertions.assertTrue(modelDef.containsResources("github_api"));
+
+        externalSystemsModelId = modelTag.getHeader();
+        externalSystemsInputSchema = modelDef.getInputsOrThrow("repo_list").getSchema();
+    }
+
+    private ModelDefinition modelStub(String entryPoint) throws Exception {
+
+        // Fails if current commit not pushed to Git
+        var modelVersion = GitHelpers.getCurrentCommit();
+
+        return ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint(entryPoint)
+                .setVersion(modelVersion)
+                .build();
+    }
+
+    @Test @Order(301)
     void createFlow() {
 
         var metaClient = platform.metaClientBlocking();
@@ -163,36 +353,36 @@ public class RunFlowTest {
         flowId = metaClient.createObject(createReq);
     }
 
-    @Test @Order(2)
+    @Test @Order(302)
     void createSchemas() {
 
         var loansSchema = ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.SCHEMA)
                 .setSchema(SchemaDefinition.newBuilder()
-                .setSchemaType(SchemaType.TABLE)
-                .setTable(TableSchema.newBuilder()
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("id")
-                                .setFieldType(BasicType.STRING)
-                                .setBusinessKey(true)
-                                .setLabel("Customer Id"))
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("loan_amount")
-                                .setFieldType(BasicType.DECIMAL)
-                                .setLabel("Loan amount"))
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("loan_condition_cat")
-                                .setFieldType(BasicType.INTEGER)
-                                .setLabel("Loan condition category code"))
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("total_pymnt")
-                                .setFieldType(BasicType.DECIMAL)
-                                .setLabel("Total payment received to date"))
-                        .addFields(FieldSchema.newBuilder()
-                                .setFieldName("region")
-                                .setFieldType(BasicType.STRING)
-                                .setCategorical(true)
-                                .setLabel("Customer region"))))
+                        .setSchemaType(SchemaType.TABLE)
+                        .setTable(TableSchema.newBuilder()
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("id")
+                                        .setFieldType(BasicType.STRING)
+                                        .setBusinessKey(true)
+                                        .setLabel("Customer Id"))
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("loan_amount")
+                                        .setFieldType(BasicType.DECIMAL)
+                                        .setLabel("Loan amount"))
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("loan_condition_cat")
+                                        .setFieldType(BasicType.INTEGER)
+                                        .setLabel("Loan condition category code"))
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("total_pymnt")
+                                        .setFieldType(BasicType.DECIMAL)
+                                        .setLabel("Total payment received to date"))
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("region")
+                                        .setFieldType(BasicType.STRING)
+                                        .setCategorical(true)
+                                        .setLabel("Customer region"))))
                 .build();
 
         var loansSchemaAttrs = List.of(TagUpdate.newBuilder()
@@ -203,300 +393,7 @@ public class RunFlowTest {
         loansSchemaId = createSchema(loansSchema, loansSchemaAttrs);
     }
 
-    TagHeader createSchema(ObjectDefinition schema, List<TagUpdate> attrs) {
-
-        var metaClient = platform.metaClientBlocking();
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.SCHEMA)
-                .setDefinition(schema)
-                .addAllTagUpdates(attrs)
-                .build();
-
-        return metaClient.createObject(writeRequest);
-    }
-
-    @Test @Order(3)
-    void loadInputData() throws Exception {
-
-        log.info("Loading input data...");
-
-        var loansAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_dataset")
-                .setValue(MetadataCodec.encodeValue("run_flow:customer_loans"))
-                .build());
-
-        loansDataId = loadDataset(loansSchemaId, LOANS_INPUT_PATH, loansAttrs);
-    }
-
-    TagHeader loadDataset(TagHeader schemaId, String dataPath, List<TagUpdate> attrs) throws Exception {
-
-        var dataClient = platform.dataClientBlocking();
-
-        var inputPath = platform.tracRepoDir().resolve(dataPath);
-        var inputBytes = Files.readAllBytes(inputPath);
-
-        var writeRequest = DataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSchemaId(MetadataUtil.selectorFor(schemaId))
-                .setFormat("text/csv")
-                .setContent(ByteString.copyFrom(inputBytes))
-                .addAllTagUpdates(attrs)
-                .build();
-
-        return dataClient.createSmallDataset(writeRequest);
-    }
-
-    @Test @Order(4)
-    void importModels() {
-
-        log.info("Running IMPORT_MODEL job...");
-
-        var modelsPath = "examples/models/python/src";
-        var modelsVersion = "main";
-
-        var model1EntryPoint = "tutorial.using_data.PnlAggregation";
-        var model1Attrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_1"))
-                .build());
-        var model1JobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_1"))
-                .build());
-
-        var model2EntryPoint = "tutorial.chaining.CustomerDataFilter";
-        var model2Attrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("run_flow:chaining:model_2"))
-                .build());
-        var model2JobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("run_flow:import_model:model_2"))
-                .build());
-
-        aggregationModelId = importModel(
-                modelsPath, model1EntryPoint, modelsVersion,
-                model1Attrs, model1JobAttrs);
-
-        filterModelId = importModel(
-                modelsPath, model2EntryPoint, modelsVersion,
-                model2Attrs, model2JobAttrs);
-    }
-
-    private TagHeader importModel(
-            String path, String entryPoint, String version,
-            List<TagUpdate> modelAttrs, List<TagUpdate> jobAttrs) {
-
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
-        var importModel = ImportModelJob.newBuilder()
-                .setLanguage("python")
-                .setRepository(useTracRepo())
-                .setPath(path)
-                .setEntryPoint(entryPoint)
-                .setVersion(version)
-                .addAllModelAttrs(modelAttrs)
-                .build();
-
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.IMPORT_MODEL)
-                        .setImportModel(importModel))
-                .addAllJobAttrs(jobAttrs)
-                .build();
-
-        var jobStatus = runJob(orchClient, jobRequest);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var modelSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                .setObjectType(ObjectType.MODEL)
-                .setSearch(SearchExpression.newBuilder()
-                .setTerm(SearchTerm.newBuilder()
-                        .setAttrName("trac_create_job")
-                        .setAttrType(BasicType.STRING)
-                        .setOperator(SearchOperator.EQ)
-                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
-                .build();
-
-        var modelSearchResult = metaClient.search(modelSearch);
-
-        Assertions.assertEquals(1, modelSearchResult.getSearchResultCount());
-
-        return modelSearchResult.getSearchResult(0).getHeader();
-    }
-
-    @Test @Order(5)
-    void runFlow() {
-
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
-        var runFlow = RunFlowJob.newBuilder()
-                .setFlow(MetadataUtil.selectorFor(flowId))
-                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.2071))
-                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
-                .putParameters("filter_defaults", MetadataCodec.encodeValue(false))
-                .putParameters("filter_region", MetadataCodec.encodeValue("munster"))
-                .putInputs("customer_loans", MetadataUtil.selectorFor(loansDataId))
-                .putModels("customer_data_filter", MetadataUtil.selectorFor(filterModelId))
-                .putModels("pnl_aggregation", MetadataUtil.selectorFor(aggregationModelId))
-                .addOutputAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_data")
-                        .setValue(MetadataCodec.encodeValue("run_flow:data_output")))
-                .build();
-
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.RUN_FLOW)
-                        .setRunFlow(runFlow))
-                .addJobAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("run_flow:run_flow")))
-                .build();
-
-        var jobStatus = runJob(orchClient, jobRequest);
-
-        jobId = jobStatus.getJobId();
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var dataSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                .setObjectType(ObjectType.DATA)
-                .setSearch(SearchExpression.newBuilder()
-                .setTerm(SearchTerm.newBuilder()
-                        .setAttrName("trac_create_job")
-                        .setAttrType(BasicType.STRING)
-                        .setOperator(SearchOperator.EQ)
-                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId))))))
-                .build();
-
-        var dataSearchResult = metaClient.search(dataSearch);
-
-        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
-
-        var indexedResult = dataSearchResult.getSearchResultList().stream()
-                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
-
-        var profitByRegionAnalysisType = indexedResult.get("profit_by_region")
-                .getAttrsOrThrow(ANALYSIS_TYPE)
-                .getFloatValue();
-        Assertions.assertEquals(3.14, profitByRegionAnalysisType);
-
-        var searchResult = indexedResult.get("profit_by_region");
-        var dataReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
-                .build();
-
-        var dataTag = metaClient.readObject(dataReq);
-        var dataDef = dataTag.getDefinition().getData();
-        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
-        var fieldCountAttr = dataTag.getAttrsOrThrow("trac_schema_field_count");
-        var rowCountAttr = dataTag.getAttrsOrThrow("trac_data_row_count");
-
-        Assertions.assertEquals("run_flow:data_output", MetadataCodec.decodeStringValue(outputAttr));
-        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(fieldCountAttr) > 0);
-        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(rowCountAttr) > 0);
-        Assertions.assertEquals(1, dataDef.getPartsCount());
-
-        outputDataId = dataTag.getHeader();
-    }
-
-    private static String getJobOutput(org.finos.tracdap.metadata.Tag t) {
-        var attr = t.getAttrsOrThrow("trac_job_output");
-        return attr.getStringValue();
-    }
-
-    @Test @Order(6)
-    void checkResultAndLogFile() {
-
-        var metaClient = platform.metaClientBlocking();
-        var dataClient = platform.dataClientBlocking();
-
-        var jobDef = metaClient.readObject(MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(jobId))
-                .build())
-                .getDefinition().getJob();
-
-        var resultId = jobDef.getResultId();
-        var resultDef = metaClient.readObject(MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(resultId)
-                .build())
-                .getDefinition().getResult();
-
-        var logFileId = resultDef.getLogFileId();
-        var logFileDef = metaClient.readObject(MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(logFileId)
-                .build())
-                .getDefinition().getFile();
-
-        Assertions.assertEquals(jobId.getObjectId(), resultDef.getJobId().getObjectId());
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, resultDef.getStatusCode());
-        Assertions.assertTrue(logFileDef.getSize() > 0);
-
-        var logFileContent = dataClient.readSmallFile(FileReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(logFileId)
-                .build())
-                .getContent()
-                .toString(StandardCharsets.UTF_8);
-
-        System.out.println(logFileContent);
-
-        // Some things that are expected in the log
-        // Might need to be updated if there are logging changes in the runtime
-        Assertions.assertTrue(logFileContent.contains(MetadataUtil.objectKey(jobId)));
-        Assertions.assertTrue(logFileContent.contains("START RunModel"));
-
-        // This should be the last line in the job log, it is the last message from the job processor
-        // Higher level messages (from the engine and runtime classes) are not part of the recorded job log
-        var successLine = String.format("Job succeeded [%s]", MetadataUtil.objectKey(jobId));
-        Assertions.assertTrue(logFileContent.contains(successLine));
-    }
-
-    @Test @Order(6)
-    void checkOutputData() {
-
-        log.info("Checking output data...");
-
-        var dataClient = platform.dataClientBlocking();
-
-        var EXPECTED_REGIONS = 5;  // based on the chaining example models
-
-        var readRequest = DataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(outputDataId))
-                .setFormat("text/csv")
-                .build();
-
-        var readResponse = dataClient.readSmallDataset(readRequest);
-
-        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
-        var csvLines = csvText.split("\n");
-
-        var csvHeaders = Arrays.stream(csvLines[0].split(","))
-                .map(String::trim)
-                .collect(Collectors.toList());
-
-        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
-        Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
-    }
-
-    @Test @Order(7)
+    @Test @Order(303)
     void createFlow2() {
 
         var metaClient = platform.metaClientBlocking();
@@ -548,21 +445,21 @@ public class RunFlowTest {
         flowId2 = metaClient.createObject(createReq);
     }
 
-    @Test @Order(8)
+    @Test @Order(304)
     void createSchemas2() {
 
         var accountFilterSchema = ObjectDefinition.newBuilder()
                 .setObjectType(ObjectType.SCHEMA)
                 .setSchema(SchemaDefinition.newBuilder()
-                .setSchemaType(SchemaType.TABLE)
-                .setTable(TableSchema.newBuilder()
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("account_id")
-                        .setFieldType(BasicType.STRING)
-                        .setBusinessKey(true))
-                .addFields(FieldSchema.newBuilder()
-                        .setFieldName("reason")
-                        .setFieldType(BasicType.STRING))))
+                        .setSchemaType(SchemaType.TABLE)
+                        .setTable(TableSchema.newBuilder()
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("account_id")
+                                        .setFieldType(BasicType.STRING)
+                                        .setBusinessKey(true))
+                                .addFields(FieldSchema.newBuilder()
+                                        .setFieldName("reason")
+                                        .setFieldType(BasicType.STRING))))
                 .build();
 
         var accountFilterSchemaAttrs = List.of(TagUpdate.newBuilder()
@@ -573,10 +470,152 @@ public class RunFlowTest {
         accountFilterSchemaId = createSchema(accountFilterSchema, accountFilterSchemaAttrs);
     }
 
-    @Test @Order(9)
-    void loadInputData2() throws Exception {
+    TagHeader createSchema(ObjectDefinition schema, List<TagUpdate> attrs) {
+
+        var metaClient = platform.metaClientBlocking();
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(schema)
+                .addAllTagUpdates(attrs)
+                .build();
+
+        return metaClient.createObject(writeRequest);
+    }
+
+    @Test @Order(305)
+    void createFlow_struct() {
+
+        var metaClient = platform.metaClientBlocking();
+
+        var flowDef = FlowDefinition.newBuilder()
+                .putNodes("run_config", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("run_config")
+                        .addOutputs("modified_config")
+                        .build())
+                .putNodes("model_2", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("run_config")
+                        .addOutputs("modified_config")
+                        .build())
+                .putNodes("modified_config", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
+                        .build())
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("run_config"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("run_config")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("modified_config"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_2").setSocket("run_config")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_2").setSocket("modified_config"))
+                        .setTarget(FlowSocket.newBuilder().setNode("modified_config")))
+                .build();
+
+        var createReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.FLOW).setFlow(flowDef))
+                .build();
+
+        structFlowId = metaClient.createObject(createReq);
+    }
+
+    @Test @Order(306)
+    void createFlow_externalSystems() {
+
+        var metaClient = platform.metaClientBlocking();
+
+        // Use a different name for the resource node, to test flow wiring
+
+        var flowDef = FlowDefinition.newBuilder()
+                .putNodes("repo_list", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("github_api_mapped", FlowNode.newBuilder().setNodeType(FlowNodeType.RESOURCE_NODE).build())
+                .putNodes("github_projects", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("repo_list")
+                        .addOutputs("repo_details")
+                        .addResources("github_api")
+                        .build())
+                .putNodes("repo_details", FlowNode.newBuilder()
+                        .setNodeType(FlowNodeType.OUTPUT_NODE)
+                        .build())
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("repo_list"))
+                        .setTarget(FlowSocket.newBuilder().setNode("github_projects").setSocket("repo_list")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("github_api_mapped"))
+                        .setTarget(FlowSocket.newBuilder().setNode("github_projects").setSocket("github_api")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("github_projects").setSocket("repo_details"))
+                        .setTarget(FlowSocket.newBuilder().setNode("repo_details")))
+                .build();
+
+        var createReq = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.FLOW).setFlow(flowDef))
+                .build();
+
+        externalSystemsFlowId = metaClient.createObject(createReq);
+    }
+
+    @Test @Order(401)
+    void loadInputData() throws Exception {
 
         log.info("Loading input data...");
+
+        var loansAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_dataset")
+                .setValue(MetadataCodec.encodeValue("run_flow:customer_loans"))
+                .build());
+
+        loansDataId = loadDataset(loansSchemaId, LOANS_INPUT_PATH, loansAttrs);
+    }
+
+    private TagHeader loadDataset(TagHeader schemaId, String dataPath, List<TagUpdate> attrs) throws Exception {
+
+        var dataClient = platform.dataClientBlocking();
+
+        var inputPath = platform.tracRepoDir().resolve(dataPath);
+        var inputBytes = Files.readAllBytes(inputPath);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchemaId(MetadataUtil.selectorFor(schemaId))
+                .setFormat("text/csv")
+                .setContent(ByteString.copyFrom(inputBytes))
+                .addAllTagUpdates(attrs)
+                .build();
+
+        return dataClient.createSmallDataset(writeRequest);
+    }
+
+    private TagHeader loadDataset(SchemaDefinition schema, String dataPath, List<TagUpdate> attrs) throws Exception {
+
+        var dataClient = platform.dataClientBlocking();
+
+        var inputPath = platform.tracRepoDir().resolve(dataPath);
+        var inputBytes = Files.readAllBytes(inputPath);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(schema)
+                .setFormat("text/csv")
+                .setContent(ByteString.copyFrom(inputBytes))
+                .addAllTagUpdates(attrs)
+                .build();
+
+        return dataClient.createSmallDataset(writeRequest);
+    }
+
+    @Test @Order(402)
+    void loadInputData2() throws Exception {
+
+        log.info("Loading input data for dynamic / optional...");
 
         var accountFilterAttrs = List.of(TagUpdate.newBuilder()
                 .setAttrName("e2e_test_dataset")
@@ -586,47 +625,149 @@ public class RunFlowTest {
         accountFilterDataId = loadDataset(accountFilterSchemaId, ACCOUNT_FILTER_INPUT_PATH, accountFilterAttrs);
     }
 
-    @Test @Order(10)
-    void importModels2() {
+    @Test @Order(403)
+    void loadInputData_struct() throws Exception {
 
-        log.info("Running IMPORT_MODEL job...");
-
-        var modelsPath = "examples/models/python/src";
-        var modelsVersion = "main";
-
-        var model1EntryPoint = "tutorial.dynamic_io.DynamicDataFilter";
-        var model1Attrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("run_flow:chaining:dynamic_io"))
-                .build());
-        var model1JobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("run_flow:import_model:dynamic_io"))
-                .build());
-
-        var model2EntryPoint = "tutorial.optional_io.OptionalIOModel";
-        var model2Attrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("run_flow:chaining:optional_io"))
-                .build());
-        var model2JobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("run_flow:import_model:optional_io"))
-                .build());
-
-        dynamicFilterModelId = importModel(
-                modelsPath, model1EntryPoint, modelsVersion,
-                model1Attrs, model1JobAttrs);
-
-        pnlAggregationModelId = importModel(
-                modelsPath, model2EntryPoint, modelsVersion,
-                model2Attrs, model2JobAttrs);
-    }
-
-    @Test @Order(11)
-    void runFlow2() {
+        log.info("Loading input data for struct...");
 
         var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var inputPath = platform.tracRepoDir().resolve(STRUCT_INPUT_PATH);
+        var inputBytes = Files.readAllBytes(inputPath);
+
+        var writeRequest = DataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSchema(structModelInputSchema)
+                .setFormat("application/json")
+                .setContent(ByteString.copyFrom(inputBytes))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_dataset")
+                        .setValue(MetadataCodec.encodeValue("run_flow:run_config")))
+                .build();
+
+        structInputDataId = dataClient.createSmallDataset(writeRequest);
+
+        var dataSelector = MetadataUtil.selectorFor(structInputDataId);
+        var dataRequest = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(dataSelector)
+                .build();
+
+        var dataTag = metaClient.readObject(dataRequest);
+
+        var datasetAttr = dataTag.getAttrsOrThrow("e2e_test_dataset");
+        var datasetSchema = dataTag.getDefinition().getData().getSchema();
+
+        Assertions.assertEquals("run_flow:run_config", MetadataCodec.decodeStringValue(datasetAttr));
+        Assertions.assertEquals(SchemaType.STRUCT_SCHEMA, datasetSchema.getSchemaType());
+        Assertions.assertEquals(4, datasetSchema.getStruct().getFieldsCount());
+
+        log.info("Struct input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
+    }
+
+    @Test @Order(404)
+    void loadInputData_externalSystems() throws Exception {
+
+        log.info("Loading input data for external systems...");
+
+        var accountFilterAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_dataset")
+                .setValue(MetadataCodec.encodeValue("run_flow:repo_list"))
+                .build());
+
+        externalSystemsInputDataId = loadDataset(externalSystemsInputSchema, REPO_LIST_INPUT_PATH, accountFilterAttrs);
+    }
+
+    @Test @Order(501)
+    void runFlow() {
+
+        var orchClient = platform.orchClientBlocking();
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(MetadataUtil.selectorFor(flowId))
+                .putParameters("eur_usd_rate", MetadataCodec.encodeValue(1.2071))
+                .putParameters("default_weighting", MetadataCodec.encodeValue(1.5))
+                .putParameters("filter_defaults", MetadataCodec.encodeValue(false))
+                .putParameters("filter_region", MetadataCodec.encodeValue("munster"))
+                .putInputs("customer_loans", MetadataUtil.selectorFor(loansDataId))
+                .putModels("customer_data_filter", MetadataUtil.selectorFor(filterModelId))
+                .putModels("pnl_aggregation", MetadataUtil.selectorFor(aggregationModelId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_flow:data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_FLOW)
+                        .setRunFlow(runFlow))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_flow:run_flow")))
+                .build();
+
+        jobId_runFlow = Helpers.startJob(orchClient, jobRequest).getJobId();
+    }
+
+    @Test @Order(601)
+    void runFlow_result() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_runFlow);
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setSearch(SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                        .setAttrName("trac_create_job")
+                        .setAttrType(BasicType.STRING)
+                        .setOperator(SearchOperator.EQ)
+                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId_runFlow))))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var indexedResult = dataSearchResult.getSearchResultList().stream()
+                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
+
+        var profitByRegionAnalysisType = indexedResult.get("profit_by_region")
+                .getAttrsOrThrow(ANALYSIS_TYPE)
+                .getFloatValue();
+        Assertions.assertEquals(3.14, profitByRegionAnalysisType);
+
+        var searchResult = indexedResult.get("profit_by_region");
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+        var fieldCountAttr = dataTag.getAttrsOrThrow("trac_schema_field_count");
+        var rowCountAttr = dataTag.getAttrsOrThrow("trac_data_row_count");
+
+        Assertions.assertEquals("run_flow:data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(fieldCountAttr) > 0);
+        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(rowCountAttr) > 0);
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        outputDataId = dataTag.getHeader();
+    }
+
+    @Test @Order(502)
+    void runFlow2() {
+
         var orchClient = platform.orchClientBlocking();
 
         var runFlow = RunFlowJob.newBuilder()
@@ -655,7 +796,16 @@ public class RunFlowTest {
                         .setValue(MetadataCodec.encodeValue("run_flow:run_flow_2")))
                 .build();
 
-        var jobStatus = runJob(orchClient, jobRequest);
+        jobId_runFlow_dynamicOptional = Helpers.startJob(orchClient, jobRequest).getJobId();
+    }
+
+    @Test @Order(602)
+    void runFlow2_result() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_runFlow_dynamicOptional);
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
         Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
@@ -710,10 +860,243 @@ public class RunFlowTest {
         exclusionsDataId = dataTag2.getHeader();
     }
 
-    @Test @Order(12)
-    void checkOutputData2() {
+    @Test @Order(503)
+    void runFlow_struct() {
+
+        var orchClient = platform.orchClientBlocking();
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(MetadataUtil.selectorFor(structFlowId))
+                .putParameters("t0_date", MetadataCodec.encodeValue(LocalDate.now()))
+                .putParameters("projection_period", MetadataCodec.encodeValue(365))
+                .putInputs("run_config", MetadataUtil.selectorFor(structInputDataId))
+                .putModels("model_1", MetadataUtil.selectorFor(structModelId))
+                .putModels("model_2", MetadataUtil.selectorFor(structModelId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_flow:struct_data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_FLOW)
+                        .setRunFlow(runFlow))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_flow:struct_run_flow")))
+                .build();
+
+        jobId_runFlow_struct = Helpers.startJob(orchClient, jobRequest).getJobId();
+    }
+
+    @Test @Order(603)
+    void runFlow_struct_result() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_runFlow_struct);
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId_runFlow_struct))))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var indexedResult = dataSearchResult.getSearchResultList().stream()
+                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
+
+        var searchResult = indexedResult.get("modified_config");
+
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_flow:struct_data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        structOutputDataId = dataTag.getHeader();
+    }
+
+    @Test @Order(504)
+    void runFlow_externalSystems() {
+
+        var orchClient = platform.orchClientBlocking();
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(MetadataUtil.selectorFor(externalSystemsFlowId))
+                .putInputs("repo_list", MetadataUtil.selectorFor(externalSystemsInputDataId))
+                .putResources("github_api_mapped", "github_api")
+                .putModels("github_projects", MetadataUtil.selectorFor(externalSystemsModelId))
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_data")
+                        .setValue(MetadataCodec.encodeValue("run_flow:external_systems_data_output")))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_FLOW)
+                        .setRunFlow(runFlow))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("e2e_test_job")
+                        .setValue(MetadataCodec.encodeValue("run_flow:external_systems_run_flow")))
+                .build();
+
+        jobId_runFlow_externalSystem = Helpers.startJob(orchClient, jobRequest).getJobId();
+    }
+
+    @Test @Order(604)
+    void runFlow_externalSystems_result() {
+
+        var metaClient = platform.metaClientBlocking();
+        var orchClient = platform.orchClientBlocking();
+
+        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_runFlow_externalSystem);
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var dataSearch = MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName("trac_create_job")
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId_runFlow_externalSystem))))))
+                .build();
+
+        var dataSearchResult = metaClient.search(dataSearch);
+
+        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
+
+        var indexedResult = dataSearchResult.getSearchResultList().stream()
+                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
+
+        var searchResult = indexedResult.get("repo_details");
+
+        var dataReq = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
+                .build();
+
+        var dataTag = metaClient.readObject(dataReq);
+        var dataDef = dataTag.getDefinition().getData();
+        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
+
+        Assertions.assertEquals("run_flow:external_systems_data_output", MetadataCodec.decodeStringValue(outputAttr));
+        Assertions.assertEquals(1, dataDef.getPartsCount());
+
+        externalSystemsOutputDataId = dataTag.getHeader();
+    }
+
+    private static String getJobOutput(org.finos.tracdap.metadata.Tag t) {
+        var attr = t.getAttrsOrThrow("trac_job_output");
+        return attr.getStringValue();
+    }
+
+    @Test @Order(701)
+    void checkResultAndLogFile() {
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+
+        var jobDef = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(jobId_runFlow))
+                .build())
+                .getDefinition().getJob();
+
+        var resultId = jobDef.getResultId();
+        var resultDef = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(resultId)
+                .build())
+                .getDefinition().getResult();
+
+        var logFileId = resultDef.getLogFileId();
+        var logFileDef = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(logFileId)
+                .build())
+                .getDefinition().getFile();
+
+        Assertions.assertEquals(jobId_runFlow.getObjectId(), resultDef.getJobId().getObjectId());
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, resultDef.getStatusCode());
+        Assertions.assertTrue(logFileDef.getSize() > 0);
+
+        var logFileContent = dataClient.readSmallFile(FileReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(logFileId)
+                .build())
+                .getContent()
+                .toString(StandardCharsets.UTF_8);
+
+        System.out.println(logFileContent);
+
+        // Some things that are expected in the log
+        // Might need to be updated if there are logging changes in the runtime
+        Assertions.assertTrue(logFileContent.contains(MetadataUtil.objectKey(jobId_runFlow)));
+        Assertions.assertTrue(logFileContent.contains("START RunModel"));
+
+        // This should be the last line in the job log, it is the last message from the job processor
+        // Higher level messages (from the engine and runtime classes) are not part of the recorded job log
+        var successLine = String.format("Job succeeded [%s]", MetadataUtil.objectKey(jobId_runFlow));
+        Assertions.assertTrue(logFileContent.contains(successLine));
+    }
+
+    @Test @Order(702)
+    void checkOutputData() {
 
         log.info("Checking output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var EXPECTED_REGIONS = 5;  // based on the chaining example models
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(outputDataId))
+                .setFormat("text/csv")
+                .build();
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("region", "gross_profit"), csvHeaders);
+        Assertions.assertEquals(EXPECTED_REGIONS + 1, csvLines.length);
+    }
+
+    @Test @Order(703)
+    void checkOutputData2() {
+
+        log.info("Checking output data for dynamic / optional...");
 
         var dataClient = platform.dataClientBlocking();
 
@@ -763,198 +1146,10 @@ public class RunFlowTest {
         Assertions.assertTrue(csvLines2.length >= 2);
     }
 
-    @Test @Order(13)
-    void struct_createFlow() {
+    @Test @Order(704)
+    void checkOutputData_struct() {
 
-        var metaClient = platform.metaClientBlocking();
-
-        var flowDef = FlowDefinition.newBuilder()
-                .putNodes("run_config", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
-                .putNodes("model_1", FlowNode.newBuilder()
-                        .setNodeType(FlowNodeType.MODEL_NODE)
-                        .addInputs("run_config")
-                        .addOutputs("modified_config")
-                        .build())
-                .putNodes("model_2", FlowNode.newBuilder()
-                        .setNodeType(FlowNodeType.MODEL_NODE)
-                        .addInputs("run_config")
-                        .addOutputs("modified_config")
-                        .build())
-                .putNodes("modified_config", FlowNode.newBuilder()
-                        .setNodeType(FlowNodeType.OUTPUT_NODE)
-                        .build())
-                .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("run_config"))
-                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("run_config")))
-                .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("modified_config"))
-                        .setTarget(FlowSocket.newBuilder().setNode("model_2").setSocket("run_config")))
-                .addEdges(FlowEdge.newBuilder()
-                        .setSource(FlowSocket.newBuilder().setNode("model_2").setSocket("modified_config"))
-                        .setTarget(FlowSocket.newBuilder().setNode("modified_config")))
-                .build();
-
-        var createReq = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.FLOW)
-                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.FLOW).setFlow(flowDef))
-                .build();
-
-        structFlowId = metaClient.createObject(createReq);
-    }
-
-    @Test @Order(14)
-    void struct_importModel() throws Exception {
-
-        log.info("Running IMPORT_MODEL job for struct...");
-
-        var modelVersion = GitHelpers.getCurrentCommit();
-        var modelStub = ModelDefinition.newBuilder()
-                .setLanguage("python")
-                .setRepository(useTracRepo())
-                .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.structured_objects.StructModel")
-                .setVersion(modelVersion)
-                .build();
-
-        var modelAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("run_flow:struct"))
-                .build());
-
-        var jobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("run_flow:struct_import_model"))
-                .build());
-
-        var modelTag = ImportModelTest.doImportModel(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
-        var modelDef = modelTag.getDefinition().getModel();
-        var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
-
-        Assertions.assertEquals("run_flow:struct", MetadataCodec.decodeStringValue(modelAttr));
-        Assertions.assertEquals("tutorial.structured_objects.StructModel", modelDef.getEntryPoint());
-        Assertions.assertTrue(modelDef.getInputsMap().containsKey("run_config"));
-        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("modified_config"));
-
-        structModelId = modelTag.getHeader();
-        structModelInputSchema = modelDef.getInputsOrThrow("run_config").getSchema();
-    }
-
-    @Test @Order(15)
-    void struct_loadInputData() throws Exception {
-
-        log.info("Loading struct input data...");
-
-        var metaClient = platform.metaClientBlocking();
-        var dataClient = platform.dataClientBlocking();
-
-        var inputPath = platform.tracRepoDir().resolve(STRUCT_INPUT_PATH);
-        var inputBytes = Files.readAllBytes(inputPath);
-
-        var writeRequest = DataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSchema(structModelInputSchema)
-                .setFormat("application/json")
-                .setContent(ByteString.copyFrom(inputBytes))
-                .addTagUpdates(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_dataset")
-                        .setValue(MetadataCodec.encodeValue("run_flow:run_config")))
-                .build();
-
-        structInputDataId = dataClient.createSmallDataset(writeRequest);
-
-        var dataSelector = MetadataUtil.selectorFor(structInputDataId);
-        var dataRequest = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(dataSelector)
-                .build();
-
-        var dataTag = metaClient.readObject(dataRequest);
-
-        var datasetAttr = dataTag.getAttrsOrThrow("e2e_test_dataset");
-        var datasetSchema = dataTag.getDefinition().getData().getSchema();
-
-        Assertions.assertEquals("run_flow:run_config", MetadataCodec.decodeStringValue(datasetAttr));
-        Assertions.assertEquals(SchemaType.STRUCT_SCHEMA, datasetSchema.getSchemaType());
-        Assertions.assertEquals(4, datasetSchema.getStruct().getFieldsCount());
-
-        log.info("Struct input data loaded, data ID = [{}]", dataTag.getHeader().getObjectId());
-    }
-
-    @Test @Order(16)
-    void struct_runFlow() {
-
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
-        var runFlow = RunFlowJob.newBuilder()
-                .setFlow(MetadataUtil.selectorFor(structFlowId))
-                .putParameters("t0_date", MetadataCodec.encodeValue(LocalDate.now()))
-                .putParameters("projection_period", MetadataCodec.encodeValue(365))
-                .putInputs("run_config", MetadataUtil.selectorFor(structInputDataId))
-                .putModels("model_1", MetadataUtil.selectorFor(structModelId))
-                .putModels("model_2", MetadataUtil.selectorFor(structModelId))
-                .addOutputAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_data")
-                        .setValue(MetadataCodec.encodeValue("run_flow:struct_data_output")))
-                .build();
-
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.RUN_FLOW)
-                        .setRunFlow(runFlow))
-                .addJobAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("run_flow:struct_run_flow")))
-                .build();
-
-        var jobStatus = runJob(orchClient, jobRequest);
-
-        jobId = jobStatus.getJobId();
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var dataSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                        .setObjectType(ObjectType.DATA)
-                        .setSearch(SearchExpression.newBuilder()
-                                .setTerm(SearchTerm.newBuilder()
-                                        .setAttrName("trac_create_job")
-                                        .setAttrType(BasicType.STRING)
-                                        .setOperator(SearchOperator.EQ)
-                                        .setSearchValue(MetadataCodec.encodeValue(MetadataUtil.objectKey(jobId))))))
-                .build();
-
-        var dataSearchResult = metaClient.search(dataSearch);
-
-        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
-
-        var indexedResult = dataSearchResult.getSearchResultList().stream()
-                .collect(Collectors.toMap(RunFlowTest::getJobOutput, Function.identity()));
-
-        var searchResult = indexedResult.get("modified_config");
-
-        var dataReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
-                .build();
-
-        var dataTag = metaClient.readObject(dataReq);
-        var dataDef = dataTag.getDefinition().getData();
-        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
-
-        Assertions.assertEquals("run_flow:struct_data_output", MetadataCodec.decodeStringValue(outputAttr));
-        Assertions.assertEquals(1, dataDef.getPartsCount());
-
-        structOutputDataId = dataTag.getHeader();
-    }
-
-    @Test @Order(17)
-    void struct_checkOutputData() {
-
-        log.info("Checking struct output data...");
+        log.info("Checking output data for struct...");
 
         var dataClient = platform.dataClientBlocking();
 
@@ -972,4 +1167,34 @@ public class RunFlowTest {
         Assertions.assertTrue(jsonText.contains("hpi_shock"));
     }
 
+    @Test @Order(705)
+    void checkOutputData_externalSystems() {
+
+        log.info("Checking external systems output data...");
+
+        var dataClient = platform.dataClientBlocking();
+
+        var readRequest = DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(externalSystemsOutputDataId))
+                .setFormat("text/csv")
+                .build();
+
+
+        var readResponse = dataClient.readSmallDataset(readRequest);
+
+        var csvText = readResponse.getContent().toString(StandardCharsets.UTF_8);
+        var csvLines = csvText.split("\n");
+
+        var csvHeaders = Arrays.stream(csvLines[0].split(","))
+                .map(String::trim)
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(List.of("repo_owner","repo_name","description","license","last_push"), csvHeaders);
+
+        // Look for expected words in the output data
+
+        Assertions.assertTrue(csvText.contains("tracdap"));
+        Assertions.assertTrue(csvText.contains("Apache License 2.0"));
+    }
 }

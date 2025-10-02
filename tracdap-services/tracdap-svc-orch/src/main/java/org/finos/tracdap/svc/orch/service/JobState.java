@@ -22,6 +22,8 @@ import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.common.middleware.GrpcClientConfig;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.config.JobConfig;
@@ -29,17 +31,20 @@ import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.RuntimeConfig;
 import org.finos.tracdap.metadata.*;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 
 public class JobState implements Serializable, Cloneable {
 
-    // Note: Do not keep exceptions in job state, not all exception classes are fully serializable
+    // Job state is stored in the job cache using Java serialization
+    // Updates must follow the rules of Java serialization compatability
     // Serialization failures can mask real errors, especially for rare error conditions
+    // Note: Do not keep exceptions in job state, not all exception classes are fully serializable
 
     private final static long serialVersionUID = 1L;
 
@@ -68,11 +73,18 @@ public class JobState implements Serializable, Cloneable {
     String errorDetail;
     int retries;
 
-    // Job definition and referenced metadata, built up by the job logic
+    // Job definition
     JobDefinition definition;
-    Map<String, TagHeader> objectMapping = new HashMap<>();
-    Map<String, ObjectDefinition> objects = new HashMap<>();
-    Map<String, Tag> tags = new HashMap<>();
+
+    // Referenced metadata and resources are restored from job config / sys config
+    // Do not leak extra serialization dependencies into -lib-common
+    transient MetadataBundle metadata;
+    transient ResourceBundle resources;
+
+    // No longer used
+    private Map<String, TagHeader> objectMapping = null;
+    private Map<String, ObjectDefinition> objects = null;
+    private Map<String, Tag> tags = null;
 
     TagHeader resultId;
     List<TagHeader> preallocatedIds = new ArrayList<>();
@@ -97,16 +109,38 @@ public class JobState implements Serializable, Cloneable {
         try {
 
             var clone = (JobState) super.clone();
-
-            clone.objectMapping = new HashMap<>(this.objectMapping);
-            clone.objects = new HashMap<>(this.objects);
-            clone.tags = new HashMap<>(this.tags);
             clone.preallocatedIds = new ArrayList<>(this.preallocatedIds);
 
             return clone;
         }
         catch (CloneNotSupportedException e) {
             throw new EUnexpected(e);
+        }
+    }
+
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+
+        // Default deserialization
+        in.defaultReadObject();
+
+        // Restore metadata and resource bundles from job / sys config
+
+        if (jobConfig != null) {
+            var objectMapping = jobConfig.getObjectMappingMap();
+            var objects = jobConfig.getObjectsMap();
+            var tags = jobConfig.getTagsMap();
+            this.metadata = new MetadataBundle(objectMapping, objects, tags);
+        }
+        else {
+            this.metadata = MetadataBundle.empty();
+        }
+
+        if (sysConfig != null) {
+            var resources = sysConfig.getResourcesMap();
+            this.resources = new ResourceBundle(resources);
+        }
+        else {
+            this.resources = ResourceBundle.empty();
         }
     }
 }

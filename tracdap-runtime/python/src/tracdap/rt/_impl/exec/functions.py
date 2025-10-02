@@ -33,6 +33,7 @@ import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.struct as _struct
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.util as _util
+import tracdap.rt.ext.external as _ext_system
 
 from tracdap.rt._impl.exec.graph import *
 from tracdap.rt._impl.exec.graph import _T
@@ -211,6 +212,21 @@ class ContextPopFunc(_ContextPushPopFunc):
 
     def __init__(self, node: ContextPopNode):
         super(ContextPopFunc, self).__init__(node, self._POP)
+
+
+# RESOURCE PROVISION
+# ------------------
+
+
+class ResourceFunc(NodeFunction):
+
+    def __init__(self, node: ResourceNode, resource: _resources.Resource):
+        super().__init__()
+        self.node = node
+        self.resource = resource
+
+    def _execute(self, ctx: NodeContext) -> _resources.Resource:
+        return self.resource
 
 
 # DATA HANDLING
@@ -599,6 +615,8 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             if node_id.namespace == self.node.id.namespace:
                 if node_id.name in model_def.parameters or node_id.name in model_def.inputs:
                     local_ctx[node_id.name] = node_result
+                elif node_id.name in model_def.resources:
+                    local_ctx[node_id.name] = self._wrap_resource(node_id.name, node_result)
 
         # Run the model against the mapped local context
 
@@ -610,7 +628,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
         else:
             trac_ctx = _ctx.TracContextImpl(
                 self.node.model_def, self.model_class,
-                local_ctx, dynamic_outputs, self.resources,
+                local_ctx, dynamic_outputs,
                 self.log_provider, self.checkout_directory)
 
         try:
@@ -647,6 +665,13 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             self.node_callback.send_graph_update(update)
 
         return results
+
+    def _wrap_resource(self, resource_name, resource):
+
+        if isinstance(resource, _ext_system.IExternalSystem):
+            return _ctx.TracExternalSystemWrapper(resource)
+
+        raise _ex.EJobValidation(f"Unsupported resource [{resource_name}] of type [{type(resource).__name__}]")
 
 
 # RESULTS PROCESSING
@@ -828,6 +853,20 @@ class FunctionResolver:
 
         return resolve_func(self, node)
 
+    def resolve_resource_node(self, node: ResourceNode):
+
+        if node.model_resource is not None:
+            resource_def = self._resources.get_resource_definition(node.resource_key)
+            self._check_model_resource(node.resource_key, node.model_resource, resource_def)
+
+        if node.resource_type == _meta.ResourceType.EXTERNAL_SYSTEM:
+            resource = self._resources.get_external_system(node.resource_key)
+        else:
+            # Other resource types not currently used as graph nodes
+            raise _ex.EUnexpected()
+
+        return ResourceFunc(node, resource)
+
     def resolve_load_data(self, node: LoadDataNode):
         return LoadDataFunc(node, self._resources.get_storage())
 
@@ -845,10 +884,10 @@ class FunctionResolver:
         model_class = model_loader.load_model_class(node.model_scope, node.model_def)
         checkout_directory = model_loader.model_load_checkout_directory(node.model_scope, node.model_def)
 
-        # Prepare model resources - Missing resources will raise an error during the resolve phase
-        resources = self._resolve_model_resources(node, checkout_directory, self._log_provider)
+        # Prepare external storage resources - Missing resources will raise an error during the resolve phase
+        storage_map = self._resolve_model_storage_resources(node, checkout_directory, self._log_provider)
 
-        return RunModelFunc(node, model_class, resources, self._log_provider, checkout_directory)
+        return RunModelFunc(node, model_class, storage_map, self._log_provider, checkout_directory)
 
     __basic_node_mapping: tp.Dict[Node.__class__, NodeFunction.__class__] = {
 
@@ -869,33 +908,21 @@ class FunctionResolver:
 
     __node_mapping: tp.Dict[Node.__class__, tp.Callable[["FunctionResolver", Node], NodeFunction]] = {
 
+        ResourceNode: resolve_resource_node,
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node
     }
 
-    def _resolve_model_resources(
+    def _resolve_model_storage_resources(
             self, node: RunModelNode,
             checkout_directory, log_provider) \
             -> tp.Dict[str, tp.Any]:
 
-        resources = {}
+        storage_map = {}
 
-        for model_resource_key, model_resource in node.model_def.resources.items():
-
-            resource_key = node.resource_mapping.get(model_resource_key)
-            resource_def = self._resources.get_resource_definition(resource_key) if resource_key else None
-
-            self._check_model_resource(
-                model_resource_key, model_resource,
-                resource_key, resource_def)
-
-            if resource_def.resourceType == _meta.ResourceType.EXTERNAL_SYSTEM:
-                system_impl = self._resources.get_external_system(resource_key)
-                system = _ctx.TracExternalSystemWrapper(system_impl)
-                resources[model_resource_key] = system
-
+        # TODO: Switch to resource nodes for external storage
         if node.storage_access:
 
             storage_manager = self._resources.get_storage()
@@ -905,7 +932,7 @@ class FunctionResolver:
                 if storage_manager.has_file_storage(storage_key, external=True):
                     storage_impl = storage_manager.get_file_storage(storage_key, external=True)
                     storage = _ctx.TracFileStorageImpl(storage_key, storage_impl, write_access, checkout_directory, log_provider)
-                    resources[storage_key] = storage
+                    storage_map[storage_key] = storage
                 elif storage_manager.has_data_storage(storage_key, external=True):
                     storage_impl = storage_manager.get_data_storage(storage_key, external=True)
                     # This is a work-around until the storage extension API can be updated / unified
@@ -913,31 +940,29 @@ class FunctionResolver:
                         raise _ex.EStorageConfig(f"External storage for [{storage_key}] is using the legacy storage framework]")
                     converter = _data.DataConverter.noop()
                     storage = _ctx.TracDataStorageImpl(storage_key, storage_impl, converter, write_access, checkout_directory, log_provider)
-                    resources[storage_key] = storage
+                    storage_map[storage_key] = storage
                 else:
                     raise _ex.EStorageConfig(f"External storage is not available: [{storage_key}]")
 
-        return resources
+        return storage_map
 
     @classmethod
     def _check_model_resource(
-            cls, model_resource_key: str, model_resource: _meta.ModelResource,
-            resource_key: str, resource_def: _meta.ResourceDefinition):
-
-        if resource_key is None:
-            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not available (missing resource mapping)")
+            cls, resource_key: str,
+            model_resource: _meta.ModelResource,
+            resource_def: _meta.ResourceDefinition):
 
         if resource_def is None:
-            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not available (missing job resource [{resource_key}])")
+            raise _ex.EJobValidation(f"Resource [{resource_key}] is not available)")
 
         if model_resource.resourceType != resource_def.resourceType:
             detail = f"(expected {model_resource.resourceType}, got {resource_def.resourceType})"
-            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not compatible with the model {detail}")
+            raise _ex.EJobValidation(f"Resource [{resource_key}] is not compatible with the model {detail}")
 
         if model_resource.protocol and model_resource.protocol != resource_def.protocol:
             detail = f"(expected protocol {model_resource.protocol}, got protocol {resource_def.protocol})"
-            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not compatible with the model {detail}")
+            raise _ex.EJobValidation(f"Resource [{resource_key}] is not compatible with the model {detail}")
 
         if model_resource.subProtocol and model_resource.subProtocol != resource_def.subProtocol:
             detail = f"(expected sub-protocol {model_resource.protocol}, got sub-protocol {resource_def.protocol})"
-            raise _ex.EJobValidation(f"Resource [{model_resource_key}] is not compatible with the model {detail}")
+            raise _ex.EJobValidation(f"Resource [{resource_key}] is not compatible with the model {detail}")

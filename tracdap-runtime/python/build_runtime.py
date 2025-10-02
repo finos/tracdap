@@ -65,12 +65,14 @@ def copy_project_files(plugin_path, plugin_package, project_root=RUNTIME_DIR):
 
     plugin_package_path = f"src/{plugin_package.replace('.', '/')}"
     plugin_package_dir = project_root.joinpath(plugin_package_path)
-
     project_work_dir = WORK_PATH.joinpath(plugin_path)
-    project_work_dir.mkdir(parents=True, exist_ok=False)
+    target_package_dir = project_work_dir.joinpath(plugin_package_path)
 
     # Copy source code for the plugin's root package
-    target_package_dir = project_work_dir.joinpath(plugin_package_path)
+    if project_work_dir.exists():
+        shutil.rmtree(project_work_dir)
+
+    project_work_dir.mkdir(parents=True)
     shutil.copytree(plugin_package_dir, target_package_dir)
 
     # Copy other content files from the plugins content folder

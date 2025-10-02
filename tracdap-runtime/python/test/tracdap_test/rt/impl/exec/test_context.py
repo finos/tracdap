@@ -121,8 +121,6 @@ class TracContextTest(unittest.TestCase):
             "profit_by_region": profit_by_region_view
         }
 
-        local_ctx = {**params, **data}
-
         github_props = { "scheme": "https", "host": "github.com", "port": "443" }
         github_content = ext_system.ExtExternalSystemPlugin(github_props)
 
@@ -131,7 +129,9 @@ class TracContextTest(unittest.TestCase):
             "github_2": TracExternalSystemWrapper(github_content)
         }
 
-        self.ctx = TracContextImpl(_test_model_def, test_models.TestModel, local_ctx, resources=resources)
+        local_ctx = {**params, **data, **resources}
+
+        self.ctx = TracContextImpl(_test_model_def, test_models.TestModel, local_ctx)
 
     # Getting params
 

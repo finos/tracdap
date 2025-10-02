@@ -86,3 +86,27 @@ class ResourceManager:
             raise _ex.ETracInternal(f"External system [{system_name}] is not available")
 
         return system
+
+
+class ResourceMeta(type):
+
+    # Use a placeholder type for representing resources in the execution engine
+    # This allows resource objects to be defined and type checked during graph processing
+
+    __RESOURCE_TYPES = [_external.IExternalSystem]
+
+    def __instancecheck__(self, instance):
+        for resource_type in self.__RESOURCE_TYPES:
+            if isinstance(instance, resource_type):
+                return True
+        return False
+
+    def __subclasscheck__(self, subclass):
+        for resource_type in self.__RESOURCE_TYPES:
+            if issubclass(subclass, resource_type):
+                return True
+        return False
+
+
+class Resource(metaclass=ResourceMeta):
+    pass
