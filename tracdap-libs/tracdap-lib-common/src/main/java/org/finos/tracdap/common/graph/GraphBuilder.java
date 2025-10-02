@@ -913,6 +913,9 @@ public class GraphBuilder {
 
             if (flowNode.getNodeType() == FlowNodeType.OUTPUT_NODE && metadata.modelOutputSchema() != null)
                 flow.putOutputs(nodeName, metadata.modelOutputSchema());
+
+            if (flowNode.getNodeType() == FlowNodeType.RESOURCE_NODE && metadata.modelResource() != null)
+                flow.putResources(nodeName, metadata.modelResource());
         }
 
         return flow.build();
