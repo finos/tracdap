@@ -47,7 +47,9 @@ class GitHubProjectDetails(trac.TracModel):
 
     def define_resources(self) -> dict[str, trac.ModelResource]:
 
-        return { "github_api": trac.define_external_system("http", hc.HTTPSConnection) }
+        github_api = trac.define_external_system("http", hc.HTTPSConnection, label="GitHub API")
+
+        return { "github_api": github_api }
 
     def run_model(self, ctx: trac.TracContext):
 
