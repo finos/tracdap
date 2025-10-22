@@ -131,9 +131,11 @@ class StaticApiImpl(_StaticApiHook):
                 msg = f"Default value for parameter [{param_name}] does not match the declared type"
                 raise _ex.EModelValidation(msg) from e
 
+        encoded_props = self._encode_props(param_props, "parameter", param_name)
+
         return _Named(param_name, _meta.ModelParameter(
             param_type_descriptor, label, default_value,
-            paramProps=param_props))
+            paramProps=encoded_props))
 
     def define_parameters(
             self, *params: _tp.Union[_Named[_meta.ModelParameter], _tp.List[_Named[_meta.ModelParameter]]]) \
@@ -218,19 +220,21 @@ class StaticApiImpl(_StaticApiHook):
             label=label, optional=optional, dynamic=dynamic,
             input_props=input_props)
 
+        encoded_props = self._encode_props(input_props, "input")
+
         if isinstance(requirement, _meta.SchemaDefinition):
 
             return _meta.ModelInputSchema(
                 objectType=_meta.ObjectType.DATA, schema=requirement,
                 label=label, optional=optional, dynamic=dynamic,
-                inputProps=input_props)
+                inputProps=encoded_props)
 
         elif isinstance(requirement, _meta.FileType):
 
             return _meta.ModelInputSchema(
                 objectType=_meta.ObjectType.FILE, fileType=requirement,
                 label=label, optional=optional, dynamic=dynamic,
-                inputProps=input_props)
+                inputProps=encoded_props)
 
         else:
             raise _ex.EUnexpected()
@@ -246,38 +250,45 @@ class StaticApiImpl(_StaticApiHook):
             label=label, optional=optional, dynamic=dynamic,
             output_props=output_props)
 
+        encoded_props = self._encode_props(output_props, "output")
+
         if isinstance(requirement, _meta.SchemaDefinition):
 
             return _meta.ModelOutputSchema(
                 objectType=_meta.ObjectType.DATA, schema=requirement,
                 label=label, optional=optional, dynamic=dynamic,
-                outputProps=output_props)
+                outputProps=encoded_props)
 
         elif isinstance(requirement, _meta.FileType):
 
             return _meta.ModelOutputSchema(
                 objectType=_meta.ObjectType.FILE, fileType=requirement,
                 label=label, optional=optional, dynamic=dynamic,
-                outputProps=output_props)
+                outputProps=encoded_props)
 
         else:
             raise _ex.EUnexpected()
 
     def define_external_system(
             self, protocol: str, client_type: type, *,
-            sub_protocol: _tp.Optional[str] = None) \
+            sub_protocol: _tp.Optional[str] = None,
+            label: _tp.Optional[str] = None,
+            resource_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelResource:
 
         _val.validate_signature(
             self.define_external_system, protocol, client_type,
-            sub_protocol=sub_protocol)
+            sub_protocol=sub_protocol,
+            label=label, resource_props=resource_props)
 
         client_type_name = _util.qualified_type_name(client_type)
+        encoded_props = self._encode_props(resource_props, "resource")
 
         return _meta.ModelResource(
             resourceType=_meta.ResourceType.EXTERNAL_SYSTEM,
             protocol=protocol, subProtocol=sub_protocol,
-            system=_meta.ModelSystemDetails(clientType=client_type_name))
+            system=_meta.ModelSystemDetails(clientType=client_type_name),
+            label=label, resourceProps=encoded_props)
 
     @staticmethod
     def _build_named_dict(
@@ -372,3 +383,25 @@ class StaticApiImpl(_StaticApiHook):
 
         stream = _shim.ShimLoader.open_text_resource(package, resource_file, encoding, resource_size_limit)
         return self.__rct.wrap(resource_file, stream)
+
+    @classmethod
+    def _encode_props(
+            cls, props: _tp.Optional[_tp.Dict[str, _tp.Any]],
+            socket_type: str, socket_name: _tp.Optional[str] = None) \
+            -> _tp.Dict[str, _meta.Value]:
+
+        encoded_props = dict()
+
+        if props is not None:
+            for key, raw_value in props.items():
+                try:
+                    if isinstance(raw_value, _meta.Value):
+                        encoded_props[key] = raw_value
+                    else:
+                        encoded_props[key] = _type_system.MetadataCodec.encode_value(raw_value)
+                except _ex.ETracInternal as e:
+                    error_suffix = f" [{socket_name}]" if socket_name is not None else ""
+                    error = f"Illegal value for prop [{key}] on model {socket_type}{error_suffix}: {str(e)}"
+                    raise _ex.EModelValidation(error)
+
+        return encoded_props
