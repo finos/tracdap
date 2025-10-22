@@ -159,7 +159,9 @@ class _StaticApiHook(_abc.ABC):
     @_abc.abstractmethod
     def define_external_system(
             self, protocol: str, client_type: type, *,
-            sub_protocol: _tp.Optional[str] = None) \
+            sub_protocol: _tp.Optional[str] = None,
+            label: _tp.Optional[str] = None,
+            resource_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) \
             -> _meta.ModelResource:
 
         pass
