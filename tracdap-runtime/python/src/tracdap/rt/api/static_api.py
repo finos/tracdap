@@ -642,7 +642,9 @@ def define_output_file(
 
 def define_external_system(
         protocol: str, client_type: _tp.Type, *,
-        sub_protocol: _tp.Optional[str] = None) -> ModelResource:
+        sub_protocol: _tp.Optional[str] = None,
+        label: _tp.Optional[str] = None,
+        resource_props: _tp.Optional[_tp.Dict[str, _tp.Any]] = None) -> ModelResource:
 
     """
     Define a model resource for an external system.
@@ -650,11 +652,15 @@ def define_external_system(
     :param protocol: The protocol for the external system
     :param client_type: The client type for the external system
     :param sub_protocol: If specified, the target resource must match both protocol and sub-protocol
+    :param label: A descriptive label for the resource (optional)
+    :param resource_props: Associate key-value properties with this resource (not used by the TRAC engine)
     :return: A model resource suitable to return from :py:meth:`define_resources() <tracdap.rt.api.TracModel.define_resources>`
     """
 
     sa = _StaticApiHook.get_instance()
-    return sa.define_external_system(protocol, client_type, sub_protocol=sub_protocol)
+    return sa.define_external_system(
+        protocol, client_type, sub_protocol=sub_protocol,
+        lbale=label, resource_props=resource_props)
 
 
 def load_schema(
