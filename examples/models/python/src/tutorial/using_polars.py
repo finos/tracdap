@@ -33,7 +33,7 @@ def calculate_profit_by_region_polars(
     # Build a weighting vector, use default_weighting for bad loans and 1.0 for good loans
     condition_weighting = customer_loans \
             .get_column("loan_condition_cat") \
-            .map_elements(lambda c: default_weighting if c > 0 else 1.0, polars.Decimal)
+            .map_elements(lambda c: default_weighting if c > 0 else 1.0, polars.Decimal(38, 10))
 
     # Use lazy processing
     customer_loans = customer_loans.lazy() \
