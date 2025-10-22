@@ -129,6 +129,9 @@ message ModelResource {
     oneof details {
         ModelSystemDetails system = 4;
     }
+
+    optional string label = 5;
+    map<string, Value> resourceProps = 6;
 }
 
 
