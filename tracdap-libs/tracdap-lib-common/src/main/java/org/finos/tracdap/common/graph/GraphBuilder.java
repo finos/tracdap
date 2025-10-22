@@ -686,8 +686,11 @@ public class GraphBuilder {
         var schema = modelInput.getSchema();
         var nextSchema = nextModelInput.getSchema();
 
-        if (schema.getSchemaType() != SchemaType.TABLE || nextSchema.getSchemaType() != SchemaType.TABLE) {
-            errorHandler.error(nodeId, "Only TABLE schema types are supported");
+        if (schema.getSchemaType() != nextSchema.getSchemaType()) {
+            errorHandler.error(nodeId, String.format(
+                    "Cannot combine schema types %s and %s",
+                    schema.getSchemaType().name(),
+                    nextSchema.getSchemaType().name()));
             return null;
         }
 
@@ -702,31 +705,125 @@ public class GraphBuilder {
             return modelInput;
         }
 
-        var table = schema.getTable().toBuilder();
-        var nextTable = nextSchema.getTable();
+        var combinedSchema = combineSchema(nodeId, schema, nextSchema);
+        return combinedSchema != null ? modelInput.setSchema(combinedSchema) : null;
+    }
 
-        var fieldsMap = table.getFieldsList().stream()
+    private SchemaDefinition combineSchema(NodeId nodeId, SchemaDefinition schema, SchemaDefinition nextSchema) {
+
+        if (schema.getSchemaType() != nextSchema.getSchemaType()) {
+            errorHandler.error(nodeId, String.format(
+                    "Cannot combine schema types %s and %s",
+                    schema.getSchemaType().name(),
+                    nextSchema.getSchemaType().name()));
+            return null;
+        }
+
+        var combinedSchema = schema.toBuilder();
+
+        for (var enumEntry : nextSchema.getNamedEnumsMap().entrySet()) {
+
+            var namedEnumKey = enumEntry.getKey();
+            var namedEnum = enumEntry.getValue();
+
+            if (!combinedSchema.containsNamedEnums(namedEnumKey)) {
+                combinedSchema.putNamedEnums(namedEnumKey, namedEnum);
+            }
+            else {
+                var originalNamedEnum = schema.getNamedEnumsOrThrow(namedEnumKey);
+                var combinedNamedEnum = combineEnumValues(nodeId, namedEnumKey, originalNamedEnum, namedEnum);
+                if (combinedNamedEnum != null)
+                    combinedSchema.putNamedEnums(namedEnumKey, combinedNamedEnum);
+            }
+        }
+
+        for (var typeEntry : nextSchema.getNamedTypesMap().entrySet()) {
+
+            var namedTypeKey = typeEntry.getKey();
+            var namedType = typeEntry.getValue();
+
+            if (!combinedSchema.containsNamedTypes(namedTypeKey)) {
+                combinedSchema.putNamedTypes(namedTypeKey, namedType);
+            }
+            else {
+                var originalNamedType = schema.getNamedTypesOrThrow(namedTypeKey);
+                var combinedNamedType = combineSchema(nodeId,originalNamedType, namedType);
+                if (combinedNamedType != null)
+                    combinedSchema.putNamedTypes(namedTypeKey, combinedNamedType);
+            }
+        }
+
+        if (schema.getSchemaType() == SchemaType.TABLE_SCHEMA) {
+
+            var fieldList = schema.getTable().getFieldsList();
+            var nextFieldList = nextSchema.getTable().getFieldsList();
+            var combinedFieldList = combineFieldList(fieldList, nextFieldList);
+            if (combinedFieldList == null)
+                return null;
+            var combinedTable = schema.getTable().toBuilder().clearFields().addAllFields(combinedFieldList);
+            return schema.toBuilder().setTable(combinedTable).build();
+        }
+        else if (schema.getSchemaType() == SchemaType.STRUCT_SCHEMA) {
+
+            var fieldList = schema.getStruct().getFieldsList();
+            var nextFieldList = nextSchema.getStruct().getFieldsList();
+            var combinedFieldList = combineFieldList(fieldList, nextFieldList);
+            if (combinedFieldList == null)
+                return null;
+            var combinedStruct = schema.getStruct().toBuilder().clearFields().addAllFields(combinedFieldList);
+            return schema.toBuilder().setStruct(combinedStruct).build();
+        }
+        else {
+
+            // Unknown schema type
+            throw new EUnexpected();
+        }
+    }
+
+    private EnumValues combineEnumValues(NodeId nodeId, String namedEnumKey, EnumValues enumValues, EnumValues nextEnumValues) {
+
+        // Combining two named enums is restrictive
+        // Values must be valid in both enums to be included in the combined enum
+
+        var combinedValues = enumValues.getValuesList();
+        combinedValues.removeIf(value -> !nextEnumValues.getValuesList().contains(value));
+
+        if (combinedValues.isEmpty()) {
+            errorHandler.error(nodeId, String.format("Cannot combine named enums for %s (no common values)", namedEnumKey));
+            return null;
+        }
+
+        return EnumValues.newBuilder().addAllValues(combinedValues).build();
+    }
+
+    private List<FieldSchema> combineFieldList(List<FieldSchema> fieldList, List<FieldSchema> nextFieldList) {
+
+        var combinedFieldList = new ArrayList<>(fieldList);
+
+        var fieldsMap = fieldList.stream()
                 .collect(Collectors.toMap(f -> f.getFieldName().toLowerCase(), f -> f));
 
-        for (var nextField : nextTable.getFieldsList()) {
+        for (var nextField : nextFieldList) {
 
             var field = fieldsMap.get(nextField.getFieldName().toLowerCase());
 
             if (field == null) {
-                var nextFieldOrder = table.getFieldsCount();
-                table.addFields(nextField.toBuilder().setFieldOrder(nextFieldOrder));
+                var nextFieldOrder = fieldsMap.size();
+                combinedFieldList.add(nextField.toBuilder().setFieldOrder(nextFieldOrder).build());
+                fieldsMap.put(
+                        nextField.getFieldName().toLowerCase(),
+                        combinedFieldList.get(nextFieldOrder));
             }
             else {
                 var combinedField = combineFieldSchema(field, nextField);
                 if (combinedField == null)
                     return null;
-                table.setFields(field.getFieldOrder(), combinedField);
+                combinedFieldList.set(combinedField.getFieldOrder(), combinedField);
                 fieldsMap.put(nextField.getFieldName().toLowerCase(), combinedField);
             }
         }
 
-        var combinedSchema = schema.toBuilder().setTable(table);
-        return modelInput.setSchema(combinedSchema);
+        return combinedFieldList;
     }
 
     private FieldSchema combineFieldSchema(FieldSchema field, FieldSchema nextField) {
