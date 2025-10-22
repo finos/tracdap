@@ -660,7 +660,7 @@ def define_external_system(
     sa = _StaticApiHook.get_instance()
     return sa.define_external_system(
         protocol, client_type, sub_protocol=sub_protocol,
-        lbale=label, resource_props=resource_props)
+        label=label, resource_props=resource_props)
 
 
 def load_schema(
