@@ -75,6 +75,8 @@ public class ModelValidator {
     private static final Descriptors.FieldDescriptor MR_PROTOCOL;
     private static final Descriptors.FieldDescriptor MR_SUB_PROTOCOL;
     private static final Descriptors.FieldDescriptor MR_SYSTEM;
+    private static final Descriptors.FieldDescriptor MR_LABEL;
+    private static final Descriptors.FieldDescriptor MR_RESOURCE_PROPS;
 
     private static final Descriptors.Descriptor MODEL_SYSTEM_DETAILS;
     private static final Descriptors.FieldDescriptor MSD_CLIENT_TYPE;
@@ -121,6 +123,8 @@ public class ModelValidator {
         MR_PROTOCOL = field(MODEL_RESOURCE, ModelResource.PROTOCOL_FIELD_NUMBER);
         MR_SUB_PROTOCOL = field(MODEL_RESOURCE, ModelResource.SUBPROTOCOL_FIELD_NUMBER);
         MR_SYSTEM = field(MODEL_RESOURCE, ModelResource.SYSTEM_FIELD_NUMBER);
+        MR_LABEL = field(MODEL_RESOURCE, ModelResource.LABEL_FIELD_NUMBER);
+        MR_RESOURCE_PROPS = field(MODEL_RESOURCE, ModelResource.RESOURCEPROPS_FIELD_NUMBER);
 
         MODEL_SYSTEM_DETAILS = ModelSystemDetails.getDescriptor();
         MSD_CLIENT_TYPE = field(MODEL_SYSTEM_DETAILS, ModelSystemDetails.CLIENTTYPE_FIELD_NUMBER);
@@ -363,6 +367,16 @@ public class ModelValidator {
                         CommonValidators::required,
                         CommonValidators::omitted)
                 .apply(ModelValidator::modelSystemDetails, ModelSystemDetails.class)
+                .pop();
+
+        ctx = ctx.push(MR_LABEL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
+                .pop();
+
+        ctx = ctx.pushMap(MR_RESOURCE_PROPS)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
                 .pop();
 
         return ctx;
