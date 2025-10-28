@@ -18,6 +18,12 @@ import ssl as _ssl
 import typing as _tp
 import pathlib as _pathlib
 
+try:
+    import httpx as _hx  # noqa
+except ModuleNotFoundError:
+    _hx = None
+
+
 import tracdap.rt.metadata as _meta
 import tracdap.rt._impl.core.config_parser as _cfg
 import tracdap.rt._impl.core.guard_rails as _guard
@@ -87,7 +93,30 @@ class NetworkManager:
         else:
             return _hc.HTTPConnection(host, port, **client_args)
 
+    def create_httpx_client(self, config: CONFIG_TYPE = None, **client_args) -> "_hx.Client":
+
+        _guard.run_model_guard()
+        _val.validate_signature(self.create_httpx_client, config, **client_args)
+        self._check_args(self.create_httpx_client, client_args, self.HTTPX_CLIENT_ARGS)
+
+        transport_args = self._filter_args(client_args, self.HTTPX_TRANSPORT_ARGS)
+        transport = self.create_httpx_transport(config, **transport_args)
+
+        return _hx.Client(transport=transport, **client_args)
+
+    def create_httpx_transport(self, config: CONFIG_TYPE = None, **transport_args) -> "_hx.HTTPTransport":
+
+        _guard.run_model_guard()
+        _val.validate_signature(self.create_httpx_transport, config, **transport_args)
+        self._check_args(self.create_httpx_transport, transport_args, self.HTTPX_TRANSPORT_ARGS)
+
+        ssl_context = self._create_ssl_context(config)
+
+        return _hx.HTTPTransport(verify=ssl_context, **transport_args)
+
     def _create_ssl_context(self, config: CONFIG_TYPE) -> _ssl.SSLContext:
+
+        _guard.run_model_guard()
 
         properties = self._process_network_properties(config)
         ca_certs = _util.read_property(properties, self.NETWORK_SSL_CA_CERTIFICATES_KEY, optional=True)
@@ -124,6 +153,8 @@ class NetworkManager:
         return context
 
     def _process_network_properties(self, config: CONFIG_TYPE= None) -> dict[str, str]:
+
+        _guard.run_model_guard()
 
         if config is None or config.properties is None:
             return self.__sys_config.properties
