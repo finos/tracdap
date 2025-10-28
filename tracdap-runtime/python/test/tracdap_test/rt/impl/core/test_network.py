@@ -28,6 +28,7 @@ import tracdap.rt._impl.core.util as _util  # noqa
 import tracdap.rt._impl.core.network as _net  # noqa
 
 import urllib3 as _ul3  # noqa
+import requests as _rq  # noqa
 import httpx as _hx  # noqa
 
 # When a private SSL cert is available for testing
@@ -353,6 +354,76 @@ class NetworkManagerTest(unittest.TestCase):
         finally:
             pool.close()
             pool_manager.clear()
+
+    def test_requests_session_no_tls(self):
+
+        session = self._nmgr.create_requests_session()
+
+        try:
+
+            response = session.request("GET", "http://google.com/")  # noqa
+            self.assertEqual(200, response.status_code)
+            self.assertTrue("content-type" in response.headers)
+
+        finally:
+            session.close()
+
+    def test_requests_session_public_tls(self):
+
+        session = self._nmgr.create_requests_session()
+
+        try:
+
+            response = session.request("GET", "https://google.com/")  # noqa
+            self.assertEqual(200, response.status_code)
+            self.assertTrue("content-type" in response.headers)
+
+        finally:
+            session.close()
+
+    def test_requests_session_private_tls(self):
+
+        _net.NetworkManager.initialize(self._config_mgr, self._tls_config)
+
+        session = self._nmgr.create_requests_session()
+
+        try:
+
+            response = session.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}")
+            self.assertEqual(200, response.status_code)
+            self.assertEqual(b"Hello from test HTTPS server!", response.content)
+
+        finally:
+            session.close()
+
+    def test_requests_session_private_tls_no_config(self):
+
+        session = self._nmgr.create_requests_session()
+
+        try:
+
+            self.assertRaises(_rq.exceptions.SSLError, lambda:
+                session.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}"))
+
+        finally:
+            session.close()
+
+    def test_requests_session_private_tls_custon_config(self):
+
+        config = _cfg.PluginConfig()
+        config.properties["network.profile"] = "custom"
+        config.properties["network.ssl.caCertificates"] = str(pathlib.Path(self._temp_dir.name).joinpath(CERT_FILE))
+
+        session = self._nmgr.create_requests_session(config)
+
+        try:
+
+            response = session.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}")
+            self.assertEqual(200, response.status_code)
+            self.assertEqual(b"Hello from test HTTPS server!", response.content)
+
+        finally:
+            session.close()
 
     def test_httx_client_no_tls(self):
 
