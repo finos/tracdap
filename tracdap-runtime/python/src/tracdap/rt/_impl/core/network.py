@@ -24,6 +24,12 @@ except ModuleNotFoundError:
     _ul3 = None
 
 try:
+    import requests as _rq  # noqa
+    import requests.adapters as _rqa
+except ModuleNotFoundError:
+    _rq = None
+
+try:
     import httpx as _hx  # noqa
 except ModuleNotFoundError:
     _hx = None
@@ -54,6 +60,18 @@ class NetworkManager:
     CONFIG_TYPE = _tp.Union[_cfg.PluginConfig, _meta.ResourceDefinition, None]
 
     __instance: "NetworkManager" = None
+
+    # Utility class to allow using a regular SSL context with the requests library
+    if _rq is not None:
+        class _RequestsSslAdapter(_rqa.HTTPAdapter):
+
+            def __init__(self, ssl_context):
+                self._ssl_context = ssl_context
+                super().__init__()
+
+            def init_poolmanager(self, *args, **kwargs):
+                kwargs['ssl_context'] = self._ssl_context
+                return super().init_poolmanager(*args, **kwargs)
 
     @classmethod
     def initialize(
@@ -127,6 +145,19 @@ class NetworkManager:
 
         ssl_context = self._create_ssl_context(config)
         return _ul3.PoolManager(ssl_context=ssl_context, **pool_args)
+
+    def create_requests_session(self, config: CONFIG_TYPE = None) -> "_rq.Session":
+
+        _guard.run_model_guard()
+        _val.validate_signature(self.create_requests_session, config)
+
+        ssl_context = self._create_ssl_context(config)
+
+        session = _rq.Session()
+        adapter = self._RequestsSslAdapter(ssl_context)
+        session.mount("https://", adapter)
+
+        return session
 
     def create_httpx_client(self, config: CONFIG_TYPE = None, **client_args) -> "_hx.Client":
 
