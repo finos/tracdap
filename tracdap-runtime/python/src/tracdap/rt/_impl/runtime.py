@@ -33,6 +33,7 @@ import tracdap.rt._impl.core.config_parser as _cparse
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
+import tracdap.rt._impl.core.network as _network
 import tracdap.rt._impl.core.plugins as _plugins
 import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.resources as _resources
@@ -166,14 +167,21 @@ class TracRuntime:
             else:
                 self._log.info("Using embedded system config")
 
-            _static_api.StaticApiImpl.register_impl()
-            _static_api.StaticApiImpl.supply_config(self._sys_config)
-
             # Dev mode translation is controlled by the dev mode flag
             # I.e. it can be applied to embedded configs
 
             if self._dev_mode:
                 self._sys_config = _dev_mode.DevModeTranslator.translate_sys_config(self._sys_config, self._config_mgr)
+
+            # Network manager needs the config manager and system config
+            # This assumes that the root config can be loaded without custom network settings
+
+            _network.NetworkManager.initialize(self._config_mgr, self._sys_config)
+
+            # Set up the static API
+
+            _static_api.StaticApiImpl.register_impl()
+            _static_api.StaticApiImpl.supply_config(self._sys_config)
 
             # Runtime API server is controlled by the sys config
 
