@@ -27,6 +27,7 @@ import tracdap.rt._impl.core.config_parser as _cfg  # noqa
 import tracdap.rt._impl.core.util as _util  # noqa
 import tracdap.rt._impl.core.network as _net  # noqa
 
+import urllib3 as _ul3  # noqa
 import httpx as _hx  # noqa
 
 # When a private SSL cert is available for testing
@@ -250,6 +251,78 @@ class NetworkManagerTest(unittest.TestCase):
 
         finally:
             conn.close()
+
+    def test_urllib3_connection_pool_no_tls(self):
+
+        pool = self._nmgr.create_urllib3_connection_pool("www.google.com", 80, False)
+
+        try:
+
+            response = pool.request("GET", "/")
+            self.assertEqual(200, response.status)
+            self.assertTrue("content-type" in response.headers)
+
+        finally:
+            pool.close()
+
+    def test_urllib3_connection_pool_public_tls(self):
+
+        pool = self._nmgr.create_urllib3_connection_pool("www.google.com", 443, True)
+
+        try:
+
+            response = pool.request("GET", "/")
+            self.assertEqual(200, response.status)
+            self.assertTrue("content-type" in response.headers)
+
+        finally:
+            pool.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_urllib3_connection_pool_private_tls(self):
+
+        _net.NetworkManager.initialize(self._config_mgr, self._tls_config)
+
+        pool = self._nmgr.create_urllib3_connection_pool(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+
+        try:
+
+            response = pool.request("GET", "/")
+            self.assertEqual(200, response.status)
+            self.assertEqual(b"Hello from test HTTPS server!", response.data)
+
+        finally:
+            pool.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_urllib3_connection_pool_private_tls_no_config(self):
+
+        pool = self._nmgr.create_urllib3_connection_pool(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+
+        try:
+
+            self.assertRaises(_ul3.exceptions.MaxRetryError, lambda: pool.request("GET", "/"))
+
+        finally:
+            pool.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_urllib3_connection_pool_private_tls_custom_config(self):
+
+        config = _cfg.PluginConfig()
+        config.properties["network.profile"] = "custom"
+        config.properties["network.ssl.caCertificates"] = str(pathlib.Path(self._temp_dir.name).joinpath(CERT_FILE))
+
+        pool = self._nmgr.create_urllib3_connection_pool(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True, config)
+
+        try:
+
+            response = pool.request("GET", "/")
+            self.assertEqual(200, response.status)
+            self.assertEqual(b"Hello from test HTTPS server!", response.data)
+
+        finally:
+            pool.close()
 
     def test_httx_client_no_tls(self):
 
