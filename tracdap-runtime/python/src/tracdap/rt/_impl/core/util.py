@@ -363,13 +363,19 @@ def filter_model_stack_trace(full_stack: tb.StackSummary, checkout_directory: pa
 
 __T = tp.TypeVar("__T")
 
-def read_property(properties: tp.Dict[str, str], key: str, default: tp.Optional[__T] = None, convert: tp.Optional[tp.Type[__T]] = str) -> __T:
+def read_property(
+        properties: tp.Dict[str, str], key: str,
+        default: tp.Optional[__T] = None,
+        convert: tp.Optional[tp.Type[__T]] = str, *,
+        optional: bool = False) -> __T:
 
     value = properties.get(key)
 
     if value is None:
         if default is not None:
             value = default
+        elif optional:
+            return None
         else:
             raise ex.EConfigParse(f"Missing required property: [{key}]")
 
