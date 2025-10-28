@@ -19,6 +19,11 @@ import typing as _tp
 import pathlib as _pathlib
 
 try:
+    import urllib3 as _ul3  # noqa
+except ModuleNotFoundError:
+    _ul3 = None
+
+try:
     import httpx as _hx  # noqa
 except ModuleNotFoundError:
     _hx = None
@@ -39,7 +44,8 @@ class NetworkManager:
     NETWORK_SSL_CA_CERTIFICATES_KEY = "network.ssl.caCertificates"
     NETWORK_SSL_PUBLIC_CERTIFICATES_KEY = "network.ssl.publicCertificates"
 
-    HTTP_CLIENT_ARGS = ["timeout"]
+    HTTP_CONNECTION_ARGS = ["timeout"]
+    URLLIB3_CONNECTION_POOL_ARGS = ["timeout", "retries"]
 
     HTTPX_TRANSPORT_ARGS = ["retries", "limits", "htp1", "http2"]
     HTTPX_CLIENT_ARGS = ["base_url", "timeout", "follow_redirects", "max_redirects"] + HTTPX_TRANSPORT_ARGS
@@ -80,11 +86,12 @@ class NetworkManager:
 
     def create_http_connection(
             self, host: str, port: int, tls: bool = True,
-            config: CONFIG_TYPE = None, **client_args) -> "_hc.HTTPConnection":
+            config: CONFIG_TYPE = None, **client_args) \
+            -> "_hc.HTTPConnection":
 
         _guard.run_model_guard()
         _val.validate_signature(self.create_http_connection, host, port, tls, config, **client_args)
-        self._check_args(self.create_http_connection, client_args, self.HTTPX_CLIENT_ARGS)
+        self._check_args(self.create_http_connection, client_args, self.HTTP_CONNECTION_ARGS)
 
         if tls:
             ssl_context = self._create_ssl_context(config)
@@ -92,6 +99,22 @@ class NetworkManager:
 
         else:
             return _hc.HTTPConnection(host, port, **client_args)
+
+    def create_urllib3_connection_pool(
+            self, host: str, port: int, tls: bool = True,
+            config: CONFIG_TYPE = None, **client_args) \
+            -> "_ul3.HTTPConnectionPool":
+
+        _guard.run_model_guard()
+        _val.validate_signature(self.create_urllib3_connection_pool, host, port, tls, config, **client_args)
+        self._check_args(self.create_urllib3_connection_pool, client_args, self.URLLIB3_CONNECTION_POOL_ARGS)
+
+        if tls:
+            ssl_context = self._create_ssl_context(config)
+            return _ul3.HTTPSConnectionPool(host, port, ssl_context=ssl_context, **client_args)
+
+        else:
+            return _ul3.HTTPConnectionPool(host, port, **client_args)
 
     def create_httpx_client(self, config: CONFIG_TYPE = None, **client_args) -> "_hx.Client":
 
