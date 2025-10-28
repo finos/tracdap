@@ -53,7 +53,6 @@ public class FlowValidator {
     private static final Descriptors.FieldDescriptor FN_OUTPUTS;
     private static final Descriptors.FieldDescriptor FN_RESOURCES;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
-    private static final Descriptors.FieldDescriptor FN_NODE_RESOURCE_SEARCH;
     private static final Descriptors.FieldDescriptor FN_NODE_ATTRS;
     private static final Descriptors.FieldDescriptor FN_NODE_PROPS;
     private static final Descriptors.FieldDescriptor FN_LABEL;
@@ -83,7 +82,6 @@ public class FlowValidator {
         FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
         FN_RESOURCES = field(FLOW_NODE, FlowNode.RESOURCES_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
-        FN_NODE_RESOURCE_SEARCH = field(FLOW_NODE, FlowNode.NODERESOURCESEARCH_FIELD_NUMBER);
         FN_NODE_ATTRS = field(FLOW_NODE, FlowNode.NODEATTRS_FIELD_NUMBER);
         FN_NODE_PROPS = field(FLOW_NODE, FlowNode.NODEPROPS_FIELD_NUMBER);
         FN_LABEL = field(FLOW_NODE, FlowNode.LABEL_FIELD_NUMBER);
@@ -155,14 +153,8 @@ public class FlowValidator {
         var isOutputNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.OUTPUT_NODE.name());
 
         // Search expressions are not allowed for parameter or resource nodes
-        var notParamOrResourceNode = msg.getNodeType() == FlowNodeType.PARAMETER_NODE || msg.getNodeType() == FlowNodeType.RESOURCE_NODE;
-        var notParamOrResourceNodeQualifier = String.format("%s == %s or %s == %s",
-                FN_NODE_TYPE.getName(), FlowNodeType.PARAMETER_NODE.name(),
-                FN_NODE_TYPE.getName(), FlowNodeType.RESOURCE_NODE.name());
-
-        // Resource search expressions are only allowed for resource nodes
-        var resourceNode = msg.getNodeType() == FlowNodeType.RESOURCE_NODE;
-        var resourceNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.RESOURCE_NODE.name());
+        var notParameterNode = msg.getNodeType() == FlowNodeType.PARAMETER_NODE;
+        var notParameterNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.PARAMETER_NODE.name());
 
 
         var knownSockets = new HashMap<String, String>();
@@ -201,13 +193,8 @@ public class FlowValidator {
                 .pop();
 
         ctx = ctx.push(FN_NODE_SEARCH)
-                .apply(CommonValidators.onlyIf(notParamOrResourceNode, notParamOrResourceNodeQualifier, true))
+                .apply(CommonValidators.onlyIf(notParameterNode, notParameterNodeQualifier, true))
                 .apply(SearchValidator::searchExpression, SearchExpression.class)
-                .pop();
-
-        ctx = ctx.push(FN_NODE_RESOURCE_SEARCH)
-                .apply(CommonValidators.onlyIf(resourceNode, resourceNodeQualifier))
-                .apply(ModelValidator::modelResource, ModelResource.class)
                 .pop();
 
         ctx = ctx.pushRepeated(FN_NODE_ATTRS)
