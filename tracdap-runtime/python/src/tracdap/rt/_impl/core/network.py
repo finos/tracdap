@@ -13,10 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import http.client as _hc
 import ssl as _ssl
 import typing as _tp
 import pathlib as _pathlib
+
+import http.client as _hc
 
 try:
     import urllib3 as _ul3  # noqa
@@ -34,8 +35,6 @@ try:
 except ModuleNotFoundError:
     _hx = None
 
-
-import tracdap.rt.metadata as _meta
 import tracdap.rt._impl.core.config_parser as _cfg
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _log
@@ -43,8 +42,10 @@ import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 import tracdap.rt.exceptions as _ex
 
+from tracdap.rt.ext.network import *
 
-class NetworkManager:
+
+class NetworkManager(INetworkManager):
 
     NETWORK_PROFILE_KEY = "network.profile"
     NETWORK_SSL_CA_CERTIFICATES_KEY = "network.ssl.caCertificates"
@@ -57,7 +58,7 @@ class NetworkManager:
     HTTPX_TRANSPORT_ARGS = ["retries", "limits", "htp1", "http2"]
     HTTPX_CLIENT_ARGS = ["base_url", "timeout", "follow_redirects", "max_redirects"] + HTTPX_TRANSPORT_ARGS
 
-    CONFIG_TYPE = _tp.Union[_cfg.PluginConfig, _meta.ResourceDefinition, None]
+    CONFIG_TYPE = INetworkManager.CONFIG_TYPE
 
     __instance: "NetworkManager" = None
 
@@ -103,14 +104,14 @@ class NetworkManager:
         self.__sys_config: _cfg.RuntimeConfig = system_config
         self.__log = _log.logger_for_object(self)
 
-    def create_http_connection(
+    def create_http_client_connection(
             self, host: str, port: int, tls: bool = True,
             config: CONFIG_TYPE = None, **client_args) \
             -> "_hc.HTTPConnection":
 
         _guard.run_model_guard()
-        _val.validate_signature(self.create_http_connection, host, port, tls, config, **client_args)
-        self._check_args(self.create_http_connection, client_args, self.HTTP_CONNECTION_ARGS)
+        _val.validate_signature(self.create_http_client_connection, host, port, tls, config, **client_args)
+        self._check_args(self.create_http_client_connection, client_args, self.HTTP_CONNECTION_ARGS)
 
         if tls:
             ssl_context = self._create_ssl_context(config)

@@ -121,7 +121,7 @@ class NetworkManagerTest(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._nmgr: _net.NetworkManager = None  # noqa
+        self._nmgr: _net.INetworkManager = None  # noqa
 
     @classmethod
     def setUpClass(cls):
@@ -165,9 +165,9 @@ class NetworkManagerTest(unittest.TestCase):
         _net.NetworkManager.initialize(self._config_mgr, self._default_config)
         self._nmgr = _net.NetworkManager.instance()
 
-    def test_http_connection_no_tls(self):
+    def test_http_client_connection_no_tls(self):
 
-        conn = self._nmgr.create_http_connection("google.com", 80, False)
+        conn = self._nmgr.create_http_client_connection("google.com", 80, False)
 
         try:
 
@@ -182,9 +182,9 @@ class NetworkManagerTest(unittest.TestCase):
         finally:
             conn.close()
 
-    def test_http_connection_public_tls(self):
+    def test_http_client_connection_public_tls(self):
 
-        conn = self._nmgr.create_http_connection("google.com", 443, True)
+        conn = self._nmgr.create_http_client_connection("google.com", 443, True)
 
         try:
 
@@ -200,11 +200,11 @@ class NetworkManagerTest(unittest.TestCase):
             conn.close()
 
     @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
-    def test_http_connection_private_tls(self):
+    def test_http_client_connection_private_tls(self):
 
         _net.NetworkManager.initialize(self._config_mgr, self._tls_config)
 
-        conn = self._nmgr.create_http_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+        conn = self._nmgr.create_http_client_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
 
         try:
 
@@ -220,9 +220,9 @@ class NetworkManagerTest(unittest.TestCase):
             conn.close()
 
     @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
-    def test_http_connection_private_tls_no_config(self):
+    def test_http_client_connection_private_tls_no_config(self):
 
-        conn = self._nmgr.create_http_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+        conn = self._nmgr.create_http_client_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
 
         try:
 
@@ -232,13 +232,13 @@ class NetworkManagerTest(unittest.TestCase):
             conn.close()
 
     @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
-    def test_http_connection_private_tls_custom_config(self):
+    def test_http_client_connection_private_tls_custom_config(self):
 
         config = _cfg.PluginConfig()
         config.properties["network.profile"] = "custom"
         config.properties["network.ssl.caCertificates"] = str(pathlib.Path(self._temp_dir.name).joinpath(CERT_FILE))
 
-        conn = self._nmgr.create_http_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True, config)
+        conn = self._nmgr.create_http_client_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True, config)
 
         try:
 
