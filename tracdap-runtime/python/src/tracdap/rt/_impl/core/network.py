@@ -46,6 +46,7 @@ class NetworkManager:
 
     HTTP_CONNECTION_ARGS = ["timeout"]
     URLLIB3_CONNECTION_POOL_ARGS = ["timeout", "retries"]
+    URLLIB3_POOL_MANAGER_ARGS = ["num_pools"]
 
     HTTPX_TRANSPORT_ARGS = ["retries", "limits", "htp1", "http2"]
     HTTPX_CLIENT_ARGS = ["base_url", "timeout", "follow_redirects", "max_redirects"] + HTTPX_TRANSPORT_ARGS
@@ -115,6 +116,17 @@ class NetworkManager:
 
         else:
             return _ul3.HTTPConnectionPool(host, port, **client_args)
+
+    def create_urllib3_pool_manager(
+            self, config: CONFIG_TYPE = None, **pool_args) \
+            -> "_ul3.PoolManager":
+
+        _guard.run_model_guard()
+        _val.validate_signature(self.create_urllib3_pool_manager, config, **pool_args)
+        self._check_args(self.create_urllib3_pool_manager, pool_args, self.URLLIB3_POOL_MANAGER_ARGS)
+
+        ssl_context = self._create_ssl_context(config)
+        return _ul3.PoolManager(ssl_context=ssl_context, **pool_args)
 
     def create_httpx_client(self, config: CONFIG_TYPE = None, **client_args) -> "_hx.Client":
 

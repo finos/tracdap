@@ -252,77 +252,107 @@ class NetworkManagerTest(unittest.TestCase):
         finally:
             conn.close()
 
-    def test_urllib3_connection_pool_no_tls(self):
+    def test_urllib3_no_tls(self):
 
         pool = self._nmgr.create_urllib3_connection_pool("www.google.com", 80, False)
+        pool_manager = self._nmgr.create_urllib3_pool_manager()
 
         try:
 
-            response = pool.request("GET", "/")
-            self.assertEqual(200, response.status)
-            self.assertTrue("content-type" in response.headers)
+            pool_response = pool.request("GET", "/")
+            self.assertEqual(200, pool_response.status)
+            self.assertTrue("content-type" in pool_response.headers)
+
+            mgr_response = pool_manager.request("GET", "http://www.google.com")  # noqa
+            self.assertEqual(200, mgr_response.status)
+            self.assertTrue("content-type" in mgr_response.headers)
 
         finally:
             pool.close()
+            pool_manager.clear()
 
-    def test_urllib3_connection_pool_public_tls(self):
+    def test_urllib3_public_tls(self):
 
         pool = self._nmgr.create_urllib3_connection_pool("www.google.com", 443, True)
+        pool_manager = self._nmgr.create_urllib3_pool_manager()
 
         try:
 
-            response = pool.request("GET", "/")
-            self.assertEqual(200, response.status)
-            self.assertTrue("content-type" in response.headers)
+            pool_response = pool.request("GET", "/")
+            self.assertEqual(200, pool_response.status)
+            self.assertTrue("content-type" in pool_response.headers)
+
+            mgr_response = pool_manager.request("GET", "https://www.google.com")
+            self.assertEqual(200, mgr_response.status)
+            self.assertTrue("content-type" in mgr_response.headers)
 
         finally:
             pool.close()
+            pool_manager.clear()
+
 
     @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
-    def test_urllib3_connection_pool_private_tls(self):
+    def test_urllib3_private_tls(self):
 
         _net.NetworkManager.initialize(self._config_mgr, self._tls_config)
 
         pool = self._nmgr.create_urllib3_connection_pool(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+        pool_manager = self._nmgr.create_urllib3_pool_manager()
 
         try:
 
-            response = pool.request("GET", "/")
-            self.assertEqual(200, response.status)
-            self.assertEqual(b"Hello from test HTTPS server!", response.data)
+            pool_response = pool.request("GET", "/")
+            self.assertEqual(200, pool_response.status)
+            self.assertEqual(b"Hello from test HTTPS server!", pool_response.data)
+
+            mgr_response = pool_manager.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}")
+            self.assertEqual(200, mgr_response.status)
+            self.assertEqual(b"Hello from test HTTPS server!", mgr_response.data)
 
         finally:
             pool.close()
+            pool_manager.clear()
+
 
     @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
-    def test_urllib3_connection_pool_private_tls_no_config(self):
+    def test_urllib3_private_tls_no_config(self):
 
         pool = self._nmgr.create_urllib3_connection_pool(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+        pool_manager = self._nmgr.create_urllib3_pool_manager()
 
         try:
 
             self.assertRaises(_ul3.exceptions.MaxRetryError, lambda: pool.request("GET", "/"))
+            self.assertRaises(_ul3.exceptions.MaxRetryError, lambda:
+                pool.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}"))
 
         finally:
             pool.close()
+            pool_manager.clear()
 
     @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
-    def test_urllib3_connection_pool_private_tls_custom_config(self):
+    def test_urllib3_private_tls_custom_config(self):
 
         config = _cfg.PluginConfig()
         config.properties["network.profile"] = "custom"
         config.properties["network.ssl.caCertificates"] = str(pathlib.Path(self._temp_dir.name).joinpath(CERT_FILE))
 
         pool = self._nmgr.create_urllib3_connection_pool(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True, config)
+        pool_manager = self._nmgr.create_urllib3_pool_manager(config)
 
         try:
 
-            response = pool.request("GET", "/")
-            self.assertEqual(200, response.status)
-            self.assertEqual(b"Hello from test HTTPS server!", response.data)
+            pool_response = pool.request("GET", "/")
+            self.assertEqual(200, pool_response.status)
+            self.assertEqual(b"Hello from test HTTPS server!", pool_response.data)
+
+            mgr_response = pool_manager.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}")
+            self.assertEqual(200, mgr_response.status)
+            self.assertEqual(b"Hello from test HTTPS server!", mgr_response.data)
 
         finally:
             pool.close()
+            pool_manager.clear()
 
     def test_httx_client_no_tls(self):
 
