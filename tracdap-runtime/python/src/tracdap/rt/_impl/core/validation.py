@@ -274,7 +274,7 @@ class _TypeValidator:
     @classmethod
     def _validate_type(cls, expected_type: tp.Type, value: tp.Any) -> bool:
 
-        if expected_type == tp.Any:
+        if expected_type == tp.Any or expected_type is None:
             return True
 
         if expected_type == type(None) or expected_type == inspect._empty:
@@ -378,6 +378,10 @@ class _TypeValidator:
 
         # TODO: Recursive validation of types for class members using field annotations
 
+        # If None was allowed, it would have been accepted by now
+        if value is None:
+            return False
+
         return isinstance(value, expected_type)
 
     @classmethod
@@ -426,6 +430,9 @@ class _TypeValidator:
 
     @classmethod
     def _type_name(cls, type_var: tp.Type, qualified: bool = False) -> str:
+
+        if type_var is None:
+            return type(None).__name__
 
         if any(map(lambda _t: isinstance(type_var, _t),  cls.__generic_metaclass)):
 
