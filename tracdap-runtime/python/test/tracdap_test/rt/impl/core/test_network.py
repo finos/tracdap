@@ -27,6 +27,8 @@ import tracdap.rt._impl.core.config_parser as _cfg  # noqa
 import tracdap.rt._impl.core.util as _util  # noqa
 import tracdap.rt._impl.core.network as _net  # noqa
 
+import httpx as _hx  # noqa
+
 # When a private SSL cert is available for testing
 # This requires openssl to be installed and available
 PRIVATE_SSL_AVAILABLE = "CI" in os.environ or not _util.is_windows()
@@ -209,9 +211,20 @@ class NetworkManagerTest(unittest.TestCase):
             response = conn.getresponse()
             data = response.read()
 
-            # Expect a redirect
             self.assertEqual(200, response.status)
             self.assertEqual(b"Hello from test HTTPS server!", data)
+
+        finally:
+            conn.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_http_connection_private_tls_no_config(self):
+
+        conn = self._nmgr.create_http_connection(self.PRIVATE_SERVER_HOST, self.PRIVATE_SERVER_PORT, True)
+
+        try:
+
+            self.assertRaises(ssl.SSLCertVerificationError, lambda: conn.connect())
 
         finally:
             conn.close()
@@ -232,12 +245,94 @@ class NetworkManagerTest(unittest.TestCase):
             response = conn.getresponse()
             data = response.read()
 
-            # Expect a redirect
             self.assertEqual(200, response.status)
             self.assertEqual(b"Hello from test HTTPS server!", data)
 
         finally:
             conn.close()
+
+    def test_httx_client_no_tls(self):
+
+        client = self._nmgr.create_httpx_client(follow_redirects=True)
+
+        try:
+
+            response = client.request("GET", "http://google.com/")  # noqa
+            self.assertEqual(200, response.status_code)
+            self.assertTrue("content-type" in response.headers)
+
+            # Turn off follow redirects - expect a redirect response
+            response = client.request("GET", "http://google.com/", follow_redirects=False)  # noqa
+            self.assertTrue(300 <= response.status_code < 400)
+            self.assertTrue("location" in response.headers)
+
+        finally:
+            client.close()
+
+    def test_httx_client_public_tls(self):
+
+        client = self._nmgr.create_httpx_client(follow_redirects=True)
+
+        try:
+
+            response = client.request("GET", "https://google.com/")
+            self.assertEqual(200, response.status_code)
+            self.assertTrue("content-type" in response.headers)
+
+            # Turn off follow redirects - expect a redirect response
+            response = client.request("GET", "https://google.com/", follow_redirects=False)
+            self.assertTrue(300 <= response.status_code < 400)
+            self.assertTrue("location" in response.headers)
+
+        finally:
+            client.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_httx_client_private_tls(self):
+
+        _net.NetworkManager.initialize(self._config_mgr, self._tls_config)
+
+        client = self._nmgr.create_httpx_client()
+
+        try:
+
+            response = client.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}")
+            self.assertEqual(200, response.status_code)
+            self.assertEqual(b"Hello from test HTTPS server!", response.read())
+
+        finally:
+            client.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_httx_client_private_tls_no_config(self):
+
+        client = self._nmgr.create_httpx_client()
+
+        try:
+
+            self.assertRaises(_hx.ConnectError, lambda:
+                client.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}"))
+
+        finally:
+            client.close()
+
+    @unittest.skipIf(not PRIVATE_SSL_AVAILABLE, "Private SSL keys are not available (requires openssl)")
+    def test_httx_client_private_tls_custom_config(self):
+
+        config = _cfg.PluginConfig()
+        config.properties["network.profile"] = "custom"
+        config.properties["network.ssl.caCertificates"] = str(pathlib.Path(self._temp_dir.name).joinpath(CERT_FILE))
+
+        client = self._nmgr.create_httpx_client(config)
+
+        try:
+
+            response = client.request("GET", f"https://{self.PRIVATE_SERVER_HOST}:{self.PRIVATE_SERVER_PORT}")
+            self.assertEqual(200, response.status_code)
+            self.assertEqual(b"Hello from test HTTPS server!", response.read())
+
+        finally:
+            client.close()
 
 
 if __name__ == '__main__':
