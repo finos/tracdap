@@ -173,7 +173,7 @@ class ConfigManager:
             dev_mode_locations: tp.List[str] = None,
             config_file_name: tp.Optional[str] = None) -> _T:
 
-        resolved_url = self._resolve_config_file(config_url)
+        resolved_url = self.resolve_config_url(config_url)
 
         if config_file_name is not None:
             self._log.info(f"Loading {config_file_name} config: {self._url_to_str(resolved_url)}")
@@ -189,7 +189,7 @@ class ConfigManager:
             self, config_url: tp.Union[str, pathlib.Path],
             config_file_name: tp.Optional[str] = None) -> bytes:
 
-        resolved_url = self._resolve_config_file(config_url)
+        resolved_url = self.resolve_config_url(config_url)
 
         if config_file_name is not None:
             self._log.info(f"Loading {config_file_name} config: {self._url_to_str(resolved_url)}")
@@ -198,7 +198,7 @@ class ConfigManager:
 
         return self._load_config_file(resolved_url)
 
-    def _resolve_config_file(self, config_url: tp.Union[str, pathlib.Path]) -> _urlp.ParseResult:
+    def resolve_config_url(self, config_url: tp.Union[str, pathlib.Path]) -> _urlp.ParseResult:
 
         # If the config URL defines a scheme, treat it as absolute
         # (This also works for Windows paths, C:\ is an absolute path)
