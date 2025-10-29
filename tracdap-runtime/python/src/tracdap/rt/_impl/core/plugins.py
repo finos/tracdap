@@ -22,6 +22,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.network as _net
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -209,6 +210,11 @@ class PluginManagerImpl(PluginManager):
                 if config.properties:
                     properties.update(config.properties)
                 args["properties"] = properties
+
+            elif arg_name == "network_manager":
+                cls.__check_plugin_arg(plugin_class, "properties", _net.INetworkManager, hints)
+                network_manager = _net.NetworkManager.instance()
+                args["network_manager"] = network_manager
 
             else:
                 detail = f"(unknown argument)"
