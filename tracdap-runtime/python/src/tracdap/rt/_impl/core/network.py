@@ -109,7 +109,7 @@ class NetworkManager(INetworkManager):
             config: CONFIG_TYPE = None, **client_args) \
             -> "_hc.HTTPConnection":
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_http_client_connection, host, port, tls, config, **client_args)
         self._check_args(self.create_http_client_connection, client_args, self.HTTP_CONNECTION_ARGS)
 
@@ -125,7 +125,7 @@ class NetworkManager(INetworkManager):
             config: CONFIG_TYPE = None, **client_args) \
             -> "_ul3.HTTPConnectionPool":
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_urllib3_connection_pool, host, port, tls, config, **client_args)
         self._check_args(self.create_urllib3_connection_pool, client_args, self.URLLIB3_CONNECTION_POOL_ARGS)
 
@@ -140,7 +140,7 @@ class NetworkManager(INetworkManager):
             self, config: CONFIG_TYPE = None, **pool_args) \
             -> "_ul3.PoolManager":
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_urllib3_pool_manager, config, **pool_args)
         self._check_args(self.create_urllib3_pool_manager, pool_args, self.URLLIB3_POOL_MANAGER_ARGS)
 
@@ -149,7 +149,7 @@ class NetworkManager(INetworkManager):
 
     def create_requests_session(self, config: CONFIG_TYPE = None) -> "_rq.Session":
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_requests_session, config)
 
         ssl_context = self._create_ssl_context(config)
@@ -162,7 +162,7 @@ class NetworkManager(INetworkManager):
 
     def create_httpx_client(self, config: CONFIG_TYPE = None, **client_args) -> "_hx.Client":
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_httpx_client, config, **client_args)
         self._check_args(self.create_httpx_client, client_args, self.HTTPX_CLIENT_ARGS)
 
@@ -173,7 +173,7 @@ class NetworkManager(INetworkManager):
 
     def create_httpx_transport(self, config: CONFIG_TYPE = None, **transport_args) -> "_hx.HTTPTransport":
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_httpx_transport, config, **transport_args)
         self._check_args(self.create_httpx_transport, transport_args, self.HTTPX_TRANSPORT_ARGS)
 
@@ -183,7 +183,7 @@ class NetworkManager(INetworkManager):
 
     def _create_ssl_context(self, config: CONFIG_TYPE) -> _ssl.SSLContext:
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
 
         properties = self._process_network_properties(config)
         ca_certs = _util.read_property(properties, self.NETWORK_SSL_CA_CERTIFICATES_KEY, optional=True)
@@ -221,7 +221,7 @@ class NetworkManager(INetworkManager):
 
     def _process_network_properties(self, config: CONFIG_TYPE= None) -> dict[str, str]:
 
-        _guard.run_model_guard()
+        _guard.run_model_guard(allow_callback=True)
 
         if config is None or config.properties is None:
             return self.__sys_config.properties
