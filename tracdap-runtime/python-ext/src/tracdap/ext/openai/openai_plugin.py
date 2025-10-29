@@ -28,6 +28,7 @@ except ModuleNotFoundError:
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.external as _external
+import tracdap.rt.ext.network as _net
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt.ext.util as _util
 
@@ -51,12 +52,13 @@ class OpenAIPlugin(_external.IExternalSystem):
     AZURE_OPENAI_API_KEY = "AZURE_OPENAI_API_KEY"
     AZURE_OPENAI_AD_TOKEN = "AZURE_OPENAI_AD_TOKEN"
 
-    def __init__(self, resource_name: str, config: _cfg.PluginConfig):
+    def __init__(self, resource_name: str, config: _cfg.PluginConfig, network_manager: _net.INetworkManager):
 
         log_name = f"{OpenAIPlugin.__module__}.{OpenAIPlugin.__name__}"
         self.__log = logging.getLogger(log_name)
 
         self.__resource_name = resource_name
+        self.__config = config
         self.__protocol = config.protocol
         self.__sub_protocol = config.subProtocol
 
@@ -86,6 +88,8 @@ class OpenAIPlugin(_external.IExternalSystem):
         self.__factory_thread = threading.Thread(name="openai-factory", target=self.__factory_main, daemon=True)
         self.__factory_thread.start()
         self.__warmed_up = False
+
+        self._network_manager = network_manager
 
         # Do not print info-level logs from the low-level frameworks
         # HTTPX logs every request by default
@@ -143,12 +147,28 @@ class OpenAIPlugin(_external.IExternalSystem):
     def _create_client_std(self, **client_args):
 
         std_args = self._build_std_args(**client_args)
-        return openai.OpenAI(**std_args)
+        client = self._create_httpx_client()
+
+        return openai.OpenAI(**std_args, http_client=client)
 
     def _create_client_azure(self, **client_args):
 
         azure_args = self._build_azure_args(**client_args)
-        return openai.AzureOpenAI(**azure_args)
+        client = self._create_httpx_client()
+
+        return openai.AzureOpenAI(**azure_args, http_client=client)
+
+    def _create_httpx_client(self):
+
+        # These are the defaults set by openai.DefaultHttpxClient
+        # Client comes from the ext Network API, so apply these settings manually
+        client_args = {
+            "timeout": openai.DEFAULT_TIMEOUT,
+            "limits": openai.DEFAULT_CONNECTION_LIMITS,
+            "follow_redirects": True
+        }
+
+        return self._network_manager.create_httpx_client(self.__config, **client_args)
 
     def _build_std_args(self, **client_args):
 

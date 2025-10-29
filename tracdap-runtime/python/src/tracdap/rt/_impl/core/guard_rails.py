@@ -23,6 +23,7 @@ import contextlib
 import tracdap.rt.api as api
 import tracdap.rt.exceptions as ex
 
+__rt_impl_path = str(pathlib.Path(__file__).parent.parent)
 
 def _get_model_entry_points():
 
@@ -47,25 +48,28 @@ def _get_package_path(module_name):
     return module_path.parents[depth]
 
 
-def run_model_guard(operation: str = None):
+def run_model_guard(operation: str = None, allow_callback: bool =False):
 
     # A simple guard method to block model code from accessing parts of the TRAC runtime framework
     # To blocks calls to the Python stdlib or 3rd party libs, use PythonGuardRails instead
 
     stack = inspect.stack()
-    frame = stack[-1]
+    parent_frame = stack[1]
 
     if operation is None:
-        operation = f"Calling {frame.function}()"
+        operation = f"Calling {parent_frame.function}()"
 
-    for frame_index in range(len(stack) - 2, 0, -1):
+    for frame_index in range(2, len(stack)):
 
-        parent_frame = frame
-        frame = stack[frame_index]
+        frame = parent_frame
+        parent_frame = stack[frame_index]
 
         if frame.function == "run_model" and parent_frame.function == "_execute":
             err = f"{operation} is not allowed inside run_model()"
             raise ex.ERuntimeValidation(err)
+
+        if allow_callback and parent_frame.filename is not None and parent_frame.filename.startswith(__rt_impl_path):
+            return
 
 
 class PythonGuardRails:
