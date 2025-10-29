@@ -23,6 +23,7 @@ except ModuleNotFoundError:
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.external as _external
+import tracdap.rt.ext.network as _net
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt.ext.util as _util
 
@@ -34,22 +35,24 @@ class HttpPlugin(_external.IExternalSystem):
     TLS_KEY = "tls"
     TIMEOUT_KEY = "timeout"
 
-    def __init__(self, resource_name: str, config: _cfg.PluginConfig):
+    def __init__(self, resource_name: str, config: _cfg.PluginConfig, network_manager: _net.INetworkManager):
 
         self.__resource_name = resource_name
+        self.__config = config
 
         self.__host = _util.read_plugin_config(config, self.HOST_KEY)
         self.__port = _util.read_plugin_config(config, self.PORT_KEY, optional=True, convert=int)
         self.__tls = _util.read_plugin_config(config, self.TLS_KEY, default=True, convert=bool)
         self.__timeout = _util.read_plugin_config(config, self.TIMEOUT_KEY, optional=True, convert=int)
 
+        self.__network_manager = network_manager
+
     def supported_types(self) -> list[type]:
 
         supported_types: list[type] = list()
 
-        if _hc:
-            supported_types.append(_hc.HTTPConnection)
-            supported_types.append(_hc.HTTPSConnection)
+        supported_types.append(_hc.HTTPConnection)
+        supported_types.append(_hc.HTTPSConnection)
 
         if _ul3:
             supported_types.append(_ul3.HTTPConnectionPool)
@@ -65,47 +68,27 @@ class HttpPlugin(_external.IExternalSystem):
 
     def create_client(self, client_type: type, **client_args) -> object:
 
-        if client_type == _hc.HTTPConnection:
-            if self.__tls:
-                return self._create_client_hc_https(**client_args)
-            else:
-                return self._create_client_hc_http(**client_args)
+        common_args = self._build_common_args(**client_args)
 
-        if client_type == _hc.HTTPSConnection:
-            if self.__tls:
-                return self._create_client_hc_https(**client_args)
-            else:
+        if client_type == _hc.HTTPConnection or client_type == _hc.HTTPSConnection:
+
+            if not self.__tls and client_type == _hc.HTTPSConnection:
                 raise self._error_tls_not_enabled()
 
-        if _ul3 and client_type == _ul3.HTTPConnectionPool:
-            if self.__tls:
-                return self._create_client_ul3_https(**client_args)
-            else:
-                return self._create_client_ul3_http(**client_args)
+            return self.__network_manager.create_http_client_connection(
+                self.__host, self.__port, self.__tls,
+                self.__config, **common_args)
 
-        if _ul3 and client_type == _ul3.HTTPSConnectionPool:
-            if self.__tls:
-                return self._create_client_ul3_https(**client_args)
-            else:
+        if _ul3 and client_type == _ul3.HTTPConnectionPool or client_type == _ul3.HTTPSConnectionPool:
+
+            if not self.__tls and client_type == _ul3.HTTPSConnectionPool:
                 raise self._error_tls_not_enabled()
+
+            return self.__network_manager.create_urllib3_connection_pool(
+                self.__host, self.__port, self.__tls,
+                self.__config, **common_args)
 
         raise _ex.EPluginNotAvailable(f"Client type [{client_type.__qualname__}] is not available in {self.__class__.__name__}")
-
-    def _create_client_hc_http(self, **client_args):
-        hc_args = self._build_common_args(**client_args)
-        return _hc.HTTPSConnection(self.__host, self.__port, **hc_args)
-
-    def _create_client_hc_https(self, **client_args):
-        hc_args = self._build_common_args(**client_args)
-        return _hc.HTTPSConnection(self.__host, self.__port, **hc_args)
-
-    def _create_client_ul3_http(self, **client_args):
-        ul3_args = self._build_common_args(**client_args)
-        return _ul3.HTTPSConnectionPool(self.__host, self.__port, **ul3_args)
-
-    def _create_client_ul3_https(self, **client_args):
-        ul3_args = self._build_common_args(**client_args)
-        return _ul3.HTTPSConnectionPool(self.__host, self.__port, **ul3_args)
 
     def _build_common_args(self, **client_args):
 
