@@ -103,10 +103,10 @@ jobs:
               PANDAS_DEPENDENCY: "'pandas ~= 2.2.0'",
               PYSPARK_DEPENDENCY: "'pyspark ~= 3.4.0'" }
 
-          # Python 3.12 requires Pandas 2.1, Pandas 2.0 only has binaries for 3.11
+          # Python 3.12 requires Pandas 2.2, first version with cp312 support
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "'pandas == 2.1.0'",
+              PANDAS_DEPENDENCY: "'pandas == 2.2.0'",
               PYSPARK_DEPENDENCY: "'pyspark ~= 3.3.0'" }
 
           # Force testing on the first release of the Pandas 2 series, requires Python 3.11
@@ -116,11 +116,12 @@ jobs:
               PANDAS_DEPENDENCY: "'pandas == 2.0.0' 'numpy < 2.0.0'",
               PYSPARK_DEPENDENCY: "'pyspark ~= 3.1.0'" }
 
-          # Oldest supported versions, force testing against .0 for Pandas and PySpark
-          # If those don't work due to bugs, we need to update README for the supported versions
+          # Oldest supported versions, if those don't working we need to update the supported versions
+          # Pandas got 3.10 support halfway through the 1.3 series
+          # Force testing .0 version for Spark 3
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.10",
-              PANDAS_DEPENDENCY: "'pandas == 1.2.0' 'numpy < 2.0.0'",
+              PANDAS_DEPENDENCY: "'pandas ~= 1.3.0' 'numpy < 2.0.0'",
               PYSPARK_DEPENDENCY: "'pyspark == 3.0.0'" }
 
     # E.g. platform = "windows" -> build image = "windows-latest"
