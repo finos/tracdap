@@ -121,7 +121,7 @@ jobs:
           # Force testing .0 version for Spark 3
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.10",
-              PANDAS_DEPENDENCY: "'pandas ~= 1.3.0' 'numpy < 2.0.0'",
+              PANDAS_DEPENDENCY: "'pandas == 1.3.4' 'numpy == 1.22.0'",
               PYSPARK_DEPENDENCY: "'pyspark == 3.0.0'" }
 
     # E.g. platform = "windows" -> build image = "windows-latest"
