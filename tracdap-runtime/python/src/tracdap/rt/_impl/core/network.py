@@ -116,7 +116,7 @@ class NetworkManager(INetworkManager):
         self._check_args(self.create_http_client_connection, client_args, self.HTTP_CONNECTION_ARGS)
 
         if tls:
-            ssl_context = self._create_ssl_context(config)
+            ssl_context = self.create_ssl_context(config)
             return _hc.HTTPSConnection(host, port, context=ssl_context, **client_args)
 
         else:
@@ -132,7 +132,7 @@ class NetworkManager(INetworkManager):
         self._check_args(self.create_urllib3_connection_pool, client_args, self.URLLIB3_CONNECTION_POOL_ARGS)
 
         if tls:
-            ssl_context = self._create_ssl_context(config)
+            ssl_context = self.create_ssl_context(config)
             return _ul3.HTTPSConnectionPool(host, port, ssl_context=ssl_context, **client_args)
 
         else:
@@ -146,7 +146,7 @@ class NetworkManager(INetworkManager):
         _val.validate_signature(self.create_urllib3_pool_manager, config, **pool_args)
         self._check_args(self.create_urllib3_pool_manager, pool_args, self.URLLIB3_POOL_MANAGER_ARGS)
 
-        ssl_context = self._create_ssl_context(config)
+        ssl_context = self.create_ssl_context(config)
         return _ul3.PoolManager(ssl_context=ssl_context, **pool_args)
 
     def create_requests_session(self, config: CONFIG_TYPE = None) -> "_rq.Session":
@@ -154,7 +154,7 @@ class NetworkManager(INetworkManager):
         _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_requests_session, config)
 
-        ssl_context = self._create_ssl_context(config)
+        ssl_context = self.create_ssl_context(config)
 
         session = _rq.Session()
         adapter = self._RequestsSslAdapter(ssl_context)
@@ -179,11 +179,11 @@ class NetworkManager(INetworkManager):
         _val.validate_signature(self.create_httpx_transport, config, **transport_args)
         self._check_args(self.create_httpx_transport, transport_args, self.HTTPX_TRANSPORT_ARGS)
 
-        ssl_context = self._create_ssl_context(config)
+        ssl_context = self.create_ssl_context(config)
 
         return _hx.HTTPTransport(verify=ssl_context, **transport_args)
 
-    def _create_ssl_context(self, config: CONFIG_TYPE) -> _ssl.SSLContext:
+    def create_ssl_context(self, config: CONFIG_TYPE = None) -> _ssl.SSLContext:
 
         _guard.run_model_guard(allow_callback=True)
 

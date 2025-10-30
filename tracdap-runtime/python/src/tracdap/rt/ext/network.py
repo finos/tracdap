@@ -14,6 +14,7 @@
 #  limitations under the License.
 
 import abc as _abc
+import ssl as _ssl
 import typing as _tp
 
 import tracdap.rt.config as _cfg
@@ -79,5 +80,10 @@ class INetworkManager(metaclass=_abc.ABCMeta):
 
     @_abc.abstractmethod
     def create_httpx_transport(self, config: CONFIG_TYPE = None, **transport_args) -> "_hx.HTTPTransport":
+
+        pass
+
+    @_abc.abstractmethod
+    def create_ssl_context(self, config: CONFIG_TYPE = None) -> _ssl.SSLContext:
 
         pass
