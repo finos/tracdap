@@ -18,7 +18,7 @@ grpcio-tools == 1.74.0
 
 # Core data framework is based on Arrow
 # This should always match the Java Arrow version
-pyarrow == 21.0.0
+pyarrow == 22.0.0
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.2
@@ -44,8 +44,8 @@ requests == 2.32.4
 # We do not support the 0.x series! 1.2 added the new dType for integers which supports nulls
 # NumPy 2.0 is not supported yet, it breaks the ABI and other packages need time to catch up
 
-pandas >= 1.2.0, < 2.3.0
-numpy >= 1.20, < 2.3.0
+pandas >= 1.2.0, < 2.4.0
+numpy >= 1.20, < 2.4.0
 
 # Polars is an optional dependency - support the 1.x series
 
