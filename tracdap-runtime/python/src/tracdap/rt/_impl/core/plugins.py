@@ -212,7 +212,7 @@ class PluginManagerImpl(PluginManager):
                 args["properties"] = properties
 
             elif arg_name == "network_manager":
-                cls.__check_plugin_arg(plugin_class, "properties", _net.INetworkManager, hints)
+                cls.__check_plugin_arg(plugin_class, "network_manager", _net.INetworkManager, hints)
                 network_manager = _net.NetworkManager.instance()
                 args["network_manager"] = network_manager
 
