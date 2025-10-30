@@ -16,16 +16,17 @@
 import typing as _tp
 import http.client as _http
 
-import tracdap.rt.exceptions as ex
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.ext.external as trac_external
+import tracdap.rt.ext.network as net
 
 
 class ExtExternalSystemPlugin(trac_external.IExternalSystem):
 
-    def __init__(self, properties: dict[str, str]):
+    def __init__(self, properties: dict[str, str], network_manager: net.INetworkManager):
 
         self._properties = properties
+        self._network_manager = network_manager
 
     def supported_types(self) -> list[type]:
 
@@ -67,15 +68,10 @@ class ExtExternalSystemPlugin(trac_external.IExternalSystem):
 
         scheme = self._properties.get("scheme")
         host = self._properties.get("host")
-        port = self._properties.get("port")
+        port = int(self._properties.get("port"))
+        tls = scheme == "https"
 
-        if scheme == "https":
-            return _http.HTTPSConnection(host, int(port), **client_args)
-
-        if scheme == "http":
-            return _http.HTTPConnection(host, int(port), **client_args)
-
-        raise ex.EConfig("Unsupported scheme: " + scheme)
+        return self._network_manager.create_http_client_connection(host, port, tls, **client_args)
 
     def close_client(self, client: _http.HTTPConnection):
 
