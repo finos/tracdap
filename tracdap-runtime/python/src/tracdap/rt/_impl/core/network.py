@@ -16,8 +16,10 @@
 import ssl as _ssl
 import typing as _tp
 import pathlib as _pathlib
-
 import http.client as _hc
+
+# Hard dependency on certifi for global SSL certificates
+import certifi as _cf
 
 try:
     import urllib3 as _ul3  # noqa
@@ -185,15 +187,23 @@ class NetworkManager(INetworkManager):
 
         _guard.run_model_guard(allow_callback=True)
 
+        # Read the relevant SSL props
         properties = self._process_network_properties(config)
         ca_certs = _util.read_property(properties, self.NETWORK_SSL_CA_CERTIFICATES_KEY, optional=True)
+        public_certs = _util.read_property(properties, self.NETWORK_SSL_PUBLIC_CERTIFICATES_KEY, convert=bool, default=False)
 
-        ca_file = None
-        ca_path = None
-        ca_data = None
-
+        # If caCertificates is specified, set up a custom context
         if ca_certs is not None:
+
+            # Resolve the certs path using TRAC's configure manager path resolution
+            # This allows relative paths for cert files kept in the TRAC config directory
             certs_url = self.__config_manager.resolve_config_url(ca_certs)
+
+            ca_file = None
+            ca_path = None
+            ca_data = None
+
+            # Determine how to interpret caCertificates (file, dir or data location)
             if certs_url.scheme == "file":
                 certs_path = _pathlib.Path(certs_url.path)
                 if certs_path.is_file():
@@ -203,19 +213,16 @@ class NetworkManager(INetworkManager):
             else:
                 ca_data = self.__config_manager.load_config_file(ca_certs, "network certificates")
 
-        context = _ssl.create_default_context(
-            _ssl.Purpose.SERVER_AUTH,
-            cafile=ca_file, capath=ca_path, cadata=ca_data)
+            # Set up context using just the configured caCertificates
+            context = _ssl.create_default_context(cafile=ca_file, capath=ca_path, cadata=ca_data)
 
-        # If no custom certs are supplied, public certs are loaded by default
-        # This setting allows for including public certs as well as custom ones
+            # If publicCertificates is specified, add in the public certs as well
+            if public_certs:
+                context.load_verify_locations(cafile=_cf.where())
 
-        public_certs = _util.read_property(
-            properties, self.NETWORK_SSL_PUBLIC_CERTIFICATES_KEY,
-            convert=bool, default=False)
-
-        if public_certs:
-            context.load_default_certs(_ssl.Purpose.SERVER_AUTH)
+        # If caCertificates is not specified, always use the public certs
+        else:
+            context = _ssl.create_default_context(cafile=_cf.where())
 
         return context
 

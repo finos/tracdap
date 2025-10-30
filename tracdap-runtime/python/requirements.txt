@@ -23,6 +23,9 @@ pyarrow == 22.0.0
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.3
 
+# Certifi is a hard dependency for the network manager
+certifi >= 2025.1.31
+
 # Python implementation of Git, for model loading
 dulwich == 0.23.2
 
