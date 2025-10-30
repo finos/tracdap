@@ -149,8 +149,11 @@ class NetworkManagerTest(unittest.TestCase):
         subprocess.run([
             "openssl", "req", "-new", "-newkey", "rsa:2048", "-days", "365",
             "-nodes", "-x509", "-out", cert_file, "-keyout", key_file,
-            "-subj", f"/C=US/ST=State/L=City/O=Org/CN={cls.PRIVATE_SERVER_HOST}"
-        ])
+            "-subj", f"/C=US/ST=State/L=City/O=Org/CN={cls.PRIVATE_SERVER_HOST}",
+            "-addext", "subjectAltName = DNS:localhost,IP:127.0.0.1,DNS:" + cls.PRIVATE_SERVER_HOST,
+            "-addext", "keyUsage = keyEncipherment, dataEncipherment, digitalSignature",
+            "-addext", "extendedKeyUsage = serverAuth"
+        ], check=True)
 
     @classmethod
     def tearDownClass(cls):

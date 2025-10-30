@@ -16,8 +16,10 @@
 import ssl as _ssl
 import typing as _tp
 import pathlib as _pathlib
-
 import http.client as _hc
+
+# Hard dependency on certifi for global SSL certificates
+import certifi as _cf
 
 try:
     import urllib3 as _ul3  # noqa
@@ -114,7 +116,7 @@ class NetworkManager(INetworkManager):
         self._check_args(self.create_http_client_connection, client_args, self.HTTP_CONNECTION_ARGS)
 
         if tls:
-            ssl_context = self._create_ssl_context(config)
+            ssl_context = self.create_ssl_context(config)
             return _hc.HTTPSConnection(host, port, context=ssl_context, **client_args)
 
         else:
@@ -130,7 +132,7 @@ class NetworkManager(INetworkManager):
         self._check_args(self.create_urllib3_connection_pool, client_args, self.URLLIB3_CONNECTION_POOL_ARGS)
 
         if tls:
-            ssl_context = self._create_ssl_context(config)
+            ssl_context = self.create_ssl_context(config)
             return _ul3.HTTPSConnectionPool(host, port, ssl_context=ssl_context, **client_args)
 
         else:
@@ -144,7 +146,7 @@ class NetworkManager(INetworkManager):
         _val.validate_signature(self.create_urllib3_pool_manager, config, **pool_args)
         self._check_args(self.create_urllib3_pool_manager, pool_args, self.URLLIB3_POOL_MANAGER_ARGS)
 
-        ssl_context = self._create_ssl_context(config)
+        ssl_context = self.create_ssl_context(config)
         return _ul3.PoolManager(ssl_context=ssl_context, **pool_args)
 
     def create_requests_session(self, config: CONFIG_TYPE = None) -> "_rq.Session":
@@ -152,7 +154,7 @@ class NetworkManager(INetworkManager):
         _guard.run_model_guard(allow_callback=True)
         _val.validate_signature(self.create_requests_session, config)
 
-        ssl_context = self._create_ssl_context(config)
+        ssl_context = self.create_ssl_context(config)
 
         session = _rq.Session()
         adapter = self._RequestsSslAdapter(ssl_context)
@@ -177,23 +179,31 @@ class NetworkManager(INetworkManager):
         _val.validate_signature(self.create_httpx_transport, config, **transport_args)
         self._check_args(self.create_httpx_transport, transport_args, self.HTTPX_TRANSPORT_ARGS)
 
-        ssl_context = self._create_ssl_context(config)
+        ssl_context = self.create_ssl_context(config)
 
         return _hx.HTTPTransport(verify=ssl_context, **transport_args)
 
-    def _create_ssl_context(self, config: CONFIG_TYPE) -> _ssl.SSLContext:
+    def create_ssl_context(self, config: CONFIG_TYPE = None) -> _ssl.SSLContext:
 
         _guard.run_model_guard(allow_callback=True)
 
+        # Read the relevant SSL props
         properties = self._process_network_properties(config)
         ca_certs = _util.read_property(properties, self.NETWORK_SSL_CA_CERTIFICATES_KEY, optional=True)
+        public_certs = _util.read_property(properties, self.NETWORK_SSL_PUBLIC_CERTIFICATES_KEY, convert=bool, default=False)
 
-        ca_file = None
-        ca_path = None
-        ca_data = None
-
+        # If caCertificates is specified, set up a custom context
         if ca_certs is not None:
+
+            # Resolve the certs path using TRAC's configure manager path resolution
+            # This allows relative paths for cert files kept in the TRAC config directory
             certs_url = self.__config_manager.resolve_config_url(ca_certs)
+
+            ca_file = None
+            ca_path = None
+            ca_data = None
+
+            # Determine how to interpret caCertificates (file, dir or data location)
             if certs_url.scheme == "file":
                 certs_path = _pathlib.Path(certs_url.path)
                 if certs_path.is_file():
@@ -203,19 +213,16 @@ class NetworkManager(INetworkManager):
             else:
                 ca_data = self.__config_manager.load_config_file(ca_certs, "network certificates")
 
-        context = _ssl.create_default_context(
-            _ssl.Purpose.SERVER_AUTH,
-            cafile=ca_file, capath=ca_path, cadata=ca_data)
+            # Set up context using just the configured caCertificates
+            context = _ssl.create_default_context(cafile=ca_file, capath=ca_path, cadata=ca_data)
 
-        # If no custom certs are supplied, public certs are loaded by default
-        # This setting allows for including public certs as well as custom ones
+            # If publicCertificates is specified, add in the public certs as well
+            if public_certs:
+                context.load_verify_locations(cafile=_cf.where())
 
-        public_certs = _util.read_property(
-            properties, self.NETWORK_SSL_PUBLIC_CERTIFICATES_KEY,
-            convert=bool, default=False)
-
-        if public_certs:
-            context.load_default_certs(_ssl.Purpose.SERVER_AUTH)
+        # If caCertificates is not specified, always use the public certs
+        else:
+            context = _ssl.create_default_context(cafile=_cf.where())
 
         return context
 

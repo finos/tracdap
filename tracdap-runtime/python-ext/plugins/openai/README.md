@@ -37,7 +37,7 @@ $ pip install tracdap-ext-openai
 
 The package has the following dependencies:
 
-- tracdap-runtime (version 0.10.0-beta1 or later)
+- tracdap-runtime (version 0.10.0-beta2 or later)
 - openai (version 1.x)
 
 

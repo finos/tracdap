@@ -25,6 +25,8 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.static_api as _api_hook  # noqa
 import tracdap.rt._impl.core.type_system as _types  # noqa
 import tracdap.rt._impl.core.data as _data  # noqa
+import tracdap.rt._impl.core.network as _net  # noqa
+import tracdap.rt._impl.core.config_parser as _cfg  # noqa
 
 from tracdap.rt._impl.exec.context import TracContextImpl, TracExternalSystemWrapper  # noqa
 
@@ -81,6 +83,15 @@ class TracContextTest(unittest.TestCase):
         "gross_profit": [decimal.Decimal("150000.00"), decimal.Decimal("214489.54")]
     })
 
+    @classmethod
+    def setUpClass(cls):
+
+        # This test uses a dummy extension that needs the network manager
+        # So the network manager needs to be initialized
+        config_mgr = _cfg.ConfigManager.for_root_dir(".")
+        blank_sys_cfg = _cfg.RuntimeConfig()
+        _net.NetworkManager.initialize(config_mgr, blank_sys_cfg)
+
     def setUp(self):
 
         native_params = {
@@ -122,7 +133,7 @@ class TracContextTest(unittest.TestCase):
         }
 
         github_props = { "scheme": "https", "host": "github.com", "port": "443" }
-        github_content = ext_system.ExtExternalSystemPlugin(github_props)
+        github_content = ext_system.ExtExternalSystemPlugin(github_props, _net.NetworkManager.instance())
 
         resources = {
             "github": TracExternalSystemWrapper(github_content),
