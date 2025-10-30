@@ -106,7 +106,7 @@ jobs:
           # Python 3.12 requires Pandas 2.1, Pandas 2.0 only has binaries for 3.11
           - { PLATFORM: "ubuntu",
               PYTHON_VERSION: "3.12",
-              PANDAS_DEPENDENCY: "'pandas == 2.1.0''",
+              PANDAS_DEPENDENCY: "'pandas == 2.1.0'",
               PYSPARK_DEPENDENCY: "'pyspark ~= 3.3.0'" }
 
           # Force testing on the first release of the Pandas 2 series, requires Python 3.11
