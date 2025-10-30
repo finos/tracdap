@@ -11,9 +11,9 @@ Requirements
 
 The TRAC runtime for Python has these requirements:
 
-* Python: 3.9 up to 3.13
-* Pandas: 1.2 up to 2.2 (optional)
-* NumPy: 1.2 up to 2.2 (optional, required by Pandas)
+* Python: 3.10 or later
+* Pandas: 1.3 or later (optional)
+* NumPy: 1.22 or later (optional, required by Pandas)
 * Polars: 1.X (optional)
 
 3rd party libraries may impose additional constraints on supported versions of key libraries.
