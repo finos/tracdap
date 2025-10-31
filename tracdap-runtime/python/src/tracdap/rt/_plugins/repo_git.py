@@ -173,8 +173,16 @@ class GitRepository(IModelRepository):
                 self._log.info(line)
 
             if cmd_result.returncode == 0:
+
                 for line in cmd_err:
                     self._log.info(line)
+
+                # After the init command, use dulwich to write config into the repo folder
+                # This is a regular .gitconfig file, so it will be understood by the native commands
+                if not config_written:
+                    repo = git_repo.Repo(str(checkout_dir))
+                    self._apply_config_from_properties(repo)
+                    config_written = True
 
             elif cmd_err:
 
@@ -188,13 +196,6 @@ class GitRepository(IModelRepository):
                 error_msg = f"Git checkout failed for {model_def.package} {model_def.version}"
                 self._log.error(error_msg)
                 raise ex.EModelRepo(error_msg)
-
-            # After the init command, use dulwich to write config into the repo folder
-            # This is a regular .gitconfig file, so it will be understood by the native commands
-            if not config_written:
-                repo = git_repo.Repo(str(checkout_dir))
-                self._apply_config_from_properties(repo)
-                config_written = True
 
         return self.package_path(model_def, checkout_dir)
 
