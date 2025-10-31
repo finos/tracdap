@@ -28,7 +28,7 @@ except ModuleNotFoundError:
 
 try:
     import requests as _rq  # noqa
-    import requests.adapters as _rqa
+    import requests.adapters as _rqa  # noqa
 except ModuleNotFoundError:
     _rq = None
 
@@ -44,10 +44,8 @@ import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 import tracdap.rt.exceptions as _ex
 
-from tracdap.rt.ext.network import *
 
-
-class NetworkManager(INetworkManager):
+class NetworkManager:
 
     NETWORK_PROFILE_KEY = "network.profile"
     NETWORK_SSL_CA_CERTIFICATES_KEY = "network.ssl.caCertificates"
@@ -60,7 +58,7 @@ class NetworkManager(INetworkManager):
     HTTPX_TRANSPORT_ARGS = ["retries", "limits", "htp1", "http2"]
     HTTPX_CLIENT_ARGS = ["base_url", "timeout", "follow_redirects", "max_redirects"] + HTTPX_TRANSPORT_ARGS
 
-    CONFIG_TYPE = INetworkManager.CONFIG_TYPE
+    CONFIG_TYPE = _cfg.PluginConfig | None
 
     __instance: "NetworkManager" = None
 
