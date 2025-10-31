@@ -13,6 +13,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pathlib as _pathlib
+import platform as _platform
 import typing as _tp
 import urllib.parse as _ulp
 
@@ -116,3 +118,24 @@ def hide_http_credentials(url: str | _ulp.ParseResult | _ulp.ParseResultBytes) -
 
     else:
         return url.geturl()
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Some helpers for dealing with Windows OS
+
+
+__IS_WINDOWS = _platform.system() == "Windows"
+
+
+def is_windows():
+    return __IS_WINDOWS
+
+
+def windows_unc_path(path: _pathlib.Path) -> _pathlib.Path:
+
+    # Convert a path to its UNC form on Windows
+
+    if is_windows() and not str(path).startswith("\\\\?\\"):
+        return _pathlib.Path("\\\\?\\" + str(path.resolve()))
+    else:
+        return path
