@@ -14,11 +14,17 @@
 #  limitations under the License.
 
 import typing as _tp
+import urllib.parse as _ulp
 
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 
 _T = _tp.TypeVar("_T")
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Utilities for reading TRAC config files
+# Extensions should use these methods to get consistent behavior when handling config
 
 
 def has_plugin_config(config: _cfg.PluginConfig, key: str):
@@ -34,8 +40,8 @@ def has_plugin_config(config: _cfg.PluginConfig, key: str):
 def read_plugin_config(
         config: _cfg.PluginConfig, key: str, *,
         optional: bool = False,
-        default: _tp.Optional[_T] = None,
-        convert: _tp.Optional[_tp.Type[_T]] = str) -> _T:
+        default: _T | None = None,
+        convert: type[_T] | None = str) -> _T:
 
     if key in config.publicProperties:
         value = config.publicProperties[key]
@@ -56,3 +62,57 @@ def read_plugin_config(
 
     except (ValueError, TypeError):
         raise _ex.EConfigParse(f"Wrong property type: [{key}] = [{value}], expected type is [{convert}]")
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Helpers for handling HTTP credentials in URLs (https://user:pass@somewhere.org/)
+
+
+def apply_http_credentials(url: _ulp.ParseResult, credentials: str | None) -> _ulp.ParseResult:
+
+    if credentials is None:
+        return url
+
+    if url.username is None:
+        location = f"{credentials}@{url.netloc}"
+
+    else:
+        location_sep = url.netloc.index("@")
+        location = f"{credentials}@{url.netloc[location_sep + 1:]}"
+
+    return url._replace(netloc=location)
+
+
+def extract_http_credentials(url: _ulp.ParseResult) -> str | None:
+
+    if url.username:
+        credentials_sep = url.netloc.index("@")
+        return url.netloc[:credentials_sep]
+
+    return None
+
+
+def hide_http_credentials(url: str | _ulp.ParseResult | _ulp.ParseResultBytes) -> str:
+
+    if isinstance(url, str):
+        url = _ulp.urlparse(url)
+
+    if url.password:
+
+        user_sep = url.netloc.index(":")
+        pass_sep = url.netloc.index("@")
+
+        user = url.netloc[:user_sep]
+        safe_location = f"{user}:*****@{url.netloc[pass_sep + 1:]}"
+
+        return url._replace(netloc=safe_location).geturl()  # noqa
+
+    elif url.username:
+
+        separator = url.netloc.index("@")
+        safe_location = f"*****@{url.netloc[separator + 1:]}"
+
+        return url._replace(netloc=safe_location).geturl()  # noqa
+
+    else:
+        return url.geturl()
