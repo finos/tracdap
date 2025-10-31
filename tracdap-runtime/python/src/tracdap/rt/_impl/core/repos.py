@@ -40,14 +40,21 @@ class RepositoryManager:
 
                 try:
 
+                    plugin_config = cfg.PluginConfig(
+                        protocol=resource.protocol,
+                        subProtocol=resource.subProtocol,
+                        publicProperties=resource.publicProperties,
+                        properties=resource.properties,
+                        secrets=resource.secrets)
+
                     # Add global properties related to the repo protocol
                     related_props = {
                         k: v for (k, v) in sys_config.properties.items()
                         if k.startswith(f"{resource.protocol}.")}
 
-                    resource.properties.update(related_props)
+                    plugin_config.properties.update(related_props)
 
-                    self._repos[resource_key] = plugins.PluginManager.load_plugin(IModelRepository, resource)
+                    self._repos[resource_key] = plugins.PluginManager.load_plugin(IModelRepository, plugin_config)
 
                 except ex.EPluginNotAvailable as e:
 
