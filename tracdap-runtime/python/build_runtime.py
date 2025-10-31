@@ -315,7 +315,7 @@ def cli_args():
 
     parser.add_argument(
         "--target", type=str, metavar="target",
-        choices=["codegen", "test", "examples", "integration", "dist", "ext", "clean"], nargs="*", required=True,
+        choices=["clean", "codegen", "dist", "ext", "test", "test_ext", "integration", "integration_ext", "examples"], nargs="*", required=True,
         help="The target to build")
 
     parser.add_argument(
@@ -343,7 +343,7 @@ def cli_args():
     return parser.parse_args()
 
 
-def run_tests(test_path, pattern=None):
+def run_tests(test_path, pattern=None, ext=False):
 
     # Default test pattern for unit tests
     if pattern is None:
@@ -358,13 +358,22 @@ def run_tests(test_path, pattern=None):
         sys.path.append(str(RUNTIME_DIR.joinpath("generated")))
         sys.path.append(str(RUNTIME_DIR.joinpath("src")))
         sys.path.append(str(RUNTIME_DIR.joinpath("test")))
+        sys.path.append(str(RUNTIME_EXT_DIR.joinpath("src")))
+        sys.path.append(str(RUNTIME_EXT_DIR.joinpath("test")))
 
         runner = unittest.TextTestRunner()
         loader = unittest.TestLoader()
-        suite = loader.discover(
-            start_dir=str(RUNTIME_DIR.joinpath(test_path)),
-            top_level_dir=str(RUNTIME_DIR.joinpath("test")),
-            pattern=pattern)
+
+        if ext:
+            suite = loader.discover(
+                start_dir=str(RUNTIME_EXT_DIR.joinpath(test_path)),
+                top_level_dir=str(RUNTIME_EXT_DIR.joinpath("test")),
+                pattern=pattern)
+        else:
+            suite = loader.discover(
+                start_dir=str(RUNTIME_DIR.joinpath(test_path)),
+                top_level_dir=str(RUNTIME_DIR.joinpath("test")),
+                pattern=pattern)
 
         result = runner.run(suite)
 
@@ -452,16 +461,6 @@ def main():
     if "codegen" in args.target:
         generate_from_proto(unpacked=True)
 
-    if "test" in args.target:
-        run_tests("test/tracdap_test")
-
-    if "examples" in args.target:
-        run_tests("test/tracdap_examples")
-
-    if "integration" in args.target:
-        for pattern in args.pattern:
-            run_tests("test/tracdap_test", pattern)
-
     if "dist" in args.target:
         build_runtime()
 
@@ -469,6 +468,23 @@ def main():
         plugins = find_plugins(args)
         for plugin_name in plugins:
             build_plugin(plugin_name)
+
+    if "test" in args.target:
+        run_tests("test/tracdap_test")
+
+    if "test_ext" in args.target:
+        run_tests("test/tracdap_ext_test", ext=True)
+
+    if "integration" in args.target:
+        for pattern in args.pattern:
+            run_tests("test/tracdap_test", pattern)
+
+    if "integration_ext" in args.target:
+        for pattern in args.pattern:
+            run_tests("test/tracdap_ext_test", pattern, ext=True)
+
+    if "examples" in args.target:
+        run_tests("test/tracdap_examples")
 
 
 main()
