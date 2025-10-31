@@ -131,5 +131,5 @@ class INetworkManager(_tp.Protocol):
     def create_httpx_transport(self, config: _cfg.PluginConfig | None = None, **transport_args) -> "_hx.HTTPTransport":
         pass
 
-    def create_ssl_context(self, config: _cfg.PluginConfig | None = None) -> _ssl.SSLContext:
+    def create_ssl_context(self, config: _cfg.PluginConfig | None = None) -> "_ssl.SSLContext":
         pass
