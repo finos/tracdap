@@ -19,11 +19,12 @@ import pathlib
 import subprocess as sp
 
 import tracdap.rt.metadata as meta
-import tracdap.rt.config as config
 import tracdap.rt.exceptions as ex
+import tracdap.rt._impl.core.config_parser as config  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa
+import tracdap.rt._impl.core.network as network  # noqa
 import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.core.repos as repos  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
@@ -34,6 +35,7 @@ class ModelRepositoriesTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         plugins.PluginManagerImpl.register_trac_extensions()
+        network.NetworkManager.initialize(config.ConfigManager.for_root_dir(pathlib.Path(".")), config.RuntimeConfig())
         api_hook.StaticApiImpl.register_impl()
         log.configure_logging()
 
