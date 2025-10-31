@@ -77,7 +77,7 @@ class HttpExtensionTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         _log.configure_logging()
-        _plugins.PluginManagerImpl.register_core_plugins()
+        _plugins.PluginManagerImpl.register_trac_extensions()
 
     def setUp(self) -> None:
 

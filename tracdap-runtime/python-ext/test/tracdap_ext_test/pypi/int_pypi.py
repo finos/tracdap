@@ -31,7 +31,7 @@ class PyPIExtensionTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        plugins.PluginManagerImpl.register_core_plugins()
+        plugins.PluginManagerImpl.register_trac_extensions()
         api_hook.StaticApiImpl.register_impl()
         log.configure_logging()
 
