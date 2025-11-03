@@ -65,7 +65,7 @@ class PyPiRepository(IModelRepository):
         self._log = log_provider.logger_for_object(self)
 
         self._config = config
-        self._pool_manager = network_manager.create_urllib3_pool_manager(config)
+        self._pool_manager = network_manager.use_shared_urllib3_pool_manager(config)
 
         self._pip_index = util.read_plugin_config(self._config, self.PIP_INDEX_KEY, optional=True)
         self._pip_index_url = util.read_plugin_config(self._config, self.PIP_INDEX_URL_KEY, optional=True)

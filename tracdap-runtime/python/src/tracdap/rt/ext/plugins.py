@@ -133,3 +133,9 @@ class INetworkManager(_tp.Protocol):
 
     def create_ssl_context(self, config: _cfg.PluginConfig | None = None) -> "_ssl.SSLContext":
         pass
+
+    def use_shared_urllib3_pool_manager(self, config: _cfg.PluginConfig | None = None, **pool_args) -> "_ul3.PoolManager":
+        pass
+
+    def use_shared_ssl_context(self, config: _cfg.PluginConfig | None = None) -> "_ssl.SSLContext":
+        pass

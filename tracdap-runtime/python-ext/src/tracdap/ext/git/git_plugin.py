@@ -56,7 +56,7 @@ class GitRepository(IModelRepository):
             log_provider: plugins.ILogProvider):
 
         self._config = config
-        self._pool_manager = network_manager.create_urllib3_pool_manager(config)
+        self._pool_manager = network_manager.use_shared_urllib3_pool_manager(config)
         self._log = log_provider.logger_for_object(self)
 
         repo_url_str = util.read_plugin_config(self._config, self.REPO_URL_KEY)
