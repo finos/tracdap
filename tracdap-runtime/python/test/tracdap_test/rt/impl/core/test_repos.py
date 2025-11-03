@@ -94,7 +94,19 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-        package_dir = repo.checkout(model_def, checkout_dir)
+        package = self._package_for_model_def(model_def)
+        package_dir = repo.checkout(package, checkout_dir)
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
+
+    @staticmethod
+    def _package_for_model_def(model_def: meta.ModelDefinition) -> repos.ModelPackage:
+
+        return repos.ModelPackage(
+            language=model_def.language,
+            repository=model_def.repository,
+            packageGroup=model_def.packageGroup,
+            package=model_def.package,
+            version=model_def.version,
+            path=model_def.path)

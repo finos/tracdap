@@ -105,7 +105,8 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-        package_dir = repo.checkout(model_def, checkout_dir)
+        package = self._package_for_model_def(model_def)
+        package_dir = repo.checkout(package, checkout_dir)
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
@@ -133,11 +134,12 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("git_test")
 
+        package = self._package_for_model_def(model_def)
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, "git_native_failure")
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-        self.assertRaises(ex.EModelRepo, lambda: repo.checkout(model_def, checkout_dir))
+        self.assertRaises(ex.EModelRepo, lambda: repo.checkout(package, checkout_dir))
 
     def test_checkout_git_python(self):
 
@@ -178,7 +180,8 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-        package_dir = repo.checkout(model_def, checkout_dir)
+        package = self._package_for_model_def(model_def)
+        package_dir = repo.checkout(package, checkout_dir)
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
@@ -205,8 +208,20 @@ class ModelRepositoriesTest(unittest.TestCase):
         repo_mgr = repos.RepositoryManager(sys_config)
         repo = repo_mgr.get_repository("git_test")
 
+        package = self._package_for_model_def(model_def)
         checkout_dir = self.scratch_dir.joinpath(model_def.repository, "git_python_failure")
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-        self.assertRaises(ex.EModelRepo, lambda: repo.checkout(model_def, checkout_dir))
+        self.assertRaises(ex.EModelRepo, lambda: repo.checkout(package, checkout_dir))
+
+    @staticmethod
+    def _package_for_model_def(model_def: meta.ModelDefinition) -> repos.ModelPackage:
+
+        return repos.ModelPackage(
+            language=model_def.language,
+            repository=model_def.repository,
+            packageGroup=model_def.packageGroup,
+            package=model_def.package,
+            version=model_def.version,
+            path=model_def.path)
