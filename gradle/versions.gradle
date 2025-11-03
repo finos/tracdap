@@ -49,7 +49,7 @@ ext {
     mysql_version = '8.4.0'
     mariadb_version = '3.4.0'
     postgresql_version = '42.7.3'
-    sqlserver_version = '12.6.3.jre11'
+    sqlserver_version = '13.2.1.jre8'
     oracle_version = '19.22.0.0'
 
     // JDBC Connection pool
