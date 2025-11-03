@@ -94,7 +94,7 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_checkout_dir = util.windows_unc_path(checkout_dir)
         safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-        package_dir = repo.do_checkout(model_def, checkout_dir)
+        package_dir = repo.checkout(model_def, checkout_dir)
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())

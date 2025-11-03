@@ -70,13 +70,13 @@ class GitRepository(IModelRepository):
             self._config, self.NATIVE_GIT_KEY,
             convert=bool, default=self.NATIVE_GIT_DEFAULT)
 
-    def package_path(
+    def get_checkout_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> pathlib.Path:
 
         return checkout_dir.joinpath(model_def.path)
 
-    def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
+    def checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
         try:
 
@@ -199,7 +199,7 @@ class GitRepository(IModelRepository):
                 self._log.error(error_msg)
                 raise ex.EModelRepo(error_msg)
 
-        return self.package_path(model_def, checkout_dir)
+        return self.get_checkout_path(model_def, checkout_dir)
 
     def _do_python_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
@@ -269,7 +269,7 @@ class GitRepository(IModelRepository):
         tree = repo[b"HEAD"].tree
         git_index.build_index_from_tree(repo.path, index_file, repo.object_store, tree)
 
-        return self.package_path(model_def, checkout_dir)
+        return self.get_checkout_path(model_def, checkout_dir)
 
     def _get_http_credentials(self, url: urllib.parse.ParseResult) -> str | None:
 

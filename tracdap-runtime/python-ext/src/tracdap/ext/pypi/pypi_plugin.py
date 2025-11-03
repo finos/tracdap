@@ -75,13 +75,13 @@ class PyPiRepository(IModelRepository):
             message = f"Neither [{self.PIP_INDEX_KEY}] nor [{self.PIP_INDEX_URL_KEY} is set in PyPi repository config"
             raise ex.EConfigParse(message)
 
-    def package_path(
+    def get_checkout_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> pathlib.Path:
 
         return checkout_dir
 
-    def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
+    def checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
         self._log.info(
             f"PyPI checkout: repo = [{model_def.repository}], " +
@@ -114,7 +114,7 @@ class PyPiRepository(IModelRepository):
             self._log.info(f"Unpacked [{len(download_whl.filelist)}] files")
             self._log.info(f"PyPI checkout succeeded for {model_def.package} {model_def.version}")
 
-            return self.package_path(model_def, checkout_dir)
+            return self.get_checkout_path(model_def, checkout_dir)
 
         finally:
             if download is not None:

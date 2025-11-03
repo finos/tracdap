@@ -19,13 +19,10 @@ import pathlib as _pathlib
 import tracdap.rt.metadata as _meta
 
 
-class IModelRepository:
+class IModelRepository(metaclass=_abc.ABCMeta):
 
     @_abc.abstractmethod
-    def do_checkout(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: _pathlib.Path) \
-            -> _pathlib.Path:
+    def checkout(self, model_def: _meta.ModelDefinition, checkout_dir: _pathlib.Path) -> _pathlib.Path:
 
         """
         Perform a checkout for the given model definition, into the supplied checkout dir.
@@ -51,13 +48,10 @@ class IModelRepository:
         pass
 
     @_abc.abstractmethod
-    def package_path(
-            self, model_def: _meta.ModelDefinition,
-            checkout_dir: _pathlib.Path) \
-            -> _pathlib.Path:
+    def get_checkout_path(self, model_def: _meta.ModelDefinition, checkout_dir: _pathlib.Path) -> _pathlib.Path:
 
         """
-        Get the package path that would be returned by :py:meth:`do_checkout()`,
+        Get the checkout path that would be returned by :py:meth:`checkout()`,
         for the given checkout_dir and model_dir, without doing a checkout.
 
         This is used by the loader mechanism to avoid repeating the same checkout multiple times.
