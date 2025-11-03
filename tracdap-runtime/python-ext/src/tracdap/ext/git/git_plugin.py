@@ -16,7 +16,6 @@
 import pathlib
 import re
 import subprocess as sp
-import typing as tp
 import urllib.parse
 import time
 
@@ -25,21 +24,25 @@ import dulwich.client as git_client
 import dulwich.index as git_index
 import urllib3.exceptions  # noqa
 
+import tracdap.rt.config as cfg
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
+import tracdap.rt.ext.plugins as plugins
+import tracdap.rt.ext.util as util
 
 # Import repo interfaces
-import tracdap.rt.ext.plugins as plugins
 from tracdap.rt.ext.repos import *
-
-# Set of common helpers across the core plugins (do not reference rt._impl)
-from . import _helpers
+from tracdap.rt.ext.util import hide_http_credentials
 
 
 class GitRepository(IModelRepository):
 
     REPO_URL_KEY = "repoUrl"
     NATIVE_GIT_KEY = "nativeGit"
+    USERNAME_KEY = "username"
+    PASSWORD_KEY = "password"
+    TOKEN_KEY = "token"
+
     NATIVE_GIT_DEFAULT = False
 
     GIT_TIMEOUT_SECONDS = 30
@@ -47,34 +50,33 @@ class GitRepository(IModelRepository):
     GIT_CONFIG_PATTERN = re.compile("^git\\.([^.]+)\\.(.+)")
     SHA1_PATTERN = re.compile("^[0-9a-f]{40}$")
 
-    def __init__(self, properties: tp.Dict[str, str]):
+    def __init__(
+            self, config: cfg.PluginConfig,
+            network_manager: plugins.INetworkManager,
+            log_provider: plugins.ILogProvider):
 
-        self._properties = properties
-        self._log = _helpers.logger_for_object(self)
+        self._config = config
+        self._pool_manager = network_manager.use_shared_urllib3_pool_manager(config)
+        self._log = log_provider.logger_for_object(self)
 
-        repo_url_prop = _helpers.get_plugin_property(self._properties, self.REPO_URL_KEY)
-        native_git_prop = _helpers.get_plugin_property(self._properties, self.NATIVE_GIT_KEY)
+        repo_url_str = util.read_plugin_config(self._config, self.REPO_URL_KEY)
+        repo_url = urllib.parse.urlparse(repo_url_str)
+        credentials = self._get_http_credentials(repo_url)
 
-        if not repo_url_prop:
-            raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in Git repository config")
+        self._repo_url = util.apply_http_credentials(repo_url, credentials)
 
-        repo_url = urllib.parse.urlparse(repo_url_prop)
-        credentials = _helpers.get_http_credentials(repo_url, self._properties)
+        # Whether to use the system native Git, instead of Python Dulwich
+        self._native_git = util.read_plugin_config(
+            self._config, self.NATIVE_GIT_KEY,
+            convert=bool, default=self.NATIVE_GIT_DEFAULT)
 
-        self._repo_url = _helpers.apply_http_credentials(repo_url, credentials)
-
-        if native_git_prop is not None:
-            self._native_git = native_git_prop.strip().lower() == "true"
-        else:
-            self._native_git = self.NATIVE_GIT_DEFAULT
-
-    def package_path(
+    def get_checkout_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> pathlib.Path:
 
         return checkout_dir.joinpath(model_def.path)
 
-    def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
+    def checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
         try:
 
@@ -137,7 +139,7 @@ class GitRepository(IModelRepository):
         config_written = False
 
         # Work around Windows issues
-        if _helpers.is_windows():
+        if util.is_windows():
 
             # Some machines may still be setup without long path support in Windows and/or the Git client
             # Workaround: Enable the core.longpaths flag for each individual Git command (do not rely on system config)
@@ -155,7 +157,7 @@ class GitRepository(IModelRepository):
 
         for git_cmd in git_cmds:
 
-            safe_cmd = map(_helpers.log_safe, git_cmd)
+            safe_cmd = map(self._log_safe, git_cmd)
             self._log.info(f"=> git {' '.join(safe_cmd)}")
 
             cmd = [*git_cli, *git_cmd]
@@ -173,8 +175,16 @@ class GitRepository(IModelRepository):
                 self._log.info(line)
 
             if cmd_result.returncode == 0:
+
                 for line in cmd_err:
                     self._log.info(line)
+
+                # After the init command, use dulwich to write config into the repo folder
+                # This is a regular .gitconfig file, so it will be understood by the native commands
+                if not config_written:
+                    repo = git_repo.Repo(str(checkout_dir))
+                    self._apply_config_from_properties(repo)
+                    config_written = True
 
             elif cmd_err:
 
@@ -189,14 +199,7 @@ class GitRepository(IModelRepository):
                 self._log.error(error_msg)
                 raise ex.EModelRepo(error_msg)
 
-            # After the init command, use dulwich to write config into the repo folder
-            # This is a regular .gitconfig file, so it will be understood by the native commands
-            if not config_written:
-                repo = git_repo.Repo(str(checkout_dir))
-                self._apply_config_from_properties(repo)
-                config_written = True
-
-        return self.package_path(model_def, checkout_dir)
+        return self.get_checkout_path(model_def, checkout_dir)
 
     def _do_python_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
@@ -206,13 +209,12 @@ class GitRepository(IModelRepository):
 
         self._log.info("=> git init")
 
-        safe_checkout_dir = _helpers.windows_unc_path(checkout_dir)
-        repo = git_repo.Repo.init(str(safe_checkout_dir))
+        repo = git_repo.Repo.init(str(checkout_dir))
         self._apply_config_from_properties(repo)
 
         # Set up origin
 
-        self._log.info(f"=> git remote add origin {_helpers.log_safe(self._repo_url)}")
+        self._log.info(f"=> git remote add origin {util.hide_http_credentials(self._repo_url)}")
 
         self._add_remote(repo, "origin", self._repo_url.geturl())
 
@@ -237,12 +239,13 @@ class GitRepository(IModelRepository):
 
         self._log.info(f"=> git fetch --depth=1 origin {model_def.version}")
 
-        credentials = _helpers.get_http_credentials(self._repo_url, self._properties)
-        username, password = _helpers.split_http_credentials(credentials)
+        credentials = self._get_http_credentials(self._repo_url)
+        username, password = self._split_http_credentials(credentials)
 
         client = git_client.HttpGitClient(
             self._repo_url.geturl(),
             config=repo.get_config(),
+            pool_manager=self._pool_manager,
             username=username,
             password=password)
 
@@ -266,13 +269,43 @@ class GitRepository(IModelRepository):
         tree = repo[b"HEAD"].tree
         git_index.build_index_from_tree(repo.path, index_file, repo.object_store, tree)
 
-        return self.package_path(model_def, checkout_dir)
+        return self.get_checkout_path(model_def, checkout_dir)
+
+    def _get_http_credentials(self, url: urllib.parse.ParseResult) -> str | None:
+
+        token = util.read_plugin_config(self._config, self.TOKEN_KEY, optional=True)
+        username = util.read_plugin_config(self._config, self.USERNAME_KEY, optional=True)
+        password = util.read_plugin_config(self._config, self.PASSWORD_KEY, optional=True)
+
+        if token is not None:
+            return token
+
+        if username is not None and password is not None:
+            return f"{username}:{password}"
+
+        # If credentials are not explicit in the config, try looking in the URL
+        return util.extract_http_credentials(url)
+
+    @classmethod
+    def _split_http_credentials(cls, credentials: str) -> (str | None, str | None):
+
+        if credentials is None:
+            return None, None
+
+        elif ":" in credentials:
+            sep = credentials.index(":")
+            username = credentials[:sep]
+            password = credentials[sep + 1:]
+            return username, password
+
+        else:
+            return credentials, None
 
     def _apply_config_from_properties(self, repo: git_repo.Repo):
 
         config = repo.get_config()
 
-        for key, value in self._properties.items():
+        for key, value in self._config.properties.items():
 
             match = self.GIT_CONFIG_PATTERN.match(key)
 
@@ -310,6 +343,25 @@ class GitRepository(IModelRepository):
     # Error message format is like this:
     # <pkg.ClassName object at 0xXXXXXXX>: Message
     _URLLIB3_ERROR_PATTERN = re.compile(r"<[^>]*>: (.*)")
+
+    @classmethod
+    def _log_safe(cls, param):
+
+        if isinstance(param, urllib.parse.ParseResult) or isinstance(param, urllib.parse.ParseResultBytes):
+            return util.hide_http_credentials(param)
+
+        if isinstance(param, str):
+            try:
+                url = urllib.parse.urlparse(param)
+                return hide_http_credentials(url)
+            except ValueError:
+                return param
+
+        if isinstance(param, list):
+            return list(map(cls._log_safe, param))
+
+        return param
+
 
 # Register plugin
 plugins.PluginManager.register_plugin(IModelRepository, GitRepository, ["git"])

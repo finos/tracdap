@@ -1,0 +1,10 @@
+
+# Dependencies for the extension packages
+# Install all of these to run the extensions tests
+# Dependencies that are already in the core requirements.txt are not relisted here
+
+# tracdap-ext-git
+dulwich == 0.23.2
+
+# tracdap-ext-openai
+openai ~= 1.0

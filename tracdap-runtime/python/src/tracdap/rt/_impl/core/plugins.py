@@ -212,9 +212,14 @@ class PluginManagerImpl(PluginManager):
                 args["properties"] = properties
 
             elif arg_name == "network_manager":
-                cls.__check_plugin_arg(plugin_class, "network_manager", _net.INetworkManager, hints)
+                cls.__check_plugin_arg(plugin_class, "network_manager", INetworkManager, hints)
                 network_manager = _net.NetworkManager.instance()
                 args["network_manager"] = network_manager
+
+            elif arg_name == "log_provider":
+                cls.__check_plugin_arg(plugin_class, "log_provider", ILogProvider, hints)
+                log_provider = _logging.LogProvider()
+                args["log_provider"] = log_provider
 
             else:
                 detail = f"(unknown argument)"

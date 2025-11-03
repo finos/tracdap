@@ -147,12 +147,16 @@ jobs:
           pip install ${{ matrix.environment.PANDAS_DEPENDENCY }}
           pip install ${{ matrix.environment.PYSPARK_DEPENDENCY }}
           pip install -r requirements.txt
+          pip install -r requirements_extensions.txt
 
       - name: Protoc code generation
         run: python tracdap-runtime/python/build_runtime.py --target codegen
 
       - name: Unit tests
         run: python tracdap-runtime/python/build_runtime.py --target test
+
+      - name: Extensions tests
+        run: python tracdap-runtime/python/build_runtime.py --target integration_ext --pattern int_*.py
 
       - name: Python example models
         run: python tracdap-runtime/python/build_runtime.py --target examples

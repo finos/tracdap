@@ -18,12 +18,11 @@ import http.client as _http
 
 import tracdap.rt.ext.plugins as plugins
 import tracdap.rt.ext.external as trac_external
-import tracdap.rt.ext.network as net
 
 
 class ExtExternalSystemPlugin(trac_external.IExternalSystem):
 
-    def __init__(self, properties: dict[str, str], network_manager: net.INetworkManager):
+    def __init__(self, properties: dict[str, str], network_manager: plugins.INetworkManager):
 
         self._properties = properties
         self._network_manager = network_manager

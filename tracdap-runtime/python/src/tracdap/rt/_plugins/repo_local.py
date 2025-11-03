@@ -32,7 +32,7 @@ class IntegratedSource(IModelRepository):
     def __init__(self, properties: tp.Dict[str, str]):
         self._properties = properties
 
-    def package_path(
+    def get_checkout_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> tp.Optional[pathlib.Path]:
 
@@ -40,14 +40,14 @@ class IntegratedSource(IModelRepository):
 
         return None
 
-    def do_checkout(
+    def checkout(
             self, model_def: meta.ModelDefinition,
             checkout_dir: tp.Union[str, pathlib.Path]) \
             -> tp.Optional[pathlib.Path]:
 
         # For the integrated repo there is nothing to check out
 
-        return self.package_path(model_def, checkout_dir)
+        return self.get_checkout_path(model_def, checkout_dir)
 
 
 class LocalRepository(IModelRepository):
@@ -61,7 +61,7 @@ class LocalRepository(IModelRepository):
         if not self._repo_url:
             raise ex.EConfigParse(f"Missing required property [{self.REPO_URL_KEY}] in local repository config")
 
-    def package_path(
+    def get_checkout_path(
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> pathlib.Path:
 
@@ -69,12 +69,12 @@ class LocalRepository(IModelRepository):
 
         return checkout_path
 
-    def do_checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
+    def checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 
         # For local repos, checkout is a no-op since the model is already local
         # Just return the existing package path
 
-        return self.package_path(model_def, checkout_dir)
+        return self.get_checkout_path(model_def, checkout_dir)
 
 
 plugins.PluginManager.register_plugin(IModelRepository, IntegratedSource, ["integrated"])

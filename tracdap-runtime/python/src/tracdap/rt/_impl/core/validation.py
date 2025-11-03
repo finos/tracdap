@@ -299,7 +299,7 @@ class _TypeValidator:
                 return isinstance(value, _Named) and cls._validate_type(named_type, value.item)
 
             # _tp.Union also covers _tp.Optional, which is shorthand for _tp.Union[_type, None]
-            if origin is tp.Union:
+            if origin is tp.Union or origin is types.UnionType:
 
                 for union_type in args:
                     if cls._validate_type(union_type, value):

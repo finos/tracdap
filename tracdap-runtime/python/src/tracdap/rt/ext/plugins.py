@@ -67,3 +67,75 @@ class PluginManager:
 
         hook = cls.__get_hook()
         return hook.load_config_plugin(service_type, config)
+
+
+if _tp.TYPE_CHECKING:
+
+    import logging as _log
+    import http.client as _hc
+    import ssl as _ssl
+
+    try:
+        import urllib3 as _ul3  # noqa
+    except ModuleNotFoundError:
+        _ul3 = None
+
+    try:
+        import requests as _rq  # noqa
+    except ModuleNotFoundError:
+        _rq = None
+
+    try:
+        import httpx as _hx  # noqa
+    except ModuleNotFoundError:
+        _hx = None
+
+
+@_tp.runtime_checkable
+class ILogProvider(_tp.Protocol):
+
+    def logger_for_object(self, obj: object) -> "_log.Logger":
+        pass
+
+    def logger_for_class(self, clazz: type) -> "_log.Logger":
+        pass
+
+    def logger_for_namespace(self, namespace: str) -> "_log.Logger":
+        pass
+
+
+@_tp.runtime_checkable
+class INetworkManager(_tp.Protocol):
+
+    def create_http_client_connection(
+            self, host: str, port: int, tls: bool,
+            config: _cfg.PluginConfig | None = None, **client_args) \
+            -> "_hc.HTTPConnection":
+        pass
+
+    def create_urllib3_connection_pool(
+            self, host: str, port: int, tls: bool = True,
+            config: _cfg.PluginConfig | None = None, **client_args) \
+            -> "_ul3.HTTPConnectionPool":
+        pass
+
+    def create_urllib3_pool_manager(self, config: _cfg.PluginConfig | None = None, **pool_args) -> "_ul3.PoolManager":
+        pass
+
+    def create_requests_session(self, config: _cfg.PluginConfig | None = None) -> "_rq.Session":
+        pass
+
+    def create_httpx_client(self, config: _cfg.PluginConfig | None = None, **client_args) -> "_hx.Client":
+        pass
+
+    def create_httpx_transport(self, config: _cfg.PluginConfig | None = None, **transport_args) -> "_hx.HTTPTransport":
+        pass
+
+    def create_ssl_context(self, config: _cfg.PluginConfig | None = None) -> "_ssl.SSLContext":
+        pass
+
+    def use_shared_urllib3_pool_manager(self, config: _cfg.PluginConfig | None = None, **pool_args) -> "_ul3.PoolManager":
+        pass
+
+    def use_shared_ssl_context(self, config: _cfg.PluginConfig | None = None) -> "_ssl.SSLContext":
+        pass

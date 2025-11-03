@@ -28,7 +28,7 @@ except ModuleNotFoundError:
 
 try:
     import requests as _rq  # noqa
-    import requests.adapters as _rqa
+    import requests.adapters as _rqa  # noqa
 except ModuleNotFoundError:
     _rq = None
 
@@ -44,10 +44,8 @@ import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 import tracdap.rt.exceptions as _ex
 
-from tracdap.rt.ext.network import *
 
-
-class NetworkManager(INetworkManager):
+class NetworkManager:
 
     NETWORK_PROFILE_KEY = "network.profile"
     NETWORK_SSL_CA_CERTIFICATES_KEY = "network.ssl.caCertificates"
@@ -60,7 +58,7 @@ class NetworkManager(INetworkManager):
     HTTPX_TRANSPORT_ARGS = ["retries", "limits", "htp1", "http2"]
     HTTPX_CLIENT_ARGS = ["base_url", "timeout", "follow_redirects", "max_redirects"] + HTTPX_TRANSPORT_ARGS
 
-    CONFIG_TYPE = INetworkManager.CONFIG_TYPE
+    CONFIG_TYPE = _cfg.PluginConfig | None
 
     __instance: "NetworkManager" = None
 
@@ -106,6 +104,9 @@ class NetworkManager(INetworkManager):
         self.__sys_config: _cfg.RuntimeConfig = system_config
         self.__log = _log.logger_for_object(self)
 
+        self.__ssl_cache: dict[int, _ssl.SSLContext] = dict()
+        self.__ul3_pool_manager_cache: dict[int, _ul3.PoolManager] = dict()
+
     def create_http_client_connection(
             self, host: str, port: int, tls: bool = True,
             config: CONFIG_TYPE = None, **client_args) \
@@ -148,6 +149,27 @@ class NetworkManager(INetworkManager):
 
         ssl_context = self.create_ssl_context(config)
         return _ul3.PoolManager(ssl_context=ssl_context, **pool_args)
+
+    def use_shared_urllib3_pool_manager(
+            self, config: CONFIG_TYPE = None, **pool_args) \
+            -> "_ul3.PoolManager":
+
+        _guard.run_model_guard(allow_callback=True)
+        _val.validate_signature(self.use_shared_urllib3_pool_manager, config, **pool_args)
+        self._check_args(self.use_shared_urllib3_pool_manager, pool_args, self.URLLIB3_POOL_MANAGER_ARGS)
+
+        properties = self._process_network_properties(config)
+        pm_properties = dict(filter(lambda kv: kv[0].startswith("network."), properties))
+        pm_properties.update(**pool_args)
+        pm_cache_key = hash(frozenset(pm_properties.items()))
+        pool_manager = self.__ul3_pool_manager_cache.get(pm_cache_key)
+
+        if pool_manager is None:
+            ssl_context = self.use_shared_ssl_context(config)
+            pool_manager = _ul3.PoolManager(ssl_context=ssl_context, **pool_args)
+            self.__ul3_pool_manager_cache[pm_cache_key] = pool_manager
+
+        return pool_manager
 
     def create_requests_session(self, config: CONFIG_TYPE = None) -> "_rq.Session":
 
@@ -225,6 +247,22 @@ class NetworkManager(INetworkManager):
             context = _ssl.create_default_context(cafile=_cf.where())
 
         return context
+
+    def use_shared_ssl_context(self, config: CONFIG_TYPE = None) -> _ssl.SSLContext:
+
+        _guard.run_model_guard(allow_callback=True)
+
+        properties = self._process_network_properties(config)
+
+        ssl_properties = dict(filter(lambda kv: kv[0].startswith("network.ssl"), properties))
+        ssl_cache_key = hash(frozenset(ssl_properties.items()))
+        ssl_context = self.__ssl_cache.get(ssl_cache_key)
+
+        if ssl_context is None:
+            ssl_context = self.create_ssl_context(config)
+            self.__ssl_cache[ssl_cache_key] = ssl_context
+
+        return ssl_context
 
     def _process_network_properties(self, config: CONFIG_TYPE= None) -> dict[str, str]:
 

@@ -23,7 +23,6 @@ except ModuleNotFoundError:
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.external as _external
-import tracdap.rt.ext.network as _net
 import tracdap.rt.ext.plugins as _plugins
 import tracdap.rt.ext.util as _util
 
@@ -35,7 +34,7 @@ class HttpPlugin(_external.IExternalSystem):
     TLS_KEY = "tls"
     TIMEOUT_KEY = "timeout"
 
-    def __init__(self, resource_name: str, config: _cfg.PluginConfig, network_manager: _net.INetworkManager):
+    def __init__(self, resource_name: str, config: _cfg.PluginConfig, network_manager: _plugins.INetworkManager):
 
         self.__resource_name = resource_name
         self.__config = config

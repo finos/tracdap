@@ -127,9 +127,10 @@ class ModelLoader:
     def model_load_checkout_directory(self, scope: str, model_def: _meta.ModelDefinition) -> pathlib.Path:
 
         repo = self.__repos.get_repository(model_def.repository)
+        package = self._package_for_model_def(model_def)
         checkout_dir = self._get_checkout_dir(scope, model_def)
 
-        return repo.package_path(model_def, checkout_dir)
+        return repo.get_checkout_path(package, checkout_dir)
 
     def load_model_class(self, scope: str, model_def: _meta.ModelDefinition) -> _api.TracModel.__class__:
 
@@ -144,6 +145,7 @@ class ModelLoader:
         self.__log.info(f"Loading model [{model_def.entryPoint}] (version=[{model_def.version}], scope=[{scope}])...")
 
         repo = self.__repos.get_repository(model_def.repository)
+        package = self._package_for_model_def(model_def)
         checkout_key = self.model_checkout_key(model_def)
 
         # If the repo/checkout already exists in the code cache, we can use the existing checkout and package dir
@@ -151,7 +153,7 @@ class ModelLoader:
         code_cache_key = f"{model_def.repository}#{checkout_key}"
 
         if code_cache_key in scope_state.code_cache:
-            package_dir = repo.package_path(model_def, checkout_dir)
+            package_dir = repo.get_checkout_path(package, checkout_dir)
 
         # Otherwise, we need to run the checkout, and store the checkout dir into the code cache
         # What gets cached is the checkout, which may contain multiple packages depending on the repo type
@@ -160,7 +162,7 @@ class ModelLoader:
             safe_checkout_dir = _util.windows_unc_path(checkout_dir)
             safe_checkout_dir.mkdir(mode=0o750, parents=True, exist_ok=False)
 
-            package_dir = repo.do_checkout(model_def, checkout_dir)
+            package_dir = repo.checkout(package, checkout_dir)
 
             scope_state.code_cache[code_cache_key] = checkout_dir
 
@@ -291,3 +293,14 @@ class ModelLoader:
                 encoded_props[key] = _types.MetadataCodec.encode_value(raw_value)
 
         return encoded_props
+
+    @staticmethod
+    def _package_for_model_def(model_def: _meta.ModelDefinition) -> _repos.ModelPackage:
+
+        return _repos.ModelPackage(
+            language=model_def.language,
+            repository=model_def.repository,
+            packageGroup=model_def.packageGroup,
+            package=model_def.package,
+            version=model_def.version,
+            path=model_def.path)
