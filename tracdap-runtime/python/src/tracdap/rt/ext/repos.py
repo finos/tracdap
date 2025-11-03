@@ -14,18 +14,44 @@
 #  limitations under the License.
 
 import abc as _abc
+import dataclasses as _dc
 import pathlib as _pathlib
 
-import tracdap.rt.metadata as _meta
+
+@_dc.dataclass(kw_only=True)
+class ModelPackage:
+
+    language: str = ""
+    repository: str = ""
+    packageGroup: str | None = None
+    package: str = ""
+    version: str = ""
+    path: str | None = None
 
 
 class IModelRepository(metaclass=_abc.ABCMeta):
 
+    """
+    Extension interface for model repositories.
+
+    Model repositories are long-lived resources that are configured in the runtime system config
+    (normally sys_config.yaml). The runtime framework instantiates all the configured repositories
+    on startup and they are available for the lifetime of the process to check out model code when needed.
+    TRAC checks out all the models needed for a particular job before that job starts executing, there is
+    no way for model code to directly call into a model repository or trigger a checkout.
+
+    Some types of repository are configured with a separate repository for each package. E.g. this layout
+    is common for source packages in Git, where each repository is likely to have its own access controls.
+    Other types are configured with a single repository which hosts multiple packages, which is common e.g.
+    for enterprise proxy package servers. In this case, the package information is taken from the package
+    parameter to the :py:meth:checkout()` method.
+    """
+
     @_abc.abstractmethod
-    def checkout(self, model_def: _meta.ModelDefinition, checkout_dir: _pathlib.Path) -> _pathlib.Path:
+    def checkout(self, package: ModelPackage, checkout_dir: _pathlib.Path) -> _pathlib.Path:
 
         """
-        Perform a checkout for the given model definition, into the supplied checkout dir.
+        Perform a checkout for the given package, into the supplied checkout dir.
 
         The checkout dir will be empty before this method is called.
 
@@ -40,7 +66,7 @@ class IModelRepository(metaclass=_abc.ABCMeta):
         folder structure in the model repo itself, for example in a source repository where
         the root source folder is "src", the return value might be <checkout_dir>/src.
 
-        :param model_def: The model to check out
+        :param package: The model package to check out
         :param checkout_dir: Empty directory into which the checkout will be performed
         :return: Path for the root packages / modules that the model will load
         """
@@ -48,20 +74,20 @@ class IModelRepository(metaclass=_abc.ABCMeta):
         pass
 
     @_abc.abstractmethod
-    def get_checkout_path(self, model_def: _meta.ModelDefinition, checkout_dir: _pathlib.Path) -> _pathlib.Path:
+    def get_checkout_path(self, package: ModelPackage, checkout_dir: _pathlib.Path) -> _pathlib.Path:
 
         """
         Get the checkout path that would be returned by :py:meth:`checkout()`,
-        for the given checkout_dir and model_dir, without doing a checkout.
+        for the given package and checkout_dir, without doing a checkout.
 
         This is used by the loader mechanism to avoid repeating the same checkout multiple times.
         E.g. if there are multiple models or resources being loaded from the same package,
         or if a model is referenced multiple times.
 
-        This method is always required and may be called before :py:meth:`do_checkout()`.
-        The return value should be deterministic for a given model_def and checkout_dir.
+        This method is always required and may be called before :py:meth:`checkout()`.
+        The return value should be deterministic for a given package and checkout_dir.
 
-        :param model_def: Model for which the package path is requested
+        :param package: Model package for which the package path is requested
         :param checkout_dir: Directory where the model is (or will be) checked out
         :return: Path for the root packages / modules that the model will load
         """
