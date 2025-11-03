@@ -54,21 +54,24 @@ class IModelRepository(metaclass=_abc.ABCMeta):
         Perform a checkout for the given package, into the supplied checkout dir.
 
         The checkout dir will be empty before this method is called.
-
-        The return value is the path given to the module loader, to load the model.
-        I.e. it should contain the root packages / modules that the model will load.
+        The return value is a path given to the module loader, which is used to
+        load Python modules from this package. I.e. it should contain the root Python
+        modules that are part of this package.
 
         Repo implementations are free to put packages directly into checkout_dir,
         in which case the return value should be checkout_dir. It may be helpful to
-        create a folder structure inside checkout_dir, e.g. to separate temporary files,
-        in which case the return value will be a subfolder of checkout_dir containing
-        just the model packages to be loaded. Source repositories are likely to have a
-        folder structure in the model repo itself, for example in a source repository where
-        the root source folder is "src", the return value might be <checkout_dir>/src.
+        create a folder structure inside checkout_dir, e.g. to separate temporary files
+        used during the loading process, in which case the return value will be a subfolder
+        of checkout_dir containing just the Python modules that are available to load
+        Repositories that contain source code (as opposed to binary package repositories)
+        are likely to have a folder structure inside the repository itself, for example in a
+        source repository where the root source folder is "src", the return value might
+        be <checkout_dir>/src. If this is the case, it will be indicated by the "src' attribute
+        on the package parameter.
 
         :param package: The model package to check out
-        :param checkout_dir: Empty directory into which the checkout will be performed
-        :return: Path for the root packages / modules that the model will load
+        :param checkout_dir: An empty directory into which the checkout will be performed
+        :return: The path for the root Python modules that will be available to load
         """
 
         pass
@@ -84,12 +87,12 @@ class IModelRepository(metaclass=_abc.ABCMeta):
         E.g. if there are multiple models or resources being loaded from the same package,
         or if a model is referenced multiple times.
 
-        This method is always required and may be called before :py:meth:`checkout()`.
+        This method may be called before or after :py:meth:`checkout()`.
         The return value should be deterministic for a given package and checkout_dir.
 
-        :param package: Model package for which the package path is requested
-        :param checkout_dir: Directory where the model is (or will be) checked out
-        :return: Path for the root packages / modules that the model will load
+        :param package: The model package for which the package path is requested
+        :param checkout_dir: The directory where the package is (or will be) checked out
+        :return: The path for the root Python modules that will be available to load
         """
 
         pass
