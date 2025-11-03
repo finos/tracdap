@@ -5,8 +5,8 @@
   <br />
 
   <div>
-    <a href="https://pypi.org/project/tracdap-runtime"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/tracdap-ext-git.svg?maxAge=3600" /></a>
-    <a href="https://pypi.org/project/tracdap-runtime"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/tracdap-ext-git.svg?maxAge=3600" /></a>
+    <a href="https://pypi.org/project/tracdap-ext-git"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/tracdap-ext-git.svg?maxAge=3600" /></a>
+    <a href="https://pypi.org/project/tracdap-ext-git"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/tracdap-ext-git.svg?maxAge=3600" /></a>
     <a href="https://github.com/finos/tracdap/actions/workflows/packaging.yaml?query=branch%3Amain"><img alt="Packaging status" src="https://github.com/finos/tracdap/actions/workflows/packaging.yaml/badge.svg?branch:main&workflow:CI" /></a>
     <a href="https://github.com/finos/tracdap/actions/workflows/compliance.yaml?query=branch%3Amain"><img alt="Compliance status" src="https://github.com/finos/tracdap/actions/workflows/compliance.yaml/badge.svg?branch:main&workflow:CI" /></a>
     <a href="https://github.com/finos/tracdap/blob/main/LICENSE"><img alt="License - Apache-2.0" src="https://img.shields.io/pypi/l/tracdap-ext-git.svg" /></a>

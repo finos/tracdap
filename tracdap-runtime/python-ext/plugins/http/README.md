@@ -1,17 +1,26 @@
-<h1 align="center">
+<div align="center">
 
-![tracdap](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
+![TRAC the modern model platform](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
 
-</h1>
+  <br />
 
-<p align="center">
-  <a href="https://pypi.org/project/tracdap-ext-http"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/tracdap-ext-http.svg?maxAge=3600" /></a>
-  <a href="https://pypi.org/project/tracdap-ext-http"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/tracdap-ext-http.svg?maxAge=3600" /></a>
-  <a href="https://github.com/finos/tracdap/actions/workflows/packaging.yaml?query=branch%3Amain"><img alt="Packaging status" src="https://github.com/finos/tracdap/actions/workflows/packaging.yaml/badge.svg?branch:main&workflow:CI" /></a>
-  <a href="https://github.com/finos/tracdap/actions/workflows/compliance.yaml?query=branch%3Amain"><img alt="Compliance status" src="https://github.com/finos/tracdap/actions/workflows/compliance.yaml/badge.svg?branch:main&workflow:CI" /></a>
-  <a href="https://community.finos.org/docs/governance/software-projects/stages/incubating/"><img alt="FINOS - Incubating" src="https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg" /></a>
-</p>
+  <div>
+    <a href="https://pypi.org/project/tracdap-ext-http"><img alt="PyPI Version" src="https://img.shields.io/pypi/v/tracdap-ext-http.svg?maxAge=3600" /></a>
+    <a href="https://pypi.org/project/tracdap-ext-http"><img alt="Python Versions" src="https://img.shields.io/pypi/pyversions/tracdap-ext-http.svg?maxAge=3600" /></a>
+    <a href="https://github.com/finos/tracdap/actions/workflows/packaging.yaml?query=branch%3Amain"><img alt="Packaging status" src="https://github.com/finos/tracdap/actions/workflows/packaging.yaml/badge.svg?branch:main&workflow:CI" /></a>
+    <a href="https://github.com/finos/tracdap/actions/workflows/compliance.yaml?query=branch%3Amain"><img alt="Compliance status" src="https://github.com/finos/tracdap/actions/workflows/compliance.yaml/badge.svg?branch:main&workflow:CI" /></a>
+    <a href="https://github.com/finos/tracdap/blob/main/LICENSE"><img alt="License - Apache-2.0" src="https://img.shields.io/pypi/l/tracdap-ext-http.svg" /></a>
+    <a href="https://community.finos.org/docs/governance/software-projects/stages/incubating/"><img alt="FINOS - Incubating" src="https://cdn.jsdelivr.net/gh/finos/contrib-toolbox@master/images/badge-incubating.svg" /></a>
+  </div>
 
+  <p>
+    <a href="https://www.fintrac.co.uk/">Homepage</a>
+    ◆ <a href="https://docs.fintrac.co.uk/versions/latest/modelling">Documentation</a>
+    ◆ <a href="https://github.com/fintrac-hub/examples">Examples</a>
+    ◆ <a href="https://github.com/finos/tracdap">Source Code</a>
+    ◆ <a href="https://github.com/finos/tracdap/issues">Issue Tracker</a>
+  </p>
+</div>
 
 # HTTP Extension for the TRAC Model Runtime
 
