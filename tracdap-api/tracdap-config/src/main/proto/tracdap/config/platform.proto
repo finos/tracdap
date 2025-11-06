@@ -99,11 +99,19 @@ message RoutingTarget {
 
 message DeploymentConfig {
 
-  DeploymentLayout layout = 1;
+  ServicesLayout layout = 1;
 }
 
-enum DeploymentLayout {
+enum ServicesLayout {
+
+  option allow_alias=true;
   LAYOUT_NOT_SET = 0;
+
+  LOCALHOST = 1;
+  SERVICE_KEY = 2;
+  SERVICE_ALIAS = 3;
+
+  // For backwards compatibility with 0.9 config
   SANDBOX = 1;
   HOSTED = 2;
   CUSTOM = 3;

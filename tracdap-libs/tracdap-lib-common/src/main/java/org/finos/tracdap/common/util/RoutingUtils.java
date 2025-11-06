@@ -30,6 +30,7 @@ public class RoutingUtils {
     // This is a quick solution for routing between services based on the deployment layout
 
     private static final Map<String, String> STANDARD_ALIASES = Map.ofEntries(
+            Map.entry(ConfigKeys.ADMIN_SERVICE_KEY, "tracdap-svc-admin"),
             Map.entry(ConfigKeys.METADATA_SERVICE_KEY, "tracdap-svc-meta"),
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "tracdap-svc-data"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "tracdap-svc-orch"),
@@ -47,35 +48,35 @@ public class RoutingUtils {
             case LAYOUT_NOT_SET:
                 throw new EConfig("Missing or invalid config: [deployment.layout]");
 
-            case SANDBOX:
+            case LOCALHOST:
 
                 return RoutingTarget.newBuilder()
                         .setHost("localhost")
                         .setPort(serviceConfig.getPort())
                         .build();
 
-            case HOSTED:
+            case SERVICE_KEY:
 
-                var configuredAlias = serviceConfig.getAlias();
-                var hostedAlias = configuredAlias.isEmpty() ? STANDARD_ALIASES.get(serviceKey) : configuredAlias;
+                var optionalAlias = serviceConfig.getAlias();
+                var serviceKeyOrAlias = optionalAlias.isEmpty() ? STANDARD_ALIASES.get(serviceKey) : optionalAlias;
 
-                if (hostedAlias.isEmpty())
+                if (serviceKeyOrAlias.isEmpty())
                     throw new EConfig(String.format("Missing required config: services.%s.alias", serviceKey));
 
                 return RoutingTarget.newBuilder()
-                        .setHost(hostedAlias)
+                        .setHost(serviceKeyOrAlias)
                         .setPort(serviceConfig.getPort())
                         .build();
 
-            case CUSTOM:
+            case SERVICE_ALIAS:
 
-                var customAlias = serviceConfig.getAlias();
+                var serviceAlias = serviceConfig.getAlias();
 
-                if (customAlias.isEmpty())
+                if (serviceAlias.isEmpty())
                     throw new EConfig(String.format("Missing required config: services.%s.alias", serviceKey));
 
                 return RoutingTarget.newBuilder()
-                        .setHost(customAlias)
+                        .setHost(serviceAlias)
                         .setPort(serviceConfig.getPort())
                         .build();
 
