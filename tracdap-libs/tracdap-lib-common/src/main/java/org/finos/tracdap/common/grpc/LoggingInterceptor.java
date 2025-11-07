@@ -17,7 +17,9 @@
 
 package org.finos.tracdap.common.grpc;
 
+import com.google.protobuf.Message;
 import io.grpc.*;
+import org.finos.tracdap.common.util.LoggingProtoTranslator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,9 +27,15 @@ import org.slf4j.LoggerFactory;
 public class LoggingInterceptor implements ServerInterceptor {
 
     private final Logger log;
+    private final LoggingProtoTranslator translator;
 
     public LoggingInterceptor(Class<?> apiClass) {
-        log = LoggerFactory.getLogger(apiClass);
+        this(apiClass, null);
+    }
+
+    public LoggingInterceptor(Class<?> apiClass, LoggingProtoTranslator translator) {
+        this.log = LoggerFactory.getLogger(apiClass);
+        this.translator = translator;
     }
 
     @Override
@@ -52,14 +60,64 @@ public class LoggingInterceptor implements ServerInterceptor {
         }
 
         var loggingCall = new LoggingServerCall<>(call);
+        var nextCall = next.startCall(loggingCall, headers);
 
-        return next.startCall(loggingCall, headers);
+        return new LoggingServerCallListener<>(nextCall);
+    }
+
+    private class LoggingServerCallListener<ReqT> extends ForwardingServerCallListener.SimpleForwardingServerCallListener<ReqT> {
+
+        private boolean firstMessage;
+
+        public LoggingServerCallListener(ServerCall.Listener<ReqT> delegate) {
+            super(delegate);
+            this.firstMessage = true;
+        }
+
+        @Override
+        public void onMessage(ReqT req) {
+
+            if (firstMessage && translator != null) {
+
+                var message = (Message) req;
+                var logMessage = translator.formatMessage(message);
+
+                if (logMessage != null) {
+                    log.info("API CALL REQUEST: {}", logMessage);
+                }
+            }
+
+            firstMessage = false;
+
+            delegate().onMessage(req);
+        }
     }
 
     private class LoggingServerCall<ReqT, RespT> extends ForwardingServerCall.SimpleForwardingServerCall<ReqT, RespT> {
 
+        private boolean firstMessage;
+
         public LoggingServerCall(ServerCall<ReqT, RespT> delegate) {
             super(delegate);
+            this.firstMessage = true;
+        }
+
+        @Override
+        public void sendMessage(RespT resp) {
+
+            if (firstMessage && translator != null) {
+
+                var message = (Message) resp;
+                var logMessage = translator.formatMessage(message);
+
+                if (logMessage != null) {
+                    log.info("API CALL RESPONSE: {}", logMessage);
+                }
+            }
+
+            firstMessage = false;
+
+            delegate().sendMessage(resp);
         }
 
         @Override
