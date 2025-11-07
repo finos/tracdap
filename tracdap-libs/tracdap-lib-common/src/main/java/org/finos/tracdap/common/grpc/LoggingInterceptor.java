@@ -27,15 +27,15 @@ import org.slf4j.LoggerFactory;
 public class LoggingInterceptor implements ServerInterceptor {
 
     private final Logger log;
-    private final LoggingProtoTranslator translator;
+    private final LoggingProtoTranslator logTranslator;
 
     public LoggingInterceptor(Class<?> apiClass) {
-        this(apiClass, null);
+        this(apiClass, LoggingProtoTranslator.createDefault().build());
     }
 
-    public LoggingInterceptor(Class<?> apiClass, LoggingProtoTranslator translator) {
+    public LoggingInterceptor(Class<?> apiClass, LoggingProtoTranslator logTranslator) {
         this.log = LoggerFactory.getLogger(apiClass);
-        this.translator = translator;
+        this.logTranslator = logTranslator;
     }
 
     @Override
@@ -77,10 +77,10 @@ public class LoggingInterceptor implements ServerInterceptor {
         @Override
         public void onMessage(ReqT req) {
 
-            if (firstMessage && translator != null) {
+            if (firstMessage) {
 
                 var message = (Message) req;
-                var logMessage = translator.formatMessage(message);
+                var logMessage = logTranslator.formatMessage(message);
 
                 if (logMessage != null) {
                     log.info("API CALL REQUEST: {}", logMessage);
@@ -105,10 +105,10 @@ public class LoggingInterceptor implements ServerInterceptor {
         @Override
         public void sendMessage(RespT resp) {
 
-            if (firstMessage && translator != null) {
+            if (firstMessage) {
 
                 var message = (Message) resp;
-                var logMessage = translator.formatMessage(message);
+                var logMessage = logTranslator.formatMessage(message);
 
                 if (logMessage != null) {
                     log.info("API CALL RESPONSE: {}", logMessage);

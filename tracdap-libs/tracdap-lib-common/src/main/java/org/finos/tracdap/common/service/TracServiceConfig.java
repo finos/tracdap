@@ -24,6 +24,7 @@ import org.finos.tracdap.common.grpc.*;
 
 import io.grpc.ServerBuilder;
 import io.grpc.stub.AbstractStub;
+import org.finos.tracdap.common.util.LoggingProtoTranslator;
 
 
 public class TracServiceConfig {
@@ -40,9 +41,17 @@ public class TracServiceConfig {
 
     public static CommonConcerns<GrpcConcern> coreConcerns(Class<?> serviceClass) {
 
+        // Use a default log translator
+        var logTranslator = LoggingProtoTranslator.createDefault().build();
+
+        return coreConcerns(serviceClass, logTranslator);
+    }
+
+    public static CommonConcerns<GrpcConcern> coreConcerns(Class<?> serviceClass, LoggingProtoTranslator logTranslator) {
+
         return emptyConfig()
                 .addLast(new TracServiceConfig.TracProtocol())
-                .addLast(new TracServiceConfig.Logging(serviceClass))
+                .addLast(new TracServiceConfig.Logging(serviceClass, logTranslator))
                 .addLast(new TracServiceConfig.ErrorHandling());
     }
 
@@ -74,9 +83,15 @@ public class TracServiceConfig {
     public static class Logging implements GrpcConcern {
 
         private final Class<?> serviceClass;
+        private final LoggingProtoTranslator logTranslator;
 
         public Logging(Class<?> serviceClass) {
+            this(serviceClass, LoggingProtoTranslator.createDefault().build());
+        }
+
+        public Logging(Class<?> serviceClass, LoggingProtoTranslator logTranslator) {
             this.serviceClass = serviceClass;
+            this.logTranslator = logTranslator;
         }
 
         @Override
@@ -87,7 +102,7 @@ public class TracServiceConfig {
         @Override
         public ServerBuilder<? extends ServerBuilder<?>> configureServer(ServerBuilder<? extends ServerBuilder<?>> serverBuilder) {
 
-            return serverBuilder.intercept(new LoggingInterceptor(serviceClass));
+            return serverBuilder.intercept(new LoggingInterceptor(serviceClass, logTranslator));
         }
 
         @Override
