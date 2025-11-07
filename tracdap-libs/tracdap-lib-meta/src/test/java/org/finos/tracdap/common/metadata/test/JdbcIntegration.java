@@ -21,10 +21,8 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.startup.Startup;
-import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
-import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.extension.AfterEachCallback;
@@ -78,12 +76,11 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         dal = new JdbcMetadataStore(dialect, source);
         dal.start();
 
-        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataStore.class);
         var testInstance = context.getTestInstance();
 
         if (testInstance.isPresent()) {
             var testCase = (IMetadataStoreTest) testInstance.get();
-            testCase.setStore(dalWithLogging);
+            testCase.setStore(dal);
         }
     }
 

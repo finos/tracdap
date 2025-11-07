@@ -19,8 +19,6 @@ package org.finos.tracdap.common.metadata.test;
 
 import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
-import org.finos.tracdap.common.util.InterfaceLogging;
-import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assertions;
@@ -122,12 +120,11 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         dal = new JdbcMetadataStore(JdbcDialect.H2, source);
         dal.start();
 
-        var dalWithLogging = InterfaceLogging.wrap(dal, IMetadataStore.class);
         var testInstance = context.getTestInstance();
 
         if (testInstance.isPresent()) {
             var testCase = (IMetadataStoreTest) testInstance.get();
-            testCase.setStore(dalWithLogging);
+            testCase.setStore(dal);
         }
     }
 
