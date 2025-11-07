@@ -73,13 +73,6 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs << '-Xlint:deprecation'
 }
 
-compileJava {
-
-    // This is needed for automatic logging calls into interfaces
-    // Only needed for the main compileJava task, not for different source sets etc.
-    options.compilerArgs << '-parameters'
-}
-
 test {
 
     useJUnitPlatform {
