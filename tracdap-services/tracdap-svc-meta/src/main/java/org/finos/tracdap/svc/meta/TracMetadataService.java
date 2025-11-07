@@ -29,7 +29,6 @@ import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
-import org.finos.tracdap.common.util.InterfaceLogging;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
@@ -124,12 +123,10 @@ public class TracMetadataService extends TracServiceBase {
             executor = createPrimaryExecutor(dalProps);
 
             // Set up services and APIs
-            var metaStoreWithLogging = InterfaceLogging.wrap(metadataStore, IMetadataStore.class);
-
-            var readService = new MetadataReadService(metaStoreWithLogging, platformConfig, tenantConfigMap);
-            var writeService = new MetadataWriteService(metaStoreWithLogging);
-            var searchService = new MetadataSearchService(metaStoreWithLogging);
-            var configService = new ConfigService(metaStoreWithLogging);
+            var readService = new MetadataReadService(metadataStore, platformConfig, tenantConfigMap);
+            var writeService = new MetadataWriteService(metadataStore);
+            var searchService = new MetadataSearchService(metadataStore);
+            var configService = new ConfigService(metadataStore);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
             var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
