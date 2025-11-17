@@ -31,10 +31,13 @@ import java.util.Random;
 public class DateSnapLayout implements IStorageLayout {
 
     // YEAR / DATE / TIME - OBJECT ID / PART / SNAP / DELTAS & CHUNKS
-    private static final String STORAGE_PATH_TEMPLATE = "%d04/%d02-%d02-%d02/%s/%s/snap-%d/delta-%d-x%06x-chunk-%d.%s";
+    private static final String DATA_STORAGE_PATH_TEMPLATE = "%04d/%02d-%02d-%02d/%s/%s/snap-%d/delta-%d-x%06x-chunk-%d.%s";
 
     // YEAR / DATE / TIME - OBJECT ID / VERSION / FILENAME
-    private static final String FILE_STORAGE_PATH_TEMPLATE = "%d04/%d02-%d02-%d02/%s/version-%d-x%06x/%s";
+    private static final String FILE_STORAGE_PATH_TEMPLATE = "%04d/%02d-%02d-%02d/%s/version-%d-x%06x/%s";
+
+    // In case no extension is available, use .data for data files
+    private static final String FALLBACK_DATA_EXTENSION = "data";
 
     private final Random random;
 
@@ -134,9 +137,12 @@ public class DateSnapLayout implements IStorageLayout {
         var delta = layoutItem.delta();
         var deltaSuffix = random.nextInt(1 << 24);
         var chunk = 0;
-        var extension = "";
+        var extension = layoutItem.extension();
 
-        return String.format(STORAGE_PATH_TEMPLATE,
+        if (extension == null || extension.isEmpty())
+            extension = FALLBACK_DATA_EXTENSION;
+
+        return String.format(DATA_STORAGE_PATH_TEMPLATE,
                 date.getYear(), date.getYear(), date.getMonthValue(), date.getDayOfMonth(),
                 objectId, part, snap, delta, deltaSuffix, chunk, extension);
     }
