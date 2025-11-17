@@ -214,7 +214,8 @@ public class SampleMetadata {
                         .setSnapIndex(0)
                         .addDeltas(DataDelta.newBuilder()
                         .setDeltaIndex(0)
-                        .setDataItem("data/table/" + UUID.randomUUID() + "/snap-0/delta-0-x123456")))
+                        .setDataItem("data/table/" + UUID.randomUUID() + "/snap-0/delta-0-x123456")
+                        .setDeltaTimestamp(MetadataCodec.encodeDatetime(Instant.now()))))
                         .build()))
 
             .build();
