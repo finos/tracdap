@@ -59,6 +59,7 @@ public class DataValidator {
     private static final Descriptors.Descriptor DATA_DELTA;
     private static final Descriptors.FieldDescriptor DD_DELTA_INDEX;
     private static final Descriptors.FieldDescriptor DD_DATA_ITEM;
+    private static final Descriptors.FieldDescriptor DD_DELTA_TIMESTAMP;
 
     static {
 
@@ -87,6 +88,7 @@ public class DataValidator {
         DATA_DELTA = DataDelta.getDescriptor();
         DD_DELTA_INDEX = field(DATA_DELTA, DataDelta.DELTAINDEX_FIELD_NUMBER);
         DD_DATA_ITEM = field(DATA_DELTA, DataDelta.DATAITEM_FIELD_NUMBER);
+        DD_DELTA_TIMESTAMP = field(DATA_DELTA, DataDelta.DELTATIMESTAMP_FIELD_NUMBER);
     }
 
     @Validator
@@ -162,6 +164,11 @@ public class DataValidator {
         ctx = ctx.push(DD_DATA_ITEM)
                 .apply(CommonValidators::required)
                 .apply(StorageValidator::dataItemKey)
+                .pop();
+
+        ctx = ctx.push(DD_DELTA_TIMESTAMP)
+                .apply(CommonValidators::required)
+                .applyRegistered()
                 .pop();
 
         var snap = (DataSnapshot) ctx.parentMsg();
