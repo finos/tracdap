@@ -46,6 +46,15 @@ from tracdap.rt._impl.ext.storage import *
 
 class FormatManager:
 
+    __STRUCT_FORMAT_EXTENSIONS = {
+        "application/yaml": "yaml",
+        "YAML": "yaml",
+        "yaml": "yaml",
+        "application/json": "json",
+        "JSON": "json",
+        "json": "json",
+    }
+
     @classmethod
     def get_data_format(cls, format_code: str, format_options: tp.Dict[str, tp.Any]) -> IDataFormat:
 
@@ -68,6 +77,10 @@ class FormatManager:
 
     @classmethod
     def primary_extension(cls, format_code: str) -> str:
+
+        # Some formats are supported for STRUCT data but do not have a codec
+        if format_code in cls.__STRUCT_FORMAT_EXTENSIONS:
+            return cls.__STRUCT_FORMAT_EXTENSIONS[format_code]
 
         codec = cls.get_data_format(format_code, format_options={})
         return codec.file_extension()
