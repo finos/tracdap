@@ -35,7 +35,7 @@ public class LayoutSelector {
             Map.entry(StorageLayout.DATE_SNAP_LAYOUT, new DateSnapLayout()));
 
     // Layout to use for new objects if not explicitly set in the storage config
-    private static final StorageLayout DEFAULT_STORAGE_LAYOUT = StorageLayout.OBJECT_ID_LAYOUT;
+    private static final StorageLayout DEFAULT_STORAGE_LAYOUT = StorageLayout.DATE_SNAP_LAYOUT;
 
     // For backwards compatibility with 0.9, assume this layout on objects with no layout set
     private static final StorageLayout BACKWARDS_COMPATIBLE_LAYOUT = StorageLayout.OBJECT_ID_LAYOUT;
