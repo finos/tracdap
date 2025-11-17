@@ -66,6 +66,12 @@ class FormatManager:
         codec = cls.get_data_format(format_code, format_options={})
         return codec.format_code()
 
+    @classmethod
+    def primary_extension(cls, format_code: str) -> str:
+
+        codec = cls.get_data_format(format_code, format_options={})
+        return codec.file_extension()
+
 
 class StorageLayout(metaclass=abc.ABCMeta):
 
@@ -440,15 +446,16 @@ class DateSnapLayout(BaseLayout):
             storage_format, prior_copy):
 
         if delta_index != 0:
-            raise _ex.ETracInternal("Delta updates not yet supported for ")
+            raise _ex.ETracInternal("Delta updates not yet supported")
 
         timestamp = _meta_ts.MetadataCodec.decode_datetime_value(data_id.objectTimestamp)
         delta_suffix = self.__random.randint(0, 1 << 24)
+        extension = FormatManager.primary_extension(storage_format)
 
         return self.__DATA_STORAGE_TEMPLATE.format(
             timestamp.year, timestamp.month, timestamp.day,
             data_id.objectId, part_key.opaqueKey, snap_index, delta_index,
-            delta_suffix, 0, storage_format)
+            delta_suffix, 0, extension)
 
     def _file_storage_path(self, file_id, file_def, prior_copy):
 
@@ -478,6 +485,7 @@ class DeveloperLayout(BaseLayout):
 
         storage_dir = self._dev_storage_dir(prior_copy)
         suffix = f"-{data_id.objectVersion}" if data_id.objectVersion > 1 else ""
+        extension = FormatManager.primary_extension(storage_format)
 
         if prior_copy is not None:
             prior_path = pathlib.Path(prior_copy.storagePath)
@@ -487,7 +495,7 @@ class DeveloperLayout(BaseLayout):
         else:
             file_name = context_key
 
-        return self.__DATA_STORAGE_PATH.format(storage_dir, file_name, suffix, storage_format.lower())
+        return self.__DATA_STORAGE_PATH.format(storage_dir, file_name, suffix, extension)
 
     def _file_storage_path(self, file_id, file_def, prior_copy):
 
