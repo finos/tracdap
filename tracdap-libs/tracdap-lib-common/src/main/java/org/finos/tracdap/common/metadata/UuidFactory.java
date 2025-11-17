@@ -17,6 +17,9 @@
 
 package org.finos.tracdap.common.metadata;
 
+import com.fasterxml.uuid.Generators;
+import com.fasterxml.uuid.impl.TimeBasedEpochRandomGenerator;
+
 import java.util.UUID;
 
 
@@ -28,7 +31,13 @@ public class UuidFactory {
         DEFAULT = new UuidFactory();
     }
 
+    private final TimeBasedEpochRandomGenerator generator;
+
+    public UuidFactory() {
+        generator = Generators.timeBasedEpochRandomGenerator();
+    }
+
     public UUID allocate() {
-        return UUID.randomUUID();
+        return generator.generate();
     }
 }
