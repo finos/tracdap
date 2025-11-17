@@ -17,7 +17,8 @@ import datetime as dt
 import pathlib
 import platform
 import re
-
+import secrets
+import time
 import typing as tp
 import uuid
 
@@ -33,6 +34,8 @@ __IS_WINDOWS = platform.system() == "Windows"
 __FIRST_MODEL_FRAME_NAME = "run_model"
 __FIRST_MODEL_FRAME_TEST_NAME = "_callTestMethod"
 __OBJ_KEY_PATTERN = re.compile(r"([A-Z]+)-(.*)-v(\d+)")
+
+__uuid_v7_latest_timestamp: tp.Optional[int] = None
 
 
 def is_windows():
@@ -61,13 +64,36 @@ def format_file_size(size: int) -> str:
     return f"{gb:.1f} GB"
 
 
+def generate_uuid7() -> uuid.UUID:
+
+    global __uuid_v7_latest_timestamp
+
+    nanoseconds = time.time_ns()
+    timestamp_ms = nanoseconds // 10**6
+
+    if __uuid_v7_latest_timestamp is not None and timestamp_ms <= __uuid_v7_latest_timestamp:
+        timestamp_ms = __uuid_v7_latest_timestamp + 1
+
+    _last_v7_timestamp = timestamp_ms
+
+    uuid_int = (timestamp_ms & 0xFFFFFFFFFFFF) << 80    # Epoch time (48 bits)
+    uuid_int |= 7 << 76                                 # UUID v7 (4 bits)
+    uuid_int |= secrets.randbits(76)                    # Random (76 bits)
+
+    uuid_int &= ~(0xC000 << 48)                         # Clear variant bits
+    uuid_int |= 0x8000 << 48                            # Set variant to RFC 4122
+
+    return uuid.UUID(int=uuid_int)
+
+
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
 
     timestamp = dt.datetime.now(dt.timezone.utc)
+    object_id = generate_uuid7()
 
     return meta.TagHeader(
         objectType=object_type,
-        objectId=str(uuid.uuid4()),
+        objectId=str(object_id),
         objectVersion=1,
         objectTimestamp=meta.DatetimeValue(timestamp.isoformat()),
         tagVersion=1,

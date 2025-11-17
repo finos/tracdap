@@ -24,6 +24,7 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.util.ResourceHelpers;
 import org.finos.tracdap.metadata.*;
@@ -41,7 +42,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 
 public class JobValidationTest {
@@ -356,7 +356,7 @@ public class JobValidationTest {
                 modelTags);
 
         var missingDataSelector = basicDataSelector.toBuilder()
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .build();
 
         var job = JobDefinition.newBuilder()
@@ -686,9 +686,9 @@ public class JobValidationTest {
                 List.of());
 
         // Select random (missing) object IDs for two models and one input dataset
-        var model2 = model1.toBuilder().setObjectId(UUID.randomUUID().toString()).build();
-        var model3 = model1.toBuilder().setObjectId(UUID.randomUUID().toString()).build();
-        var basicData = basicDataSelector.toBuilder().setObjectId(UUID.randomUUID().toString()).build();
+        var model2 = model1.toBuilder().setObjectId(UuidFactory.DEFAULT.allocate().toString()).build();
+        var model3 = model1.toBuilder().setObjectId(UuidFactory.DEFAULT.allocate().toString()).build();
+        var basicData = basicDataSelector.toBuilder().setObjectId(UuidFactory.DEFAULT.allocate().toString()).build();
 
         var job = JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_FLOW)

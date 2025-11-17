@@ -22,6 +22,7 @@ import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.async.Flows;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.metadata.*;
@@ -48,7 +49,6 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static org.finos.tracdap.test.data.DataApiTestHelpers.readRequest;
 import static org.finos.tracdap.test.concurrent.ConcurrentTestHelpers.resultOf;
@@ -729,7 +729,7 @@ abstract class FileOperationsTest {
 
         var priorSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.FILE)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -1469,7 +1469,7 @@ abstract class FileOperationsTest {
     @Test
     void testReadFile_selectorIdNotFound() throws Exception {
 
-        var objId = UUID.randomUUID().toString();  // non-existent object ID to look for
+        var objId = UuidFactory.DEFAULT.allocate().toString();  // non-existent object ID to look for
 
         var createFile = DataApiTestHelpers.clientStreaming(dataClient::createFile, BASIC_CREATE_FILE_REQUEST);
         waitFor(TEST_TIMEOUT, createFile);

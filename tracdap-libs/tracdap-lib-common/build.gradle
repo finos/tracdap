@@ -68,6 +68,9 @@ dependencies {
     implementation group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: "$jackson_databind_version"
     implementation group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: "$jackson_version"
 
+    // Java UUID generator, used for UUID v6 support
+    implementation group: 'com.fasterxml.uuid', name: 'java-uuid-generator', version: "$uuid_generator_version"
+
     // Logging facade is an API dependency
     api group: 'org.slf4j', name: 'slf4j-api', version: "$slf4j_version"
 

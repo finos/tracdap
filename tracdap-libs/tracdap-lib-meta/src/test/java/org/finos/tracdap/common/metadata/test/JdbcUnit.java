@@ -19,6 +19,7 @@ package org.finos.tracdap.common.metadata.test;
 
 import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Assertions;
@@ -31,7 +32,6 @@ import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Properties;
-import java.util.UUID;
 
 import static org.finos.tracdap.test.meta.SampleMetadata.ALT_TEST_TENANT;
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
@@ -50,7 +50,7 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
 
-        var dbId = UUID.randomUUID();
+        var dbId = UuidFactory.DEFAULT.allocate();
         var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
 
         properties = new Properties();

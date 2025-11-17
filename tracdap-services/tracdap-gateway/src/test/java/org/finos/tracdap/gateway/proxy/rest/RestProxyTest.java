@@ -23,6 +23,7 @@ import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.metadata.Tag;
 import org.finos.tracdap.metadata.TagHeader;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.helpers.ResourceHelpers;
 
@@ -45,7 +46,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.Random;
-import java.util.UUID;
 
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 import static org.finos.tracdap.test.meta.SampleMetadata.selectorForTag;
@@ -234,7 +234,7 @@ public class RestProxyTest {
     void missingTenant() throws Exception {
 
         var methodTemplate = "/trac-meta/api/v1/UNKNOWN_TENANT/FLOW/%s/versions/latest/tags/latest";
-        var method = String.format(methodTemplate, UUID.randomUUID());
+        var method = String.format(methodTemplate, UuidFactory.DEFAULT.allocate());
 
         var request = HttpRequest.newBuilder()
                 .GET()
@@ -255,7 +255,7 @@ public class RestProxyTest {
     void missingObject() throws Exception {
 
         var methodTemplate = "/trac-meta/api/v1/ACME_CORP/FLOW/%s/versions/1/tags/latest";
-        var method = String.format(methodTemplate, UUID.randomUUID());
+        var method = String.format(methodTemplate, UuidFactory.DEFAULT.allocate());
 
         var request = HttpRequest.newBuilder()
                 .GET()

@@ -14,7 +14,6 @@
 #  limitations under the License.
 
 import os
-import uuid
 
 from tracdap_test.rt.suites.file_storage_suite import *
 
@@ -30,7 +29,7 @@ plugins.PluginManagerImpl.register_core_plugins()
 
 class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
-    suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
+    suite_storage_prefix = f"runtime_storage_test_suite_{util.generate_uuid7()}"
     suite_storage: storage.IFileStorage
 
     @classmethod
@@ -89,7 +88,7 @@ class GcsArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWr
 
 class GcsFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
-    suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
+    suite_storage_prefix = f"runtime_storage_test_suite_{util.generate_uuid7()}"
     suite_storage: storage.IFileStorage
 
     @classmethod

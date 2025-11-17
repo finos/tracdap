@@ -24,6 +24,7 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
@@ -41,10 +42,12 @@ public class MetadataWriteService {
     private final Validator validator = new Validator();
     private final IMetadataStore metadataStore;
     private final BundleLoader bundleLoader;
+    private final UuidFactory objectIdFactory;
 
     public MetadataWriteService(IMetadataStore metadataStore) {
         this.metadataStore = metadataStore;
         this.bundleLoader = new BundleLoader(metadataStore);
+        this.objectIdFactory = new UuidFactory();
     }
 
     public TagHeader preallocateId(String tenant, MetadataWriteRequest request) {
@@ -152,9 +155,7 @@ public class MetadataWriteService {
 
         for (var request : requests) {
 
-            // Assigning object IDs could be moved to a central function and logged
-            // There's nothing special about them though, so this is fine for now
-            var objectId = UUID.randomUUID();
+            var objectId = objectIdFactory.allocate();
 
             var preallocatedId = TagHeader.newBuilder()
                     .setObjectType(request.getObjectType())
@@ -195,9 +196,7 @@ public class MetadataWriteService {
 
         for (var request : requests) {
 
-            // Assigning object IDs could be moved to a central function and logged
-            // There's nothing special about them though, so this is fine for now
-            var objectId = UUID.randomUUID();
+            var objectId = objectIdFactory.allocate();
 
             var newObject = ObjectUpdateLogic.buildNewObject(
                     objectId, request.getDefinition(), request.getTagUpdatesList(),

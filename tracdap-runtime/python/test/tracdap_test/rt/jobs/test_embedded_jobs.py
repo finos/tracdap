@@ -15,7 +15,6 @@
 
 import unittest
 import pathlib
-import uuid
 import datetime as dt
 
 import tracdap.rt.metadata as meta
@@ -23,6 +22,7 @@ import tracdap.rt.config as config
 import tracdap.rt.ext.embed as embed
 
 import tracdap.rt._impl.static_api as api_hook  # noqa
+import tracdap.rt._impl.core.util as util  # noqa
 
 _ROOT_DIR = pathlib.Path(__file__).parent \
     .joinpath("../../../../../..") \
@@ -48,7 +48,7 @@ class EmbeddedJobsTest(unittest.TestCase):
                         "repoUrl": str(_ROOT_DIR.joinpath("examples/models/python"))
                     })})
 
-        job_id = str(uuid.uuid4())
+        job_id = str(util.generate_uuid7())
         job_timestamp = meta.DatetimeValue(isoDatetime=dt.datetime.now(dt.timezone.utc).isoformat())
         job_config = config.JobConfig(
             jobId=meta.TagHeader(meta.ObjectType.JOB, job_id, 1, job_timestamp, 1, job_timestamp),

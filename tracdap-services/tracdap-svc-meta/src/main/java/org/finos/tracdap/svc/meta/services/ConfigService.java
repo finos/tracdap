@@ -23,6 +23,7 @@ import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
@@ -36,7 +37,6 @@ import io.grpc.Context;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 
@@ -45,11 +45,13 @@ public class ConfigService {
     private final Validator validator;
     private final IMetadataStore metadataStore;
     private final BundleLoader bundleLoader;
+    private final UuidFactory objectIdFactory;
 
     public ConfigService(IMetadataStore metadataStore) {
         this.validator = new Validator();
         this.metadataStore = metadataStore;
         this.bundleLoader = new BundleLoader(metadataStore);
+        this.objectIdFactory = new UuidFactory();
     }
 
     public ConfigWriteResponse createConfigObject(ConfigWriteRequest request) {
@@ -230,8 +232,7 @@ public class ConfigService {
 
         for (var request : requests) {
 
-            // TODO: Centralize allocation of object IDs
-            var objectId = UUID.randomUUID();
+            var objectId = objectIdFactory.allocate();
 
             var configAttrs = List.of(
                     TagUpdate.newBuilder().setAttrName("trac_config_class").setValue(MetadataCodec.encodeValue(request.getConfigClass())).build(),
