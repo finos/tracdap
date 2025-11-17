@@ -36,6 +36,7 @@ import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.type_system as _meta_ts
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -68,27 +69,39 @@ class FormatManager:
 
 class StorageLayout(metaclass=abc.ABCMeta):
 
-    __LAYOUTS: "tp.Dict[str, StorageLayout]" = dict()
+    __BACKWARDS_COMPATIBLE_LAYOUT = _meta.StorageLayout.OBJECT_ID_LAYOUT
+    __LAYOUTS: "tp.Dict[_meta.StorageLayout, StorageLayout]" = dict()
 
     @classmethod
-    def select(cls, layout_key: tp.Union[str, _meta.StorageLayout]) -> "StorageLayout":
+    def select(
+            cls, layout_key: tp.Union[str, _meta.StorageLayout],
+            update: bool = False) -> "StorageLayout":
 
         # Legacy compatibility - layout key not set in storage definition
         if not layout_key or layout_key == "":
-            layout_key = _meta.StorageLayout.OBJECT_ID_LAYOUT.name
+            layout_key = _meta.StorageLayout.STORAGE_LAYOUT_NOT_SET
 
-        if isinstance(layout_key, _meta.StorageLayout):
-            layout_key = layout_key.name
+        if isinstance(layout_key, str):
+            layout_key = _meta.StorageLayout.__members__[layout_key]
+
+        if layout_key == _meta.StorageLayout.STORAGE_LAYOUT_NOT_SET:
+            if update:
+                layout_key = cls.__BACKWARDS_COMPATIBLE_LAYOUT
+            else:
+                default_layout = _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT
+                layout_key = _meta.StorageLayout.__members__[default_layout]
 
         layout = cls.__LAYOUTS.get(layout_key)
 
         if layout is not None:
             return layout
 
-        if layout_key == _meta.StorageLayout.OBJECT_ID_LAYOUT.name:
+        if layout_key == _meta.StorageLayout.OBJECT_ID_LAYOUT:
             layout = ObjectIdLayout()
-        elif layout_key == _meta.StorageLayout.DEVELOPER_LAYOUT.name:
-            layout = DevelopmentLayout()
+        elif layout_key == _meta.StorageLayout.DATE_SNAP_LAYOUT:
+            layout = DateSnapLayout()
+        elif layout_key == _meta.StorageLayout.DEVELOPER_LAYOUT:
+            layout = DeveloperLayout()
         else:
             raise _ex.ETracInternal(f"Unknown storage layout [{layout_key}]")
 
@@ -406,7 +419,49 @@ class ObjectIdLayout(BaseLayout):
             file_def.name, file_def.extension.lower())
 
 
-class DevelopmentLayout(BaseLayout):
+class DateSnapLayout(BaseLayout):
+
+    # YEAR / DATE / TIME - OBJECT ID / PART / SNAP / DELTAS & CHUNKS
+    __DATA_STORAGE_TEMPLATE = "{0:04d}/{0:04d}-{1:02d}-{2:02d}/{3}/{4}/snap-{5}/delta-{6}-x{7:06x}-chunk-{8}.{9}"
+
+    # YEAR / DATE / TIME - OBJECT ID / VERSION / FILENAME
+    __FILE_STORAGE_TEMPLATE = "{0:04d}/{0:04d}-{1:02d}-{2:02d}/{3}/version-{4}-x{5:06x}/{6}"
+
+    def __init__(self):
+        self.__random = random.Random()
+        self.__random.seed()
+
+    def layout_key(self) -> _meta.StorageLayout:
+        return _meta.StorageLayout.OBJECT_ID_LAYOUT
+
+    def _data_storage_path(
+            self, data_id, context_key, trac_schema,
+            part_key, snap_index, delta_index,
+            storage_format, prior_copy):
+
+        if delta_index != 0:
+            raise _ex.ETracInternal("Delta updates not yet supported for ")
+
+        timestamp = _meta_ts.MetadataCodec.decode_datetime_value(data_id.objectTimestamp)
+        delta_suffix = self.__random.randint(0, 1 << 24)
+
+        return self.__DATA_STORAGE_TEMPLATE.format(
+            timestamp.year, timestamp.month, timestamp.day,
+            data_id.objectId, part_key.opaqueKey, snap_index, delta_index,
+            delta_suffix, 0, storage_format)
+
+    def _file_storage_path(self, file_id, file_def, prior_copy):
+
+        timestamp = _meta_ts.MetadataCodec.decode_datetime_value(file_id.objectTimestamp)
+        version_suffix = self.__random.randint(0, 1 << 24)
+
+        return self.__FILE_STORAGE_TEMPLATE.format(
+            timestamp.year, timestamp.month, timestamp.day,
+            file_id.objectId, file_id.objectVersion, version_suffix,
+            file_def.name)
+
+
+class DeveloperLayout(BaseLayout):
 
     DEFAULT_DEV_OUTPUT_DIR = "Dev Outputs"
 
@@ -477,7 +532,7 @@ def build_data_spec(
         spec = layout.new_data_spec(data_id, storage_id, context_key, trac_schema, sys_config)
     else:
         layout_key = prior_spec.storage.layout
-        layout = StorageLayout.select(layout_key)
+        layout = StorageLayout.select(layout_key, update=True)
         spec = layout.new_data_version(data_id, storage_id, context_key, trac_schema, prior_spec)
 
     # Attach metadata if it is available
@@ -499,7 +554,7 @@ def build_file_spec(
 
     else:
         layout_key = prior_spec.storage.layout
-        layout = StorageLayout.select(layout_key)
+        layout = StorageLayout.select(layout_key, update=True)
         spec = layout.new_file_version(file_id, storage_id, context_key, file_type, prior_spec)
 
     # Attach metadata if it is available
