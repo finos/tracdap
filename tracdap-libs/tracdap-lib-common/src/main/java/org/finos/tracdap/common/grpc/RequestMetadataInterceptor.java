@@ -17,20 +17,27 @@
 
 package org.finos.tracdap.common.grpc;
 
+import org.finos.tracdap.common.metadata.UuidFactory;
+
 import io.grpc.*;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 
 public class RequestMetadataInterceptor implements ServerInterceptor {
+
+    private final UuidFactory requestIdFactory;
+
+    public RequestMetadataInterceptor() {
+        this.requestIdFactory = new UuidFactory();
+    }
 
     @Override
     public <ReqT, RespT> ServerCall.Listener<ReqT>
     interceptCall(ServerCall<ReqT, RespT> call, Metadata headers, ServerCallHandler<ReqT, RespT> next) {
 
-        var requestId = UUID.randomUUID().toString();
+        var requestId = requestIdFactory.allocate().toString();
         var requestTimestamp = Instant.now().atOffset(ZoneOffset.UTC);
         var requestMetadata = new RequestMetadata(requestId, requestTimestamp);
 
