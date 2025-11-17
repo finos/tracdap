@@ -166,8 +166,9 @@ public class DataValidator {
                 .apply(StorageValidator::dataItemKey)
                 .pop();
 
+        // Datasets created with TRAC 0.9 and earlier may not have delta timestamps
         ctx = ctx.push(DD_DELTA_TIMESTAMP)
-                .apply(CommonValidators::required)
+                .apply(CommonValidators::optional)
                 .applyRegistered()
                 .pop();
 
