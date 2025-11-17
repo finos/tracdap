@@ -499,12 +499,10 @@ public class DataService {
 
         // A new data def always means one new part/snap/delta
 
-        var timestamp = state.requestMetadata.requestTimestamp();
-
         var delta = DataDelta.newBuilder()
                 .setDeltaIndex(state.delta)
                 .setDataItem(dataItem)
-                .setDeltaTimestamp(MetadataCodec.encodeDatetime(timestamp));
+                .setDeltaTimestamp(state.dataId.getObjectTimestamp());
 
         var snap = DataSnapshot.newBuilder()
                 .setSnapIndex(state.snap)
@@ -539,8 +537,6 @@ public class DataService {
 
         // Add the new part / snap / delta as required
 
-        var timestamp = state.requestMetadata.requestTimestamp();
-
         var opaqueKey = state.part.getOpaqueKey();
 
         var part = priorDef.containsParts(opaqueKey)
@@ -554,7 +550,7 @@ public class DataService {
         var delta = DataDelta.newBuilder()
                 .setDeltaIndex(state.delta)
                 .setDataItem(dataItem)
-                .setDeltaTimestamp(MetadataCodec.encodeDatetime(timestamp));
+                .setDeltaTimestamp(state.dataId.getObjectTimestamp());
 
         snap.addDeltas(state.delta, delta);
         part.setSnap(snap);
