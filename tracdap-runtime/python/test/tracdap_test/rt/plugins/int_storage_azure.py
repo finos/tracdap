@@ -14,7 +14,6 @@
 #  limitations under the License.
 
 import os
-import uuid
 
 from tracdap_test.rt.suites.file_storage_suite import *
 
@@ -23,6 +22,7 @@ import tracdap.rt.metadata as meta
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
+import tracdap.rt._impl.core.util as util  # noqa
 
 log.configure_logging()
 plugins.PluginManagerImpl.register_core_plugins()
@@ -35,7 +35,7 @@ plugins.PluginManagerImpl.register_core_plugins()
 @unittest.skipIf(os.getenv("CI") is not None, "Arrow native storage for Azure is not available in CI")
 class BlobArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
-    suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
+    suite_storage_prefix = f"runtime_storage_test_suite_{util.generate_uuid7()}"
     suite_storage: storage.IFileStorage
 
     @classmethod
@@ -97,7 +97,7 @@ class BlobArrowStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadW
 
 class BlobFsspecStorageTest(unittest.TestCase, FileOperationsTestSuite, FileReadWriteTestSuite):
 
-    suite_storage_prefix = f"runtime_storage_test_suite_{uuid.uuid4()}"
+    suite_storage_prefix = f"runtime_storage_test_suite_{util.generate_uuid7()}"
     suite_storage: storage.IFileStorage
 
     @classmethod
