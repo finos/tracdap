@@ -39,7 +39,6 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -378,7 +377,7 @@ public class FileService {
 
         state.storage = buildStorageDef(
                 StorageDefinition.newBuilder(),
-                state.fileId, timestamp, storageKey,
+                state.fileId, state.storageId, storageKey,
                 request.getMimeType(), storagePath);
 
         return state;
@@ -407,7 +406,7 @@ public class FileService {
 
         state.storage = buildStorageDef(
                 prior.storage.toBuilder(),
-                state.fileId, timestamp, storageKey,
+                state.fileId, state.storageId, storageKey,
                 request.getMimeType(), storagePath);
 
         return state;
@@ -439,7 +438,7 @@ public class FileService {
 
     private StorageDefinition buildStorageDef(
             StorageDefinition.Builder storageDef,
-            TagHeader fileId, Instant storageTimestamp, String storageKey,
+            TagHeader fileId, TagHeader storageId, String storageKey,
             String mimeType, String storagePath) {
 
         var fileUuid = UUID.fromString(fileId.getObjectId());
@@ -473,7 +472,7 @@ public class FileService {
         // For orphaned files, there is still a chance the random bytes collide
         // But this can be resolved by retrying
 
-        var storageEncodedTimestamp = MetadataCodec.encodeDatetime(storageTimestamp);
+        var storageEncodedTimestamp = storageId.getObjectTimestamp();
 
         // For FILE objects, storage format is taken as the supplied mime type of the file
 

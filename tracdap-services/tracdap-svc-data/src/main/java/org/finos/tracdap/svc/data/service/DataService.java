@@ -42,7 +42,6 @@ import org.apache.arrow.memory.ArrowBuf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -402,18 +401,18 @@ public class DataService {
 
     private RequestState buildMetadata(DataWriteRequest request, RequestState state) {
 
-        state.dataId = MetadataBuilders.bumpVersion(state.preAllocDataId);
-        state.storageId = MetadataBuilders.bumpVersion(state.preAllocStorageId);
+        var timestamp = state.requestMetadata.requestTimestamp().toInstant();
+
+        state.dataId = MetadataUtil.nextObjectVersion(state.preAllocDataId, timestamp);
+        state.storageId = MetadataUtil.nextObjectVersion(state.preAllocStorageId, timestamp);
 
         state.part = PartKeys.ROOT;
         state.snap = 0;
         state.delta = 0;
 
         var dataItem = buildDataItem(state);
-        var timestamp = state.requestMetadata.requestTimestamp();
-
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef(state, dataItem, timestamp);
+        var storageDef = createStorageDef(state, dataItem);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -428,8 +427,10 @@ public class DataService {
 
     private RequestState buildUpdateMetadata(DataWriteRequest request, RequestState state, RequestState prior) {
 
-        state.dataId = MetadataBuilders.bumpVersion(prior.dataId);
-        state.storageId = MetadataBuilders.bumpVersion(prior.storageId);
+        var timestamp = state.requestMetadata.requestTimestamp().toInstant();
+
+        state.dataId = MetadataUtil.nextObjectVersion(prior.dataId, timestamp);
+        state.storageId = MetadataUtil.nextObjectVersion(prior.storageId, timestamp);
 
         state.part = PartKeys.ROOT;
         state.delta = 0;
@@ -447,7 +448,6 @@ public class DataService {
         }
 
         var dataItem = buildDataItem(state);
-        var timestamp = state.requestMetadata.requestTimestamp();
 
         // We are going to add this data item to the storage definition
         // If the item already exists in storage, then the file object must have been superseded
@@ -464,7 +464,7 @@ public class DataService {
         }
 
         state.data = updateDataDef(request, state, dataItem, prior.data);
-        state.storage = updateStorageDef(state, dataItem, timestamp, prior);
+        state.storage = updateStorageDef(state, dataItem, prior);
 
         state.copy = state.storage
                 .getDataItemsOrThrow(dataItem)
@@ -565,7 +565,7 @@ public class DataService {
         return dataDef.build();
     }
 
-    private StorageDefinition createStorageDef(RequestState state, String dataItem, OffsetDateTime objectTimestamp) {
+    private StorageDefinition createStorageDef(RequestState state, String dataItem) {
 
         var storage = storageManager.getTenantStorage(state.tenant);
         var layoutId = storage.defaultLayout();
@@ -580,7 +580,7 @@ public class DataService {
                 mimeType, extension);
 
         var storagePath = layout.newDataPath(layoutItem);
-        var storageItem = buildStorageItem(state, storagePath, objectTimestamp);
+        var storageItem = buildStorageItem(state, storagePath);
 
         return StorageDefinition.newBuilder()
                 .setLayout(layoutId)
@@ -590,7 +590,6 @@ public class DataService {
 
     private StorageDefinition updateStorageDef(
             RequestState state, String dataItem,
-            OffsetDateTime objectTimestamp,
             RequestState priorState) {
 
         var storage = storageManager.getTenantStorage(state.tenant);
@@ -609,14 +608,14 @@ public class DataService {
                 priorState.data, priorState.schema, priorState.storage);
 
         var storagePath = layout.updateDataPath(layoutItem, priorLayoutItem);
-        var storageItem = buildStorageItem(state, storagePath, objectTimestamp);
+        var storageItem = buildStorageItem(state, storagePath);
 
         return priorState.storage.toBuilder()
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
 
-    private StorageItem buildStorageItem(RequestState state, String storagePath, OffsetDateTime objectTimestamp) {
+    private StorageItem buildStorageItem(RequestState state, String storagePath) {
 
         var tenantStorage = storageManager.getTenantStorage(state.tenant);
         var location = tenantStorage.defaultLocation();
@@ -627,11 +626,12 @@ public class DataService {
 
         // For the time being, data has one incarnation and a single storage copy
 
+        var storageTimestamp = state.storageId.getObjectTimestamp();
         var incarnationIndex = 0;
 
         var copy = StorageCopy.newBuilder()
                 .setCopyStatus(CopyStatus.COPY_AVAILABLE)
-                .setCopyTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
+                .setCopyTimestamp(storageTimestamp)
                 .setStorageKey(location)
                 .setStoragePath(storagePath)
                 .setStorageFormat(format);
@@ -639,7 +639,7 @@ public class DataService {
         var incarnation = StorageIncarnation.newBuilder()
                 .setIncarnationStatus(IncarnationStatus.INCARNATION_AVAILABLE)
                 .setIncarnationIndex(incarnationIndex)
-                .setIncarnationTimestamp(MetadataCodec.encodeDatetime(objectTimestamp))
+                .setIncarnationTimestamp(storageTimestamp)
                 .addCopies(copy);
 
         return StorageItem.newBuilder()
