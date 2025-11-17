@@ -940,7 +940,7 @@ class DevModeTranslator:
 
         data_obj = self._generate_data_definition(
             part_key, snap_index, delta_index, data_item,
-            schema, storage_id)
+            schema, data_id, storage_id)
 
         storage_obj = self._generate_storage_definition(
             storage_id, storage_key, storage_path, storage_format,
@@ -1067,12 +1067,14 @@ class DevModeTranslator:
     @classmethod
     def _generate_data_definition(
             cls, part_key: _meta.PartKey, snap_index: int, delta_index: int, data_item: str,
-            schema: tp.Optional[_meta.SchemaDefinition], storage_id: _meta.TagHeader) \
+            schema: tp.Optional[_meta.SchemaDefinition],
+            data_id: _meta.TagHeader, storage_id: _meta.TagHeader) \
             -> (_meta.ObjectDefinition, _meta.ObjectDefinition):
 
         delta = _meta.DataDelta(
             deltaIndex=delta_index,
-            dataItem=data_item)
+            dataItem=data_item,
+            deltaTimestamp=data_id.objectTimestamp)
 
         snap = _meta.DataSnapshot(
             snapIndex=snap_index,

@@ -15,24 +15,16 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.common.config;
-
-import org.finos.tracdap.metadata.StorageLayout;
+package org.finos.tracdap.common.storage;
 
 
-public class ConfigDefaults {
+public interface IStorageLayout {
 
-    // Really we should mark these defaults up in the .proto files for the config
-    // Defaults and validation can both be done using protobuf extensions
-    // (not sure if they call it something else now)!
-    // Also, we could get the same behavior across different coding languages that way...
+    String newFilePath(LayoutItem layoutItem);
 
-    // For now, here are some config defaults!
+    String updateFilePath(LayoutItem layoutItem, LayoutItem priorLayoutItem);
 
-    public static final int NETWORK_IDLE_TIMEOUT = 30;  // seconds
+    String newDataPath(LayoutItem layoutItem);
 
-    public static final String STORAGE_DEFAULT_FORMAT = "ARROW_FILE";
-    public static final StorageLayout STORAGE_DEFAULT_LAYOUT = StorageLayout.DATE_SNAP_LAYOUT;
-
-    public static final String RESULT_STORAGE_LOCATION = "trac_results";
+    String updateDataPath(LayoutItem layoutItem, LayoutItem priorLayoutItem);
 }

@@ -245,7 +245,7 @@ class DataSpecFunc(NodeFunction[_data.DataSpec]):
         trac_schema = data_view.trac_schema
 
         # Common logic for building a data spec is part of the data module
-        return _data.build_data_spec(
+        return _storage.build_data_spec(
             self.node.data_obj_id, self.node.storage_obj_id,
             self.node.context_key, trac_schema,
             self.node.sys_config,

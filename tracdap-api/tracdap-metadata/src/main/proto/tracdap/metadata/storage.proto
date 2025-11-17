@@ -60,9 +60,13 @@ enum IncarnationStatus {
 
 enum StorageLayout {
 
-  OBJECT_ID_LAYOUT = 0;
+  STORAGE_LAYOUT_NOT_SET = 0;
 
   DEVELOPER_LAYOUT = 1;
+
+  OBJECT_ID_LAYOUT = 2;
+
+  DATE_SNAP_LAYOUT = 3;
 }
 
 /**

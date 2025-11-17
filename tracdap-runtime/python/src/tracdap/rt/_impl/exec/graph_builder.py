@@ -21,6 +21,7 @@ import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.resources as _resources
+import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.type_system as _type_system
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt.api as _api
@@ -571,7 +572,7 @@ class GraphBuilder:
         else:
 
             # If the output is not dynamic, a data spec can be built ahead of time
-            data_spec = _data.build_data_spec(
+            data_spec = _storage.build_data_spec(
                 data_id, storage_id, output_name,
                 output_schema.schema,
                 self._sys_config,
@@ -633,7 +634,7 @@ class GraphBuilder:
             storage_id = _util.new_object_version(prior_spec.storage_id)
 
         # File spec can always be built ahead of time (no equivalent of dynamic schemas)
-        file_spec = _data.build_file_spec(
+        file_spec = _storage.build_file_spec(
             file_id, storage_id,
             output_name, output_schema.fileType,
             self._sys_config,

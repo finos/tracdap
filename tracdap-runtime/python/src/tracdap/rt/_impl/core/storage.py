@@ -13,9 +13,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import abc
+import copy
 import datetime as dt
 import enum
 import pathlib
+import random
 import re
 import sys
 import typing as tp
@@ -25,6 +28,7 @@ import pyarrow as pa
 import pyarrow.fs as pa_fs
 import pyarrow.lib as pa_lib
 
+import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
@@ -32,6 +36,7 @@ import tracdap.rt.ext.plugins as plugins
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
+import tracdap.rt._impl.core.type_system as _meta_ts
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -40,6 +45,15 @@ from tracdap.rt._impl.ext.storage import *
 
 
 class FormatManager:
+
+    __STRUCT_FORMAT_EXTENSIONS = {
+        "application/yaml": "yaml",
+        "YAML": "yaml",
+        "yaml": "yaml",
+        "application/json": "json",
+        "JSON": "json",
+        "json": "json",
+    }
 
     @classmethod
     def get_data_format(cls, format_code: str, format_options: tp.Dict[str, tp.Any]) -> IDataFormat:
@@ -60,6 +74,512 @@ class FormatManager:
 
         codec = cls.get_data_format(format_code, format_options={})
         return codec.format_code()
+
+    @classmethod
+    def primary_extension(cls, format_code: str) -> str:
+
+        # Some formats are supported for STRUCT data but do not have a codec
+        if format_code in cls.__STRUCT_FORMAT_EXTENSIONS:
+            return cls.__STRUCT_FORMAT_EXTENSIONS[format_code]
+
+        codec = cls.get_data_format(format_code, format_options={})
+        return codec.file_extension()
+
+
+class StorageLayout(metaclass=abc.ABCMeta):
+
+    __BACKWARDS_COMPATIBLE_LAYOUT = _meta.StorageLayout.OBJECT_ID_LAYOUT
+    __LAYOUTS: "tp.Dict[_meta.StorageLayout, StorageLayout]" = dict()
+
+    @classmethod
+    def select(
+            cls, layout_key: tp.Union[str, _meta.StorageLayout],
+            update: bool = False) -> "StorageLayout":
+
+        # Legacy compatibility - layout key not set in storage definition
+        if not layout_key or layout_key == "":
+            layout_key = _meta.StorageLayout.STORAGE_LAYOUT_NOT_SET
+
+        if isinstance(layout_key, str):
+            layout_key = _meta.StorageLayout.__members__[layout_key]
+
+        if layout_key == _meta.StorageLayout.STORAGE_LAYOUT_NOT_SET:
+            if update:
+                layout_key = cls.__BACKWARDS_COMPATIBLE_LAYOUT
+            else:
+                default_layout = _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT
+                layout_key = _meta.StorageLayout.__members__[default_layout]
+
+        layout = cls.__LAYOUTS.get(layout_key)
+
+        if layout is not None:
+            return layout
+
+        if layout_key == _meta.StorageLayout.OBJECT_ID_LAYOUT:
+            layout = ObjectIdLayout()
+        elif layout_key == _meta.StorageLayout.DATE_SNAP_LAYOUT:
+            layout = DateSnapLayout()
+        elif layout_key == _meta.StorageLayout.DEVELOPER_LAYOUT:
+            layout = DeveloperLayout()
+        else:
+            raise _ex.ETracInternal(f"Unknown storage layout [{layout_key}]")
+
+        cls.__LAYOUTS[layout_key] = layout
+
+        return layout
+
+    @abc.abstractmethod
+    def layout_key(self) -> _meta.StorageLayout:
+        pass
+
+    @abc.abstractmethod
+    def new_data_spec(
+            self, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
+            sys_config: _cfg.RuntimeConfig) -> _data.DataSpec:
+        pass
+
+    @abc.abstractmethod
+    def new_data_version(
+            self, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
+            prior_spec: _data.DataSpec) -> _data.DataSpec:
+        pass
+
+    @abc.abstractmethod
+    def new_file_spec(
+            self, file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: str, file_type: _meta.FileType,
+            sys_config: _cfg.RuntimeConfig) -> _data.DataSpec:
+        pass
+
+    @abc.abstractmethod
+    def new_file_version(
+            self, file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: str, file_type: _meta.FileType,
+            prior_spec: _data.DataSpec) -> _data.DataSpec:
+        pass
+
+
+class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
+
+    __DATA_ITEM_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}"
+    __FILE_ITEM_TEMPLATE = "file/{}/version-{}"
+
+    @abc.abstractmethod
+    def _data_storage_path(
+            self, data_id: _meta.TagHeader, context_key: str, trac_schema: _meta.SchemaDefinition,
+            part_key: _meta.PartKey, snap_index: int, delta_index: int, storage_format: str,
+            prior_copy: tp.Optional[_meta.StorageCopy]):
+        pass
+
+    @abc.abstractmethod
+    def _file_storage_path(
+            self, file_id: _meta.TagHeader, file_def: _meta.FileDefinition,
+            prior_copy: tp.Optional[_meta.StorageCopy]):
+        pass
+
+    def new_data_spec(
+            self, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
+            sys_config: _cfg.RuntimeConfig) -> _data.DataSpec:
+
+        part_key = _meta.PartKey("part-root", _meta.PartType.PART_ROOT)
+        snap_index = 0
+
+        data_item = self.__DATA_ITEM_TEMPLATE.format(
+            trac_schema.schemaType.name.lower(), data_id.objectId,
+            part_key.opaqueKey, snap_index, 0)
+
+        # Blank data definition with no parts
+        new_data_def = _meta.DataDefinition(
+            schema=trac_schema,
+            storageId=_util.selector_for_latest(storage_id))
+
+        data_def = self._add_new_snap(new_data_def, data_item, part_key, snap_index, data_id.objectTimestamp)
+
+        # Take default location from the storage config
+        storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        if trac_schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA:
+            storage_format = "application/json"
+        else:
+            storage_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "text/csv")
+        storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy=None)
+
+        storage_copy = _meta.StorageCopy(
+            storageKey=storage_key,
+            storagePath=storage_path,
+            storageFormat=storage_format,
+            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
+            copyTimestamp=data_id.objectTimestamp)
+
+        new_storage_def = _meta.StorageDefinition()
+
+        storage_def = self._add_storage_copy(new_storage_def, data_item, storage_copy)
+
+        # Dynamic data def will always use an embedded schema (this is no ID for an external schema)
+
+        return _data.DataSpec \
+            .create_data_spec(data_item, data_def, storage_def, schema=None) \
+            .with_ids(data_id, storage_id)
+
+    def new_data_version(
+            self, data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
+            prior_spec: _data.DataSpec) -> _data.DataSpec:
+
+        part_key = _meta.PartKey("part-root", _meta.PartType.PART_ROOT)
+        snap_index = prior_spec.primary_id.objectVersion  # snap index is zero-based
+
+        data_item = self.__DATA_ITEM_TEMPLATE.format(
+            trac_schema.schemaType.name.lower(), data_id.objectId,
+            part_key.opaqueKey, snap_index, 0)
+
+        data_def = self._add_new_snap(prior_spec.definition, data_item, part_key, snap_index, data_id.objectTimestamp)
+
+        prior_item = next(iter(prior_spec.storage.dataItems.keys()), None)
+        prior_copy = self._find_storage_copy(prior_item, prior_spec.storage)
+
+        if prior_copy is None:
+            raise _ex.ETracInternal(f"Missing prior metadata for [{_util.object_key(data_id)}]")
+
+        storage_key = prior_copy.storageKey
+        storage_format = prior_copy.storageFormat
+        storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy)
+
+        storage_copy = _meta.StorageCopy(
+            storageKey=storage_key,
+            storagePath=storage_path,
+            storageFormat=storage_format,
+            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
+            copyTimestamp=data_id.objectTimestamp)
+
+        storage_def = self._add_storage_copy(prior_spec.storage, data_item, storage_copy)
+
+        return _data.DataSpec \
+            .create_data_spec(data_item, data_def, storage_def, schema=None) \
+            .with_ids(data_id, storage_id)
+
+    def new_file_spec(
+            self, file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: str, file_type: _meta.FileType,
+            sys_config: _cfg.RuntimeConfig) -> _data.DataSpec:
+
+        data_item = self.__FILE_ITEM_TEMPLATE.format(file_id.objectId, file_id.objectVersion)
+
+        file_def = _meta.FileDefinition(
+            name=f"{context_key}.{file_type.extension}",
+            extension=file_type.extension,
+            mimeType=file_type.mimeType,
+            dataItem=data_item,
+            storageId=_util.selector_for_latest(storage_id),
+            size=0)
+
+        storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        storage_format = file_def.mimeType
+        storage_path = self._file_storage_path(file_id, file_def, prior_copy=None)
+
+        storage_copy = _meta.StorageCopy(
+            storageKey=storage_key,
+            storagePath=storage_path,
+            storageFormat=storage_format,
+            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
+            copyTimestamp=file_id.objectTimestamp)
+
+        new_storage_def = _meta.StorageDefinition()
+        new_storage_def.layout = self.layout_key()
+
+        storage_def = self._add_storage_copy(new_storage_def, data_item, storage_copy)
+
+        return _data.DataSpec \
+            .create_file_spec(data_item, file_def, storage_def) \
+            .with_ids(file_id, storage_id)
+
+    def new_file_version(
+            self, file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+            context_key: str, file_type: _meta.FileType, prior_spec: _data.DataSpec) -> _data.DataSpec:
+
+        data_item = self.__FILE_ITEM_TEMPLATE.format(file_id.objectId, file_id.objectVersion)
+
+        file_def = _meta.FileDefinition(
+            name=f"{context_key}.{file_type.extension}",
+            extension=file_type.extension,
+            mimeType=file_type.mimeType,
+            dataItem=data_item,
+            storageId=_util.selector_for_latest(storage_id),
+            size=0)
+
+        prior_copy = self._find_storage_copy(prior_spec.definition.dataItem, prior_spec.storage)
+
+        if prior_copy is None:
+            raise _ex.ETracInternal(f"Missing prior metadata for [{_util.object_key(file_id)}]")
+
+        storage_key = prior_copy.storageKey
+        storage_format = file_def.mimeType
+        storage_path = self._file_storage_path(file_id, file_def, prior_copy)
+
+        storage_copy = _meta.StorageCopy(
+            storageKey=storage_key,
+            storagePath=storage_path,
+            storageFormat=storage_format,
+            copyStatus=_meta.CopyStatus.COPY_AVAILABLE,
+            copyTimestamp=file_id.objectTimestamp)
+
+        storage_def = self._add_storage_copy(prior_spec.storage, data_item, storage_copy)
+
+        return _data.DataSpec \
+            .create_file_spec(data_item, file_def, storage_def) \
+            .with_ids(file_id, storage_id)
+
+    @classmethod
+    def _add_new_snap(
+            cls, data_def: _meta.DataDefinition,data_item: str,
+            part_key: _meta.PartKey, snap_index: int,
+            delta_timestamp: _meta.DatetimeValue):
+
+        delta = _meta.DataDelta(
+            deltaIndex=0,
+            dataItem=data_item,
+            deltaTimestamp=delta_timestamp)
+
+        snap = _meta.DataSnapshot(
+            snapIndex=snap_index,
+            deltas=[delta])
+
+        part = _meta.DataPartition(
+            partKey=part_key,
+            snap=snap)
+
+        data_def = copy.copy(data_def)
+        data_def.parts = copy.copy(data_def.parts)
+        data_def.parts[part_key.opaqueKey] = part
+
+        return data_def
+
+    @classmethod
+    def _add_storage_copy(cls, storage_def: _meta.StorageDefinition, data_item: str, storage_copy: _meta.StorageCopy):
+
+        new_incarnation = _meta.StorageIncarnation(
+            copies=[storage_copy],
+            incarnationIndex=0,
+            incarnationTimestamp=storage_copy.copyTimestamp,
+            incarnationStatus=_meta.IncarnationStatus.INCARNATION_AVAILABLE)
+
+        new_item = _meta.StorageItem(incarnations=[new_incarnation])
+
+        storage_def = copy.copy(storage_def)
+        storage_def.dataItems = copy.copy(storage_def.dataItems)
+        storage_def.dataItems[data_item] = new_item
+
+        return storage_def
+
+    @classmethod
+    def _find_storage_copy(cls, data_item: str, storage_def: _meta.StorageDefinition) -> tp.Optional[_meta.StorageCopy]:
+
+        if data_item is None:
+            return None
+
+        storage_item = storage_def.dataItems.get(data_item)
+
+        if storage_item is None:
+            return None
+
+        # Latest available incarnation
+        incarnation = next(filter(
+            lambda i: i.incarnationStatus == _meta.IncarnationStatus.INCARNATION_AVAILABLE,
+            reversed(storage_item.incarnations)), None)
+
+        if incarnation is None:
+            return None
+
+        # Use any available copy (currently there is no location preference)
+        return next(filter(
+            lambda c: c.copyStatus == _meta.CopyStatus.COPY_AVAILABLE,
+            incarnation.copies), None)
+
+
+class ObjectIdLayout(BaseLayout):
+
+    __DATA_STORAGE_TEMPLATE = "data/{}/{}/{}/snap-{:d}/delta-{:d}-x{:0>6x}"
+    __FILE_STORAGE_TEMPLATE = "file/{}/version-{:d}-x{:0>6x}/{}.{}"
+
+    def __init__(self):
+        self.__random = random.Random()
+        self.__random.seed()
+
+    def layout_key(self) -> _meta.StorageLayout:
+        return _meta.StorageLayout.OBJECT_ID_LAYOUT
+
+    def _data_storage_path(
+            self, data_id, context_key, trac_schema,
+            part_key, snap_index, delta_index,
+            storage_format, prior_copy):
+
+        schema_type = trac_schema.schemaType.name.lower()
+        version_suffix = self.__random.randint(0, 1 << 24)
+
+        base_path = self.__DATA_STORAGE_TEMPLATE.format(
+            schema_type, data_id.objectId,
+            part_key.opaqueKey, snap_index, delta_index,
+            version_suffix)
+
+        # STRUCT stored as a single file, not directory layout
+        if trac_schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA:
+            return base_path + ".json"
+        else:
+            return base_path
+
+    def _file_storage_path(self, file_id, file_def, prior_copy):
+
+        version_suffix = self.__random.randint(0, 1 << 24)
+
+        return self.__FILE_STORAGE_TEMPLATE.format(
+            file_id.objectId, file_id.objectVersion, version_suffix,
+            file_def.name, file_def.extension.lower())
+
+
+class DateSnapLayout(BaseLayout):
+
+    # YEAR / DATE / TIME - OBJECT ID / PART / SNAP / DELTAS & CHUNKS
+    __DATA_STORAGE_TEMPLATE = "{0:04d}/{0:04d}-{1:02d}-{2:02d}/{3}/{4}/snap-{5}/delta-{6}-x{7:06x}-chunk-{8}.{9}"
+
+    # YEAR / DATE / TIME - OBJECT ID / VERSION / FILENAME
+    __FILE_STORAGE_TEMPLATE = "{0:04d}/{0:04d}-{1:02d}-{2:02d}/{3}/version-{4}-x{5:06x}/{6}"
+
+    def __init__(self):
+        self.__random = random.Random()
+        self.__random.seed()
+
+    def layout_key(self) -> _meta.StorageLayout:
+        return _meta.StorageLayout.OBJECT_ID_LAYOUT
+
+    def _data_storage_path(
+            self, data_id, context_key, trac_schema,
+            part_key, snap_index, delta_index,
+            storage_format, prior_copy):
+
+        if delta_index != 0:
+            raise _ex.ETracInternal("Delta updates not yet supported")
+
+        timestamp = _meta_ts.MetadataCodec.decode_datetime_value(data_id.objectTimestamp)
+        delta_suffix = self.__random.randint(0, 1 << 24)
+        extension = FormatManager.primary_extension(storage_format)
+
+        return self.__DATA_STORAGE_TEMPLATE.format(
+            timestamp.year, timestamp.month, timestamp.day,
+            data_id.objectId, part_key.opaqueKey, snap_index, delta_index,
+            delta_suffix, 0, extension)
+
+    def _file_storage_path(self, file_id, file_def, prior_copy):
+
+        timestamp = _meta_ts.MetadataCodec.decode_datetime_value(file_id.objectTimestamp)
+        version_suffix = self.__random.randint(0, 1 << 24)
+
+        return self.__FILE_STORAGE_TEMPLATE.format(
+            timestamp.year, timestamp.month, timestamp.day,
+            file_id.objectId, file_id.objectVersion, version_suffix,
+            file_def.name)
+
+
+class DeveloperLayout(BaseLayout):
+
+    DEFAULT_DEV_OUTPUT_DIR = "Dev Outputs"
+
+    __DATA_STORAGE_PATH = "{}/{}{}.{}"
+    __FILE_STORAGE_PATH = "{}/{}{}.{}"
+
+    def layout_key(self) -> _meta.StorageLayout:
+        return _meta.StorageLayout.DEVELOPER_LAYOUT
+
+    def _data_storage_path(
+            self, data_id, context_key, trac_schema,
+            part_key, snap_index, delta_index,
+            storage_format, prior_copy):
+
+        storage_dir = self._dev_storage_dir(prior_copy)
+        suffix = f"-{data_id.objectVersion}" if data_id.objectVersion > 1 else ""
+        extension = FormatManager.primary_extension(storage_format)
+
+        if prior_copy is not None:
+            prior_path = pathlib.Path(prior_copy.storagePath)
+            file_name = prior_path.stem
+            if data_id.objectVersion > 2 and "-" in file_name:
+                file_name = file_name[:file_name.rfind("-")]
+        else:
+            file_name = context_key
+
+        return self.__DATA_STORAGE_PATH.format(storage_dir, file_name, suffix, extension)
+
+    def _file_storage_path(self, file_id, file_def, prior_copy):
+
+        storage_dir = self._dev_storage_dir(prior_copy)
+        suffix = f"-{file_id.objectVersion}" if file_id.objectVersion > 1 else ""
+
+        if prior_copy is not None:
+            prior_path = pathlib.Path(prior_copy.storagePath)
+            file_name = prior_path.stem
+            if file_id.objectVersion > 2 and "-" in file_name:
+                file_name = file_name[:file_name.rfind("-")]
+        else:
+            extension_sep = file_def.name.rfind(".")
+            file_name = file_def.name[:extension_sep]
+
+        return self.__FILE_STORAGE_PATH.format(storage_dir, file_name, suffix, file_def.extension.lower())
+
+    def _dev_storage_dir(self, prior_copy: _meta.StorageCopy):
+
+        if prior_copy is None:
+            return self.DEFAULT_DEV_OUTPUT_DIR
+
+        prior_path = pathlib.Path(prior_copy.storagePath)
+
+        if len(prior_path.parts) > 1:
+            return prior_path.parent
+        else:
+            return self.DEFAULT_DEV_OUTPUT_DIR
+
+
+def build_data_spec(
+        data_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+        context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
+        sys_config: _cfg.RuntimeConfig,
+        prior_spec: tp.Optional[_data.DataSpec] = None,
+        metadata: tp.Optional[_api.RuntimeMetadata] = None) \
+        -> _data.DataSpec:
+
+    if prior_spec is None:
+        layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
+        layout = StorageLayout.select(layout_key)
+        spec = layout.new_data_spec(data_id, storage_id, context_key, trac_schema, sys_config)
+    else:
+        layout_key = prior_spec.storage.layout
+        layout = StorageLayout.select(layout_key, update=True)
+        spec = layout.new_data_version(data_id, storage_id, context_key, trac_schema, prior_spec)
+
+    # Attach metadata if it is available
+    return spec.with_metadata(metadata) if metadata is not None else spec
+
+
+def build_file_spec(
+        file_id: _meta.TagHeader, storage_id: _meta.TagHeader,
+        context_key: tp.Optional[str],  file_type: _meta.FileType,
+        sys_config: _cfg.RuntimeConfig,
+        prior_spec: tp.Optional[_data.DataSpec] = None,
+        metadata: tp.Optional[_api.RuntimeMetadata] = None) \
+        -> _data.DataSpec:
+
+    if prior_spec is None:
+        layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
+        layout = StorageLayout.select(layout_key)
+        spec = layout.new_file_spec(file_id, storage_id, context_key, file_type, sys_config)
+
+    else:
+        layout_key = prior_spec.storage.layout
+        layout = StorageLayout.select(layout_key, update=True)
+        spec = layout.new_file_version(file_id, storage_id, context_key, file_type, prior_spec)
+
+    # Attach metadata if it is available
+    return spec.with_metadata(metadata) if metadata is not None else spec
 
 
 class StorageManager:

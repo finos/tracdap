@@ -29,6 +29,7 @@ import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.resources as _resources
+import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.util as _util
 
 from .graph import NodeId
@@ -570,7 +571,7 @@ class JobProcessor(_actors.Actor):
         file_name = "trac_job_log_file"
         file_type = _meta.FileType("TXT", "text/plain")
 
-        file_spec = _data.build_file_spec(
+        file_spec = _storage.build_file_spec(
             file_id, storage_id,
             file_name, file_type,
             self._sys_config)
