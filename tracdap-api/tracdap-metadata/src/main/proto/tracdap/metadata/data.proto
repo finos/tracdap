@@ -176,6 +176,8 @@ message DataDelta {
 
     uint64 physicalRowCount = 3;
     uint64 deltaRowCount = 4;
+
+    DatetimeValue deltaTimestamp = 5;
 }
 
 /*
