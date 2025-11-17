@@ -222,7 +222,7 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
             schema=trac_schema,
             storageId=_util.selector_for_latest(storage_id))
 
-        data_def = self._add_new_snap(new_data_def, data_item, part_key, snap_index)
+        data_def = self._add_new_snap(new_data_def, data_item, part_key, snap_index, data_id.objectTimestamp)
 
         # Take default location from the storage config
         storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
@@ -261,7 +261,7 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
             trac_schema.schemaType.name.lower(), data_id.objectId,
             part_key.opaqueKey, snap_index, 0)
 
-        data_def = self._add_new_snap(prior_spec.definition, data_item, part_key, snap_index)
+        data_def = self._add_new_snap(prior_spec.definition, data_item, part_key, snap_index, data_id.objectTimestamp)
 
         prior_item = next(iter(prior_spec.storage.dataItems.keys()), None)
         prior_copy = self._find_storage_copy(prior_item, prior_spec.storage)
@@ -360,11 +360,13 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
     @classmethod
     def _add_new_snap(
             cls, data_def: _meta.DataDefinition,data_item: str,
-            part_key: _meta.PartKey, snap_index: int):
+            part_key: _meta.PartKey, snap_index: int,
+            delta_timestamp: _meta.DatetimeValue):
 
         delta = _meta.DataDelta(
             deltaIndex=0,
-            dataItem=data_item)
+            dataItem=data_item,
+            deltaTimestamp=delta_timestamp)
 
         snap = _meta.DataSnapshot(
             snapIndex=snap_index,
