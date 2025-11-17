@@ -66,8 +66,6 @@ def format_file_size(size: int) -> str:
 
 def generate_uuid7() -> uuid.UUID:
 
-    # Copied from https://github.com/oittaa/uuid6-python (MIT license)
-
     global __uuid_v7_latest_timestamp
 
     nanoseconds = time.time_ns()
@@ -78,10 +76,14 @@ def generate_uuid7() -> uuid.UUID:
 
     _last_v7_timestamp = timestamp_ms
 
-    uuid_int = (timestamp_ms & 0xFFFFFFFFFFFF) << 80
-    uuid_int |= secrets.randbits(76)
+    uuid_int = (timestamp_ms & 0xFFFFFFFFFFFF) << 80    # Epoch time (48 bits)
+    uuid_int |= 7 << 76                                 # UUID v7 (4 bits)
+    uuid_int |= secrets.randbits(76)                    # Random (76 bits)
 
-    return uuid.UUID(int=uuid_int, version=7)
+    uuid_int &= ~(0xC000 << 48)                         # Clear variant bits
+    uuid_int |= 0x8000 << 48                            # Set variant to RFC 4122
+
+    return uuid.UUID(int=uuid_int)
 
 
 def new_object_id(object_type: meta.ObjectType) -> meta.TagHeader:
