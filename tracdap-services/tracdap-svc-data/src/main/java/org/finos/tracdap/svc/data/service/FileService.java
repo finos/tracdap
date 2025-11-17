@@ -20,6 +20,8 @@ package org.finos.tracdap.svc.data.service;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc.InternalMetadataApiFutureStub;
+import org.finos.tracdap.common.storage.LayoutItem;
+import org.finos.tracdap.common.storage.LayoutSelector;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IDataContext;
@@ -39,7 +41,6 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -54,8 +55,6 @@ import static org.finos.tracdap.svc.data.service.MetadataBuilders.*;
 public class FileService {
 
     private static final String FILE_DATA_ITEM_TEMPLATE = "file/%s/version-%d";
-    private static final String FILE_STORAGE_PATH_TEMPLATE = "file/%s/version-%d%s/%s";
-    private static final String FILE_STORAGE_PATH_SUFFIX_TEMPLATE = "-x%06x";
 
     private static final String BACKSLASH = "/";
 
@@ -65,7 +64,6 @@ public class FileService {
     private final InternalMetadataApiFutureStub metaApi;
 
     private final Validator validator = new Validator();
-    private final Random random = new Random();
 
     public FileService(
             TenantStorageManager storageManager,
@@ -372,10 +370,16 @@ public class FileService {
                 state.fileId, selectorForLatest(state.storageId),
                 request.getName(), request.getMimeType());
 
+        var layoutId = storageManager.getTenantStorage(state.tenant).defaultLayout();
+        var layout = LayoutSelector.newObjectLayout(layoutId);
+        var layoutItem = LayoutItem.forFile(state.fileId, state.file);
+
+        var storagePath = layout.newFilePath(layoutItem);
+
         state.storage = buildStorageDef(
                 StorageDefinition.newBuilder(),
                 state.fileId, timestamp, storageKey,
-                request.getName(), request.getMimeType());
+                request.getMimeType(), storagePath);
 
         return state;
     }
@@ -394,10 +398,17 @@ public class FileService {
                 state.fileId, prior.file.getStorageId(),
                 request.getName(), request.getMimeType());
 
+        var layoutId = prior.storage.getLayout();
+        var layout = LayoutSelector.updateObjectLayout(layoutId);
+        var layoutItem = LayoutItem.forFile(state.fileId, state.file);
+        var priorLayoutItem = LayoutItem.forPriorFile(prior.file, prior.storage);
+
+        var storagePath = layout.updateFilePath(layoutItem, priorLayoutItem);
+
         state.storage = buildStorageDef(
                 prior.storage.toBuilder(),
                 state.fileId, timestamp, storageKey,
-                request.getName(), request.getMimeType());
+                request.getMimeType(), storagePath);
 
         return state;
     }
@@ -429,7 +440,7 @@ public class FileService {
     private StorageDefinition buildStorageDef(
             StorageDefinition.Builder storageDef,
             TagHeader fileId, Instant storageTimestamp, String storageKey,
-            String fileName, String mimeType) {
+            String mimeType, String storagePath) {
 
         var fileUuid = UUID.fromString(fileId.getObjectId());
         var fileVersion = fileId.getObjectVersion();
@@ -461,11 +472,6 @@ public class FileService {
         // In this case, the request error handler *should* clean up the file
         // For orphaned files, there is still a chance the random bytes collide
         // But this can be resolved by retrying
-
-        var storageSuffixBytes = random.nextInt(1 << 24);
-        var storageSuffix = String.format(FILE_STORAGE_PATH_SUFFIX_TEMPLATE, storageSuffixBytes);
-
-        var storagePath = String.format(FILE_STORAGE_PATH_TEMPLATE, fileUuid, fileVersion, storageSuffix, fileName);
 
         var storageEncodedTimestamp = MetadataCodec.encodeDatetime(storageTimestamp);
 
