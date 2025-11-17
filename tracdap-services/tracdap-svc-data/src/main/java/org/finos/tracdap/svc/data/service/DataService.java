@@ -20,6 +20,8 @@ package org.finos.tracdap.svc.data.service;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.data.pipeline.CounterStage;
+import org.finos.tracdap.common.storage.LayoutItem;
+import org.finos.tracdap.common.storage.LayoutSelector;
 import org.finos.tracdap.common.util.LoggingHelpers;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.async.Futures;
@@ -43,7 +45,6 @@ import org.slf4j.LoggerFactory;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Flow;
@@ -56,12 +57,9 @@ import static org.finos.tracdap.common.metadata.MetadataUtil.selectorForLatest;
 public class DataService {
 
     private static final String DATA_ITEM_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d";
-    private static final String STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x";
 
-    // TODO: Storage layout plugins to replace specialized logic
+    // TODO: Remove specialisation for STRUCT storage format
     private static final String STRUCT_STORAGE_FORMAT = "application/json";
-    private static final String STRUCT_STORAGE_EXTENSION = "json";
-    private static final String STRICT_STORAGE_PATH_TEMPLATE = "data/%s/%s/%s/snap-%d/delta-%d-x%06x.%s";
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -70,7 +68,6 @@ public class DataService {
     private final InternalMetadataApiGrpc.InternalMetadataApiFutureStub metaClient;
 
     private final Validator validator = new Validator();
-    private final Random random = new Random();
 
     public DataService(
             TenantStorageManager storageManager,
@@ -413,11 +410,10 @@ public class DataService {
         state.delta = 0;
 
         var dataItem = buildDataItem(state);
-        var storagePath = buildStoragePath(state);
         var timestamp = state.requestMetadata.requestTimestamp();
 
         var dataDef = createDataDef(request, state, dataItem);
-        var storageDef = createStorageDef(state, dataItem, storagePath, timestamp);
+        var storageDef = createStorageDef(state, dataItem, timestamp);
 
         state.data = dataDef;
         state.storage = storageDef;
@@ -451,7 +447,6 @@ public class DataService {
         }
 
         var dataItem = buildDataItem(state);
-        var storagePath = buildStoragePath(state);
         var timestamp = state.requestMetadata.requestTimestamp();
 
         // We are going to add this data item to the storage definition
@@ -469,7 +464,7 @@ public class DataService {
         }
 
         state.data = updateDataDef(request, state, dataItem, prior.data);
-        state.storage = updateStorageDef(state, dataItem, storagePath, timestamp, prior.storage);
+        state.storage = updateStorageDef(state, dataItem, timestamp, prior);
 
         state.copy = state.storage
                 .getDataItemsOrThrow(dataItem)
@@ -488,29 +483,6 @@ public class DataService {
         return String.format(DATA_ITEM_TEMPLATE,
                 dataType, objectId,
                 partKey, state.snap, state.delta);
-    }
-
-    private String buildStoragePath(RequestState state) {
-
-        var dataType = state.schema.getSchemaType().name().toLowerCase();
-        var objectId = state.dataId.getObjectId();
-        var partKey = state.part.getOpaqueKey();
-        var suffixBytes = random.nextInt(1 << 24);
-
-        if (state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA) {
-
-            return String.format(STRICT_STORAGE_PATH_TEMPLATE,
-                    dataType, objectId,
-                    partKey, state.snap, state.delta,
-                    suffixBytes, STRUCT_STORAGE_EXTENSION);
-        }
-        else {
-
-            return String.format(STORAGE_PATH_TEMPLATE,
-                    dataType, objectId,
-                    partKey, state.snap, state.delta,
-                    suffixBytes);
-        }
     }
 
     private DataDefinition createDataDef(DataWriteRequest request, RequestState state, String dataItem) {
@@ -587,25 +559,53 @@ public class DataService {
         return dataDef.build();
     }
 
-    private StorageDefinition createStorageDef(
-            RequestState state, String dataItem,
-            String storagePath, OffsetDateTime objectTimestamp) {
+    private StorageDefinition createStorageDef(RequestState state, String dataItem, OffsetDateTime objectTimestamp) {
 
+        var storage = storageManager.getTenantStorage(state.tenant);
+        var layoutId = storage.defaultLayout();
+        var layout = LayoutSelector.newObjectLayout(layoutId);
+
+        var mimeType = state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA ? STRUCT_STORAGE_FORMAT : storage.defaultFormat();
+        var extension = codecManager.getDefaultFileExtension(mimeType);
+
+        var layoutItem = LayoutItem.forData(
+                state.dataId, state.data, state.schema,
+                state.part, state.snap, state.delta,
+                mimeType, extension);
+
+        var storagePath = layout.newDataPath(layoutItem);
         var storageItem = buildStorageItem(state, storagePath, objectTimestamp);
 
         return StorageDefinition.newBuilder()
+                .setLayout(layoutId)
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
 
     private StorageDefinition updateStorageDef(
             RequestState state, String dataItem,
-            String storagePath, OffsetDateTime objectTimestamp,
-            StorageDefinition priorDef) {
+            OffsetDateTime objectTimestamp,
+            RequestState priorState) {
 
+        var storage = storageManager.getTenantStorage(state.tenant);
+        var layoutId = priorState.storage.getLayout();
+        var layout = LayoutSelector.updateObjectLayout(layoutId);
+
+        var mimeType = state.schema.getSchemaType() == SchemaType.STRUCT_SCHEMA ? STRUCT_STORAGE_FORMAT : storage.defaultFormat();
+        var extension = codecManager.getDefaultFileExtension(mimeType);
+
+        var layoutItem = LayoutItem.forData(
+                state.dataId, state.data, state.schema,
+                state.part, state.snap, state.delta,
+                mimeType, extension);
+
+        var priorLayoutItem = LayoutItem.forPriorData(
+                priorState.data, priorState.schema, priorState.storage);
+
+        var storagePath = layout.updateDataPath(layoutItem, priorLayoutItem);
         var storageItem = buildStorageItem(state, storagePath, objectTimestamp);
 
-        return priorDef.toBuilder()
+        return priorState.storage.toBuilder()
                 .putDataItems(dataItem, storageItem)
                 .build();
     }
