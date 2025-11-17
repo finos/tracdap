@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.storage;
 
+import org.finos.tracdap.common.config.ConfigDefaults;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.storage.layouts.DateSnapLayout;
 import org.finos.tracdap.common.storage.layouts.ObjectIdLayout;
@@ -34,10 +35,10 @@ public class LayoutSelector {
             Map.entry(StorageLayout.OBJECT_ID_LAYOUT, new ObjectIdLayout()),
             Map.entry(StorageLayout.DATE_SNAP_LAYOUT, new DateSnapLayout()));
 
-    // Layout to use for new objects if not explicitly set in the storage config
-    private static final StorageLayout DEFAULT_STORAGE_LAYOUT = StorageLayout.DATE_SNAP_LAYOUT;
+    // For new objects, use ConfigDefaults if a default layout is set in the storage configuration
+    private static final StorageLayout DEFAULT_STORAGE_LAYOUT = ConfigDefaults.STORAGE_DEFAULT_LAYOUT;
 
-    // For backwards compatibility with 0.9, assume this layout on objects with no layout set
+    // For backwards compatibility with 0.9, assume this layout for updates to objects with no layout set
     private static final StorageLayout BACKWARDS_COMPATIBLE_LAYOUT = StorageLayout.OBJECT_ID_LAYOUT;
 
     public static IStorageLayout newObjectLayout(StorageLayout layoutId) {
