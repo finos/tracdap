@@ -26,12 +26,12 @@ ext {
     license_check_plugin_version = "2.8"
 
     // Core platform technologies
-    netty_version = '4.1.127.Final'
-    guava_version = '33.4.8-jre'
-    gson_version = '2.13.1'
-    proto_version = '4.31.1'
-    grpc_version = '1.74.0'
-    gapi_version = '2.60.0'
+    netty_version = '4.1.128.Final'
+    guava_version = '33.5.0-jre'
+    gson_version = '2.13.2'
+    proto_version = '4.33.0'
+    grpc_version = '1.76.0'
+    gapi_version = '2.62.0'
 
     // Data technologies
     arrow_version = '18.3.0'
@@ -40,8 +40,8 @@ ext {
 
     // Util libraries
     slf4j_version = '2.0.17'
-    log4j_version = '2.25.1'
-    commons_cli_version = "1.9.0"
+    log4j_version = '2.25.2'
+    commons_cli_version = "1.10.0"
 
     // SQL (JDBC) drivers
     h2_version = '2.3.232'
@@ -71,6 +71,6 @@ ext {
 
     // Test dependencies
 
-    junit_version = '5.10.2'
-    mockito_version = '5.11.0'
+    junit_version = '5.14.0'
+    mockito_version = '5.20.0'
 }
