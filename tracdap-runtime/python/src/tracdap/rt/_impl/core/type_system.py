@@ -124,6 +124,22 @@ class MetadataCodec:
         return MetadataCodec._decode_value_for_type(value, value.type)
 
     @staticmethod
+    def decode_date_value(value: _meta.DateValue) -> dt.date:
+
+        if value is None or not isinstance(value, _meta.DateValue):
+            raise _ex.ETracInternal()
+
+        return dt.date.fromisoformat(value.isoDate)
+
+    @staticmethod
+    def decode_datetime_value(value: _meta.DatetimeValue) -> dt.datetime:
+
+        if value is None or not isinstance(value, _meta.DatetimeValue):
+            raise _ex.ETracInternal()
+
+        return dt.datetime.fromisoformat(value.isoDatetime)
+
+    @staticmethod
     def _decode_value_for_type(value: _meta.Value, type_desc: _meta.TypeDescriptor):
 
         basic_type = type_desc.basicType
