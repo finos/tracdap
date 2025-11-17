@@ -23,6 +23,7 @@ import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.SampleMetadata;
@@ -880,7 +881,7 @@ abstract class MetadataReadApiTest {
                 .setTenant(TEST_TENANT)
                 .setSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1))
                 .build();
@@ -943,7 +944,7 @@ abstract class MetadataReadApiTest {
                 .addSelector(validSelector)
                 .addSelector(TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1))
                 .build();

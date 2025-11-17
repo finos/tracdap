@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.exec;
 
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.util.ResourceHelpers;
 
 import org.junit.jupiter.api.Assertions;
@@ -24,7 +25,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 
@@ -44,7 +44,7 @@ public abstract class ExecutorBasicTestSuite {
     @Test
     void runBasicJob_ok() throws Exception {
 
-        var jobKey = UUID.randomUUID().toString();
+        var jobKey = UuidFactory.DEFAULT.allocate().toString();
 
         // Create a new batch
 
@@ -102,7 +102,7 @@ public abstract class ExecutorBasicTestSuite {
     @Test
     void runBasicJob_processFailure() throws Exception {
 
-        var jobKey = UUID.randomUUID().toString();
+        var jobKey = UuidFactory.DEFAULT.allocate().toString();
 
         // Create a new batch
 

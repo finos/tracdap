@@ -23,6 +23,7 @@ import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EMetadataWrongType;
+import org.finos.tracdap.common.metadata.UuidFactory;
 
 import java.util.Collections;
 import java.util.List;
@@ -478,7 +479,7 @@ abstract class MetadataDalWriteTest implements IMetadataStoreTest {
     @Test
     void testPreallocate_duplicate() {
 
-        var id1 = UUID.randomUUID();
+        var id1 = UuidFactory.DEFAULT.allocate();
         var header1 = TagHeader.newBuilder().setObjectType(ObjectType.DATA).setObjectId(id1.toString()).build();
 
         store.savePreallocatedIds(TEST_TENANT, List.of(header1));
@@ -487,7 +488,7 @@ abstract class MetadataDalWriteTest implements IMetadataStoreTest {
                 store.savePreallocatedIds(TEST_TENANT, List.of(header1)));
 
         var obj2 = dummyTagForObjectType(ObjectType.MODEL);
-        var id3 = UUID.randomUUID();
+        var id3 = UuidFactory.DEFAULT.allocate();
         var header3 = TagHeader.newBuilder().setObjectType(ObjectType.DATA).setObjectId(id3.toString()).build();
 
         store.saveNewObjects(TEST_TENANT, Collections.singletonList(obj2));

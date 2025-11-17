@@ -19,6 +19,7 @@ package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.DatetimeValue;
 import org.finos.tracdap.metadata.ObjectType;
@@ -27,7 +28,6 @@ import org.finos.tracdap.metadata.TagHeader;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.UUID;
 
 
 class ObjectIdTest extends BaseValidatorTest {
@@ -39,7 +39,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.SCHEMA)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -56,7 +56,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 3)
@@ -73,7 +73,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 2)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 3)
@@ -89,7 +89,7 @@ class ObjectIdTest extends BaseValidatorTest {
         var timestamp = Instant.now();
 
         var header = TagHeader.newBuilder()
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -173,7 +173,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
                 .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -189,7 +189,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(-1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -206,7 +206,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
                 .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -222,7 +222,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(DatetimeValue.newBuilder().setIsoDatetime("not_a_valid_datetime"))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -239,7 +239,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagTimestamp(MetadataCodec.encodeDatetime(timestamp))
@@ -255,7 +255,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(-1)
@@ -272,7 +272,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -288,7 +288,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -307,7 +307,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header1 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -318,7 +318,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header2 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -329,7 +329,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header3 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -348,7 +348,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header1 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 1)
@@ -359,7 +359,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header2 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 1)
@@ -370,7 +370,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header3 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 1)
@@ -389,7 +389,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header1 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -400,7 +400,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header2 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION)
@@ -411,7 +411,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header3 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION )
@@ -430,7 +430,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header1 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 1)
@@ -441,7 +441,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header2 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 1)
@@ -452,7 +452,7 @@ class ObjectIdTest extends BaseValidatorTest {
 
         var header3 = TagHeader.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(MetadataConstants.OBJECT_FIRST_VERSION + 1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(timestamp))
                 .setTagVersion(MetadataConstants.TAG_FIRST_VERSION + 1)

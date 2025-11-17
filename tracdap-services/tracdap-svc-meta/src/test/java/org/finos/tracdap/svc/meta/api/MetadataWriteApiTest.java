@@ -23,6 +23,7 @@ import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
 import org.finos.tracdap.test.meta.SampleMetadata;
@@ -2079,7 +2080,7 @@ abstract class MetadataWriteApiTest {
         // To save a preallocated object, the ID must first be reserved
         // If the ID is not reserved, that is an item not found error
 
-        var newObjectId = UUID.randomUUID();
+        var newObjectId = UuidFactory.DEFAULT.allocate();
         var selector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
                 .setObjectId(newObjectId.toString())
@@ -2485,7 +2486,7 @@ abstract class MetadataWriteApiTest {
 
         var writeRequests = IntStream.range(0, 3).mapToObj(i -> {
 
-            var newObjectId = UUID.randomUUID();
+            var newObjectId = UuidFactory.DEFAULT.allocate();
             var selector = TagSelector.newBuilder()
                     .setObjectType(ObjectType.DATA)
                     .setObjectId(newObjectId.toString())

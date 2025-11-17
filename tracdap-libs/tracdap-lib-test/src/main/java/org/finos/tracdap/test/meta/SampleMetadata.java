@@ -21,6 +21,7 @@ import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.common.metadata.TypeSystem;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import com.google.protobuf.ByteString;
 
 import java.math.BigDecimal;
@@ -48,7 +49,7 @@ public class SampleMetadata {
 
     private static TagSelector storageSelector = TagSelector.newBuilder()
             .setObjectType(ObjectType.STORAGE)
-            .setObjectId(UUID.randomUUID().toString())
+            .setObjectId(UuidFactory.DEFAULT.allocate().toString())
             .setLatestObject(true)
             .setLatestTag(true)
             .build();
@@ -152,7 +153,7 @@ public class SampleMetadata {
 
         return TagHeader.newBuilder()
                 .setObjectType(objectType)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .setIsLatestObject(true)
@@ -214,7 +215,7 @@ public class SampleMetadata {
                         .setSnapIndex(0)
                         .addDeltas(DataDelta.newBuilder()
                         .setDeltaIndex(0)
-                        .setDataItem("data/table/" + UUID.randomUUID() + "/snap-0/delta-0-x123456")
+                        .setDataItem("data/table/" + UuidFactory.DEFAULT.allocate() + "/snap-0/delta-0-x123456")
                         .setDeltaTimestamp(MetadataCodec.encodeDatetime(Instant.now()))))
                         .build()))
 
@@ -450,13 +451,13 @@ public class SampleMetadata {
 
         var targetSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.MODEL)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
         var resultSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.RESULT)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
@@ -474,13 +475,13 @@ public class SampleMetadata {
 
         var jobSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.JOB)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
         var logFileSelector = TagSelector.newBuilder()
                 .setObjectType(ObjectType.FILE)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
@@ -608,7 +609,7 @@ public class SampleMetadata {
 
     public static ObjectDefinition nextCustomDef(ObjectDefinition origDef) {
 
-        var ver = UUID.randomUUID();
+        var ver = UuidFactory.DEFAULT.allocate();
         var jsonReportDef = "{ reportType: 'magic', mainGraph: { content: 'more_magic_" + ver + " ' } }";
 
         return origDef.toBuilder()

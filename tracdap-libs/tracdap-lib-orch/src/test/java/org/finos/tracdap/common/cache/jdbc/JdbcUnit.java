@@ -19,6 +19,7 @@ package org.finos.tracdap.common.cache.jdbc;
 
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.metadata.UuidFactory;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.extension.AfterAllCallback;
@@ -29,7 +30,6 @@ import javax.sql.DataSource;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Properties;
-import java.util.UUID;
 
 public class JdbcUnit implements BeforeAllCallback, AfterAllCallback {
 
@@ -42,7 +42,7 @@ public class JdbcUnit implements BeforeAllCallback, AfterAllCallback {
     @Override
     public void beforeAll(ExtensionContext context) throws Exception {
 
-        var dbId = UUID.randomUUID();
+        var dbId = UuidFactory.DEFAULT.allocate();
         var jdbcUrl = String.format(JDBC_URL_TEMPLATE, dbId);
 
         var properties = new Properties();

@@ -19,6 +19,7 @@ package org.finos.tracdap.common.cache;
 
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
 
@@ -31,7 +32,6 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Objects;
 import java.util.Random;
-import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.function.BiFunction;
 
@@ -52,7 +52,7 @@ public abstract class JobCacheTestSuite {
     @Test
     void lifecycle_createReadDelete() {
 
-        var key = UUID.randomUUID().toString();
+        var key = UuidFactory.DEFAULT.allocate().toString();
         var status = "status1";
         var value = new DummyState();
         value.intVar = 42;
@@ -87,7 +87,7 @@ public abstract class JobCacheTestSuite {
     @Test
     void lifecycle_createAndUpdate() {
 
-        var key = UUID.randomUUID().toString();
+        var key = UuidFactory.DEFAULT.allocate().toString();
         var status = "status1";
         var value = new DummyState();
         value.intVar = 42;
@@ -144,7 +144,7 @@ public abstract class JobCacheTestSuite {
         new Random().nextBytes(value.blobVar);
         value.objectId = TagHeader.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setObjectTimestamp(MetadataCodec.encodeDatetime(Instant.now()))
                 .setTagVersion(2)
@@ -152,7 +152,7 @@ public abstract class JobCacheTestSuite {
                 .build();
         value.exception = new CompletionException(new RuntimeException("out msg", new RuntimeException("inner msg")));
 
-        var key = UUID.randomUUID().toString();
+        var key = UuidFactory.DEFAULT.allocate().toString();
         var status = "status1";
 
         int revision;
@@ -185,7 +185,7 @@ public abstract class JobCacheTestSuite {
     @Test
     void lifecycle_transientValues() {
 
-        var key = UUID.randomUUID().toString();
+        var key = UuidFactory.DEFAULT.allocate().toString();
         var status = "status1";
         var value = new DummyState();
         value.intVar = 42;
@@ -2182,7 +2182,7 @@ public abstract class JobCacheTestSuite {
 
 
     private String newKey() {
-        return UUID.randomUUID().toString();
+        return UuidFactory.DEFAULT.allocate().toString();
     }
 
     private <T, U> void failToOpen(BiFunction<T, U, AutoCloseable> openFunc, T param1, U param2) throws Exception {

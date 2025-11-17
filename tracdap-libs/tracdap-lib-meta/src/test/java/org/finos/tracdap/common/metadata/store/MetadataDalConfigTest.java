@@ -20,6 +20,7 @@ package org.finos.tracdap.common.metadata.store;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.test.IMetadataStoreTest;
 import org.finos.tracdap.common.metadata.test.JdbcIntegration;
 import org.finos.tracdap.common.metadata.test.JdbcUnit;
@@ -36,7 +37,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 
 abstract class MetadataDalConfigTest implements IMetadataStoreTest {
@@ -71,14 +71,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -133,7 +133,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -163,7 +163,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -185,7 +185,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -234,7 +234,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -256,7 +256,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -287,7 +287,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -339,7 +339,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -424,14 +424,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -484,14 +484,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -555,14 +555,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -627,14 +627,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -707,14 +707,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -783,7 +783,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -841,7 +841,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -874,7 +874,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -938,7 +938,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -977,7 +977,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1022,7 +1022,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1058,7 +1058,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1110,7 +1110,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1164,7 +1164,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1210,7 +1210,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1268,7 +1268,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1301,7 +1301,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1365,7 +1365,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1404,7 +1404,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1449,14 +1449,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -1502,14 +1502,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -1564,14 +1564,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -1615,14 +1615,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true)
                 .build();
@@ -1690,7 +1690,7 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1725,14 +1725,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector1T2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
@@ -1788,14 +1788,14 @@ abstract class MetadataDalConfigTest implements IMetadataStoreTest {
 
         var selector1 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();
 
         var selector1T2 = TagSelector.newBuilder()
                 .setObjectType(ObjectType.CUSTOM)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setTagVersion(1)
                 .build();

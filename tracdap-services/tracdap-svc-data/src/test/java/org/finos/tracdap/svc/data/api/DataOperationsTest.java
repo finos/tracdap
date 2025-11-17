@@ -22,6 +22,7 @@ import org.finos.tracdap.common.data.DataContext;
 import org.finos.tracdap.common.async.Futures;
 import org.finos.tracdap.common.data.IExecutionContext;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
@@ -46,7 +47,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.UUID;
 import java.util.Vector;
 
 import static org.finos.tracdap.common.metadata.MetadataUtil.selectorFor;
@@ -449,7 +449,7 @@ abstract class DataOperationsTest {
 
         var notASchemaId = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true);
 
@@ -499,7 +499,7 @@ abstract class DataOperationsTest {
 
         var unknownSchemaId = TagSelector.newBuilder()
                 .setObjectType(ObjectType.SCHEMA)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setObjectVersion(1)
                 .setLatestTag(true);
 
@@ -1049,7 +1049,7 @@ abstract class DataOperationsTest {
 
         var missingDataId = TagSelector.newBuilder()
                 .setObjectType(ObjectType.DATA)
-                .setObjectId(UUID.randomUUID().toString())
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
                 .setLatestObject(true)
                 .setLatestTag(true);
 
@@ -2223,7 +2223,7 @@ abstract class DataOperationsTest {
     @Test
     void readDataset_selectorIdNotFound() throws Exception {
 
-        var objId = UUID.randomUUID().toString();  // non-existent object ID to look for
+        var objId = UuidFactory.DEFAULT.allocate().toString();  // non-existent object ID to look for
 
         var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
         waitFor(TEST_TIMEOUT, createDataset);
