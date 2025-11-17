@@ -31,6 +31,10 @@ public class LayoutItem {
     private final int snap;
     private final int delta;
 
+    private final String mimeType;
+    private final String extension;
+
+
     public static LayoutItem forFile(TagHeader header, FileDefinition file) {
         return new LayoutItem(header, file);
     }
@@ -47,6 +51,9 @@ public class LayoutItem {
         this.part = null;
         this.snap = 0;
         this.delta = 0;
+
+        this.mimeType = file.getMimeType();
+        this.extension = file.getExtension();
     }
 
     public static LayoutItem forPriorFile(FileDefinition file, StorageDefinition storage) {
@@ -65,18 +72,23 @@ public class LayoutItem {
         this.part = null;
         this.snap = 0;
         this.delta = 0;
+
+        this.mimeType = null;
+        this.extension = null;
     }
 
     public static LayoutItem forData(
             TagHeader header, DataDefinition data, SchemaDefinition schema,
-            PartKey part, int snap, int delta) {
+            PartKey part, int snap, int delta,
+            String mimeType, String extension) {
 
-        return new LayoutItem(header, data, schema, part, snap, delta);
+        return new LayoutItem(header, data, schema, part, snap, delta, mimeType, extension);
     }
 
     private LayoutItem(
             TagHeader header, DataDefinition data, SchemaDefinition schema,
-            PartKey part, int snap, int delta) {
+            PartKey part, int snap, int delta,
+            String mimeType, String extension) {
 
         this.header = header;
 
@@ -88,6 +100,9 @@ public class LayoutItem {
         this.part = part;
         this.snap = snap;
         this.delta = delta;
+
+        this.mimeType = mimeType;
+        this.extension = extension;
     }
 
     public static LayoutItem forPriorData(DataDefinition data, SchemaDefinition schema, StorageDefinition storage) {
@@ -106,6 +121,9 @@ public class LayoutItem {
         this.part = null;
         this.snap = 0;
         this.delta = 0;
+
+        this.mimeType = null;
+        this.extension = null;
     }
 
     public TagHeader header() {
@@ -138,5 +156,13 @@ public class LayoutItem {
 
     public int delta() {
         return delta;
+    }
+
+    public String mimeType() {
+        return mimeType;
+    }
+
+    public String extension() {
+        return extension;
     }
 }
