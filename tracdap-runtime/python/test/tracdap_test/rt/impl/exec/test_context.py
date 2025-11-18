@@ -23,10 +23,10 @@ import pandas as pd
 import tracdap.rt.api as _api
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.static_api as _api_hook  # noqa
-import tracdap.rt._impl.core.type_system as _types  # noqa
+import tracdap.rt._impl.core.metadata as _meta  # noqa
 import tracdap.rt._impl.core.data as _data  # noqa
 import tracdap.rt._impl.core.network as _net  # noqa
-import tracdap.rt._impl.core.config_parser as _cfg  # noqa
+import tracdap.rt._impl.core.config as _cfg  # noqa
 
 from tracdap.rt._impl.exec.context import TracContextImpl, TracExternalSystemWrapper  # noqa
 
@@ -105,7 +105,7 @@ class TracContextTest(unittest.TestCase):
         }
 
         params = {
-            k: _types.MetadataCodec.encode_value(v)
+            k: _meta.MetadataCodec.encode_value(v)
             for k, v in native_params.items()}
 
         customer_loans_schema = _test_model_def.inputs.get("customer_loans").schema
