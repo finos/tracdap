@@ -20,12 +20,11 @@ import io
 import typing as tp
 
 import tracdap.rt.metadata as _meta
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.actors as _actors
 import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.exec.functions as _func
-import tracdap.rt._impl.core.config_parser as _cfg_p
+import tracdap.rt._impl.core.config as _cfg
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.resources as _resources
@@ -194,7 +193,7 @@ class TracEngine(_actors.Actor):
 
         job_logs_enabled = _util.read_property(
             job_config.properties,
-            _cfg_p.ConfigKeys.RESULT_LOGS_ENABLED,
+            _cfg.ConfigKeys.RESULT_LOGS_ENABLED,
             False, bool)
 
         job_log = _JobLog(log_file_needed=job_logs_enabled)
@@ -323,7 +322,7 @@ class TracEngine(_actors.Actor):
 
         result_enabled = _util.read_property(
             job_state.job_config.properties,
-            _cfg_p.ConfigKeys.RESULT_ENABLED,
+            _cfg.ConfigKeys.RESULT_ENABLED,
             False, bool)
 
         # Record output metadata if required
@@ -346,10 +345,10 @@ class TracEngine(_actors.Actor):
 
         self._log.info(f"Saving job result for [{job_key}]")
 
-        storage_key = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_STORAGE_LOCATION)
-        storage_path = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_STORAGE_PATH)
-        result_format = _util.read_property(job_state.job_config.properties, _cfg_p.ConfigKeys.RESULT_FORMAT, "JSON")
-        result_content = _cfg_p.ConfigQuoter.quote(job_state.job_result, result_format)
+        storage_key = _util.read_property(job_state.job_config.properties, _cfg.ConfigKeys.RESULT_STORAGE_LOCATION)
+        storage_path = _util.read_property(job_state.job_config.properties, _cfg.ConfigKeys.RESULT_STORAGE_PATH)
+        result_format = _util.read_property(job_state.job_config.properties, _cfg.ConfigKeys.RESULT_FORMAT, "JSON")
+        result_content = _cfg.ConfigQuoter.quote(job_state.job_result, result_format)
 
         storage = self._resources.get_storage().get_file_storage(storage_key)
         storage.write_bytes(storage_path, result_content.encode('utf-8'))

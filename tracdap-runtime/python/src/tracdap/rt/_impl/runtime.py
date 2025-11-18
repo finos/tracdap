@@ -27,9 +27,8 @@ import typing as tp
 
 import tracdap.rt as _rt
 import tracdap.rt.api as _api
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.core.config_parser as _cparse
+import tracdap.rt._impl.core.config as _cfg
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.models as _models
@@ -106,7 +105,7 @@ class TracRuntime:
         self._oneshot_job = None
 
         # Top level resources
-        self._config_mgr: tp.Optional[_cparse.ConfigManager] = None
+        self._config_mgr: tp.Optional[_cfg.ConfigManager] = None
         self._repos: tp.Optional[_repos] = None
         self._models: tp.Optional[_models.ModelLoader] = None
         self._storage: tp.Optional[_storage.StorageManager] = None
@@ -157,7 +156,7 @@ class TracRuntime:
             # Load sys config (or use embedded), config errors are detected before start()
             # Job config can also be checked before start() by using load_job_config()
 
-            self._config_mgr = _cparse.ConfigManager.for_root_config(self._sys_config_path)
+            self._config_mgr = _cfg.ConfigManager.for_root_config(self._sys_config_path)
 
             if self._sys_config is None:
                 sys_config_dev_mode = _dev_mode.DEV_MODE_SYS_CONFIG if self._dev_mode else None
