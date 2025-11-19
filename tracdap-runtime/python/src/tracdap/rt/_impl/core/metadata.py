@@ -19,7 +19,17 @@ import datetime as dt
 
 import tracdap.rt.exceptions as _ex
 
+# In Python 3.10, submodules are imported by default and overwrite Python builtins!
+# The issue is fixed in 3.11, in the meantime this workaround is required
+
+__TYPE = type
+__OBJECT = object
+
 from tracdap.rt.metadata import *
+
+type = __TYPE  # noqa
+object = __OBJECT  # noqa
+
 
 
 class MetadataTypes:
