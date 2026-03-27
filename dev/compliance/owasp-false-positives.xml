@@ -301,4 +301,10 @@
         <cve>CVE-2024-35255</cve>
     </suppress>
 
+    <!-- New CVE, no fix available yet -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/arrow-.*@.*$</packageUrl>
+        <cve>CVE-2026-25087</cve>
+    </suppress>
+
 </suppressions>

@@ -16,11 +16,13 @@
 ALLOWED_LICENSES="Apache Software License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache 2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-2-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache License 2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT No Attribution License (MIT-0)"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD License"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-2-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};3-Clause BSD License;"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Python Software Foundation License"
@@ -31,6 +33,8 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 # Some packages specify dual licensing as a string with both licenses
 # The license checker can't separate them out, so they are listed here
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND PSF-2.0"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MPL-2.0 AND MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND CNRI-Python"
@@ -61,3 +65,6 @@ IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"
 # https://github.com/pallets/click/?tab=BSD-3-Clause-1-ov-file#readme
 
 IGNORE_LICENSE="${IGNORE_LICENSE} click"
+
+# The license for google crc32c, which we support, is incorrectly specified.
+IGNORE_LICENSE="${IGNORE_LICENSE} google-crc32c"
