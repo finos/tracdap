@@ -12,7 +12,7 @@ pyarrow == 22.0.0
 
 # Core protobuf support for metadata / config classes
 # This should match the Java Protobuf version, if possible
-protobuf == 7.34.1
+protobuf == 6.33.6
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.3
