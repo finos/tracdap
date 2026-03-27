@@ -63,3 +63,6 @@ IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"
 # https://github.com/pallets/click/?tab=BSD-3-Clause-1-ov-file#readme
 
 IGNORE_LICENSE="${IGNORE_LICENSE} click"
+
+# The license for google crc32c, which we support, is incorrectly specified.
+IGNORE_LICENSE="${IGNORE_LICENSE} google-crc32c"
