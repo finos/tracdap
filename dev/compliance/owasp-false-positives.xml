@@ -303,7 +303,7 @@
 
     <!-- New CVE, no fix available yet -->
     <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/arrow-*@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/arrow-.*@.*$</packageUrl>
         <cve>CVE-2026-25087</cve>
     </suppress>
 
