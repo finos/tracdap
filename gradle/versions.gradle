@@ -34,7 +34,7 @@ ext {
     gapi_version = '2.60.0'
 
     // Data technologies
-    arrow_version = '19.0.0'
+    arrow_version = '18.3.0'
     jackson_version = '2.19.2'
     jackson_databind_version = '2.19.2'
 
