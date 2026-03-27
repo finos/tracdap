@@ -31,6 +31,7 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 # Some packages specify dual licensing as a string with both licenses
 # The license checker can't separate them out, so they are listed here
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND PSF-2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND CNRI-Python"
