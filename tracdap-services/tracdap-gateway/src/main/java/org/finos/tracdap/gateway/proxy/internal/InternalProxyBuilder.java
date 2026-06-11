@@ -21,6 +21,7 @@ import io.netty.channel.ChannelDuplexHandler;
 import org.finos.tracdap.common.exception.ENetworkHttp;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.LoggingHelpers;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RouteConfig;
 import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 
@@ -42,17 +43,19 @@ public class InternalProxyBuilder extends ChannelInitializer<Channel> {
     private final RouteConfig routeConfig;
     private final ChannelDuplexHandler routerLink;
     private final HttpProtocol httpProtocol;
+    private final PlatformConfig platformConfig;
 
     private final int connId;
 
     public InternalProxyBuilder(
             RouteConfig routeConfig, ChannelDuplexHandler routerLink,
-            int connId, HttpProtocol httpProtocol) {
+            int connId, HttpProtocol httpProtocol, PlatformConfig platformConfig) {
 
         this.httpProtocol = httpProtocol;
         this.routeConfig = routeConfig;
         this.routerLink = routerLink;
         this.connId = connId;
+        this.platformConfig = platformConfig;
     }
 
     @Override
@@ -96,6 +99,9 @@ public class InternalProxyBuilder extends ChannelInitializer<Channel> {
 
         if (targetProtocol.equals(HealthCheckHandler.PROTOCOL)) {
             targetPipeline.addLast(new HealthCheckHandler(httpProtocol, connId));
+        }
+        else if (targetProtocol.equals(AvailabilityHandler.PROTOCOL)) {
+            targetPipeline.addLast(new AvailabilityHandler(httpProtocol, connId, platformConfig));
         }
         else {
             var message = String.format("Internal protocol [%s] is not supported", targetProtocol);

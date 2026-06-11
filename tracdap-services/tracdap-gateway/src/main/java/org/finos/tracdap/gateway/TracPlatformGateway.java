@@ -77,6 +77,7 @@ public class TracPlatformGateway extends TracServiceBase {
     private final ConfigManager configManager;
 
     private ServiceConfig serviceConfig;
+    private PlatformConfig platformConfig;
 
     private EventLoopGroup bossGroup = null;
     private EventLoopGroup workerGroup = null;
@@ -103,7 +104,7 @@ public class TracPlatformGateway extends TracServiceBase {
         try {
             log.info("Preparing gateway config...");
 
-            var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
+            platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
             serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.GATEWAY_SERVICE_KEY);
             proxyPort = (short) serviceConfig.getPort();
 
@@ -246,7 +247,7 @@ public class TracPlatformGateway extends TracServiceBase {
     }
 
     private ChannelHandler httpHandler() {
-        return new Http1Router(routes, redirects, connId.getAndIncrement());
+        return new Http1Router(routes, redirects, connId.getAndIncrement(), platformConfig);
     }
 
     private ChannelHandler websocketHandler() {
