@@ -44,7 +44,7 @@ import java.util.concurrent.TimeUnit;
 
 public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
 
-    public static final String PROTOCOL = "available";
+    public static final String PROTOCOL = "availablez";
 
     private static final int PROBE_TIMEOUT_MS = 2000;
     private static final int TOTAL_TIMEOUT_S = 5;
