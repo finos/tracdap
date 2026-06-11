@@ -77,7 +77,8 @@ public class ProtocolNegotiator extends ChannelInitializer<SocketChannel> {
 
         var pipeline = channel.pipeline();
 
-        var httpCodec = new HttpServerCodec();
+        // Disable strict CRLF enforcement (new default in Netty 4.1.135) for compatibility with Java 11 HttpClient h2c upgrades
+        var httpCodec = new HttpServerCodec(new HttpDecoderConfig().setStrictLineParsing(false));
         var http1Init = new Http1Initializer();
 
         // Upgrade factory, gives out upgrade codec if HTTP upgrade is requested
