@@ -187,7 +187,7 @@ jobs:
     timeout-minutes: 20
 
     container:
-      image: ubuntu:latest
+      image: ubuntu:24.04
 
     services:
 
