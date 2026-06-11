@@ -43,7 +43,7 @@ def calculate_profit_by_region(
     customer_loans["gross_profit"] = customer_loans["gross_profit_weighted"] * decimal.Decimal(eur_usd_rate)
 
     profit_by_region = customer_loans \
-        .groupby("region", as_index=False) \
+        .groupby("region", as_index=False, observed=False) \
         .aggregate({"gross_profit": lambda x: sum(x)})
 
     return profit_by_region
