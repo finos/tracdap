@@ -25,8 +25,10 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 try:
+    import numpy
     import pandas  # noqa
 except ModuleNotFoundError:
+    numpy = None
     pandas = None
 
 try:
@@ -667,9 +669,9 @@ if pandas is not None:
             pa.uint16(): pandas.UInt16Dtype(),
             pa.uint32(): pandas.UInt32Dtype(),
             pa.uint64(): pandas.UInt64Dtype(),
-            pa.float16(): pandas.Float32Dtype(),
-            pa.float32(): pandas.Float32Dtype(),
-            pa.float64(): pandas.Float64Dtype(),
+            pa.float16(): numpy.float32,
+            pa.float32(): numpy.float32,
+            pa.float64(): numpy.float64,
             pa.string(): pandas.StringDtype(),
             pa.utf8(): pandas.StringDtype()
         }
