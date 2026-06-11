@@ -35,6 +35,7 @@ import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -54,11 +55,13 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
     private final HttpProtocol httpProtocol;
     private final long connId;
     private final PlatformConfig platformConfig;
+    private final SocketAddress remoteAddress;
 
-    public AvailabilityHandler(HttpProtocol httpProtocol, long connId, PlatformConfig platformConfig) {
+    public AvailabilityHandler(HttpProtocol httpProtocol, long connId, PlatformConfig platformConfig, SocketAddress remoteAddress) {
         this.httpProtocol = httpProtocol;
         this.connId = connId;
         this.platformConfig = platformConfig;
+        this.remoteAddress = remoteAddress;
     }
 
     @Override
@@ -90,6 +93,15 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
 
         if (method != HttpMethod.GET)
             throw new ETracInternal("Invalid HTTP method for availability check: " + method);
+
+        if (!isLocalhost(remoteAddress)) {
+            var response = new DefaultFullHttpResponse(
+                    request.protocolVersion(), HttpResponseStatus.FORBIDDEN,
+                    Unpooled.EMPTY_BUFFER, new DefaultHttpHeaders().addInt(HttpHeaderNames.CONTENT_LENGTH, 0),
+                    new DefaultHttpHeaders());
+            ctx.writeAndFlush(response);
+            return;
+        }
 
         var responseBody = checkAvailability();
         var responseBytes = responseBody.getBytes(StandardCharsets.UTF_8);
@@ -164,5 +176,15 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
             log.debug("Service [{}] probe failed: {}", serviceKey, e.getMessage());
             return false;
         }
+    }
+
+    private static boolean isLocalhost(SocketAddress address) {
+
+        if (address instanceof InetSocketAddress) {
+            var inetAddr = ((InetSocketAddress) address).getAddress();
+            return inetAddr != null && inetAddr.isLoopbackAddress();
+        }
+
+        return false;
     }
 }
