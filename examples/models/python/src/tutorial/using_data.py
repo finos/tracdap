@@ -44,7 +44,7 @@ def calculate_profit_by_region(
 
     profit_by_region = customer_loans \
         .groupby("region", as_index=False) \
-        .aggregate({"gross_profit": "sum"})
+        .aggregate({"gross_profit": lambda x: sum(x)})
 
     return profit_by_region
 
