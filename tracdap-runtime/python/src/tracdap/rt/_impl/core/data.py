@@ -625,7 +625,7 @@ if pandas is not None:
         __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
         __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
 
-        if __PANDAS_MAJOR_VERSION == 2:
+        if __PANDAS_MAJOR_VERSION >= 2:
 
             __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
             __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
