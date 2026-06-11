@@ -25,10 +25,8 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 try:
-    import numpy
     import pandas  # noqa
 except ModuleNotFoundError:
-    numpy = None
     pandas = None
 
 try:
@@ -669,9 +667,9 @@ if pandas is not None:
             pa.uint16(): pandas.UInt16Dtype(),
             pa.uint32(): pandas.UInt32Dtype(),
             pa.uint64(): pandas.UInt64Dtype(),
-            pa.float16(): numpy.float32,
-            pa.float32(): numpy.float32,
-            pa.float64(): numpy.float64,
+            pa.float16(): pandas.Float32Dtype(),
+            pa.float32(): pandas.Float32Dtype(),
+            pa.float64(): pandas.Float64Dtype(),
             pa.string(): pandas.StringDtype(),
             pa.utf8(): pandas.StringDtype()
         }
@@ -703,7 +701,7 @@ if pandas is not None:
                 DataConformance.check_duplicate_fields(table.schema.names, False)
 
                 # Use Arrow's built-in function to convert to Pandas
-            return table.to_pandas(
+            df = table.to_pandas(
 
                 # Mapping for arrow -> pandas types for core types
                 types_mapper=self.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
@@ -718,6 +716,16 @@ if pandas is not None:
                 # Do not consolidate memory across columns when preparing the Pandas vectors
                 # This is a significant performance win for very wide datasets
                 split_blocks=True)  # noqa
+
+            # In pandas 3.x, Float64Dtype stores NaN as pd.NA, losing the NaN/null distinction.
+            # For float columns that contain actual NaN values (not null), restore them as
+            # Python float objects so None (null) and float('nan') remain distinguishable.
+            if self.__PANDAS_MAJOR_VERSION >= 3:
+                for i, field in enumerate(table.schema):
+                    if pa.types.is_floating(field.type) and pc.any(pc.is_nan(table.column(i))).as_py():
+                        df[field.name] = table.column(i).to_pylist()
+
+            return df
 
         def to_internal(self, df: pandas.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
