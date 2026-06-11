@@ -301,7 +301,8 @@ public class Http1Router extends CoreRouter {
 
                 return new InternalProxyBuilder(
                         routeConfig.getConfig(), link, connId,
-                        HttpProtocol.HTTP_1_1, platformConfig);
+                        HttpProtocol.HTTP_1_1, platformConfig,
+                        ctx.channel().remoteAddress());
 
             case HTTP:
 
