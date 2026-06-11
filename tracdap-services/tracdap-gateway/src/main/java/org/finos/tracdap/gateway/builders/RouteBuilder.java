@@ -38,8 +38,8 @@ public class RouteBuilder {
     public static final String HEALTH_CHECK_PATH = "/healthz";
 
     public static final String AVAILABLE_NAME = "Service Availability";
-    public static final String AVAILABLE_KEY = "available";
-    public static final String AVAILABLE_PATH = "/available";
+    public static final String AVAILABLE_KEY = "availablez";
+    public static final String AVAILABLE_PATH = "/availablez";
 
     private static final Logger log = LoggerFactory.getLogger(RouteBuilder.class);
 
