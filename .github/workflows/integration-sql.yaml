@@ -227,6 +227,9 @@ jobs:
         run: |
           sed -i "s#DB_SECRET#${DB_SECRET}#" ${TRAC_RT_SYS_CONFIG}
 
+      - name: Install system dependencies
+        run: apt-get update && apt-get install -y libffi8
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

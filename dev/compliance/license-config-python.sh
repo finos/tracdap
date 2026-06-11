@@ -61,3 +61,9 @@ IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"
 # https://github.com/pallets/click/?tab=BSD-3-Clause-1-ov-file#readme
 
 IGNORE_LICENSE="${IGNORE_LICENSE} click"
+
+# google-crc32c is a BSD-3-Clause licensed package pulled in as a GCP SDK transitive dependency
+# pip-licenses reports its license as UNKNOWN due to a non-standard metadata declaration
+# https://github.com/googleapis/python-crc32c
+
+IGNORE_LICENSE="${IGNORE_LICENSE} google-crc32c"
