@@ -139,12 +139,16 @@ jobs:
 
       # CVE-2019-8341 (safety id: 70612) is a vulnerability in the latest version of Jinja2, no fix is available
       # It is only pulled in as a dependency of safety check itself, it is not a dependency of the dist wheels
+      #
+      # CVE-2026-0994 (safety id: 85151) in protobuf and CVE-2026-25087 (safety id: SFTY-20260217-93940) in
+      # pyarrow / Arrow C++ are both suppressed on the Java side of the platform (dev/compliance/owasp-false-positives.xml).
+      # They are not applicable to the way TRAC uses these libraries, so they are ignored here for consistency.
       - name: Safety check
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd tracdap-runtime/python
-          safety check --ignore 70612 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --ignore 70612 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
+          safety check --ignore 70612 --ignore 85151 --ignore SFTY-20260217-93940 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --ignore 70612 --ignore 85151 --ignore SFTY-20260217-93940 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
