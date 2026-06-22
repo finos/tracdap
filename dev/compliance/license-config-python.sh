@@ -38,6 +38,10 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-2-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND CNRI-Python"
 
+# tqdm is dual-licensed MPL-2.0 and MIT (we are relying on the MIT terms)
+# MPL-2.0 is file-level copyleft and safe to consume as a dependency
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MPL-2.0 AND MIT"
+
 # Dual licensing for Dulwich is Apache or GPL (we are choosing Apache)
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR GPL-2.0-or-later"
 
