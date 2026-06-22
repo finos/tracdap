@@ -301,4 +301,45 @@
         <cve>CVE-2024-35255</cve>
     </suppress>
 
+    <!-- CVE-2026-25087: Apache Arrow vulnerability, no fix available at time of writing -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/.*@.*$</packageUrl>
+        <cve>CVE-2026-25087</cve>
+    </suppress>
+
+    <!-- CVE-2026-33117: Azure SDK for Java, no fix available at time of writing -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.azure/.*@.*$</packageUrl>
+        <cve>CVE-2026-33117</cve>
+    </suppress>
+
+    <!-- CVE-2026-34477, CVE-2026-34478, CVE-2026-34479, CVE-2026-34480, CVE-2025-68161: Log4j 2.x -->
+    <!-- No fix available at time of writing -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.logging\.log4j/.*@.*$</packageUrl>
+        <cve>CVE-2026-34477</cve>
+        <cve>CVE-2026-34478</cve>
+        <cve>CVE-2026-34479</cve>
+        <cve>CVE-2026-34480</cve>
+        <cve>CVE-2025-68161</cve>
+    </suppress>
+
+    <!-- CVE-2026-42582: Netty 4.1.x, no fix available at time of writing -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@.*$</packageUrl>
+        <cve>CVE-2026-42582</cve>
+    </suppress>
+
+    <!-- CVE-2026-42198: PostgreSQL JDBC driver, no fix available at time of writing -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@.*$</packageUrl>
+        <cve>CVE-2026-42198</cve>
+    </suppress>
+
+    <!-- CVE-2026-0994: protobuf-java, no fix available at time of writing -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf\-java.*@.*$</packageUrl>
+        <cve>CVE-2026-0994</cve>
+    </suppress>
+
 </suppressions>
