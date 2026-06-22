@@ -77,6 +77,11 @@ packaging >= 23.0
 
 safety >= 3.6.0
 
+# Authlib 1.7 deprecated authlib.jose in favour of joserfc and breaks the
+# "from authlib.jose.errors import ExpiredTokenError" import that safety relies on.
+# Pin below 1.7 until safety migrates to joserfc.
+authlib < 1.7
+
 # Thsi project is the successor of the original pip-licenses tool
 # https://github.com/raimon49/pip-licenses/issues/227#issuecomment-3050082147
 pip-licenses-cli >= 1.4, < 2.0
