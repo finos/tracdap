@@ -86,6 +86,35 @@ class CoreJobsTest(unittest.TestCase):
                 rt.submit_job(job_config)
                 rt.wait_for_job(job_id)
 
+    def test_import_model_job_new_version(self):
+
+        prior_model_id = util.new_object_id(meta.ObjectType.MODEL)
+        prior_model_selector = util.selector_for(prior_model_id)
+
+        job_id = util.new_object_id(meta.ObjectType.JOB)
+
+        job_def = meta.JobDefinition(
+            jobType=meta.JobType.IMPORT_MODEL,
+            importModel=meta.ImportModelJob(
+                language="python",
+                repository="unit_test_repo",
+                package="trac-example-models",
+                version=self.commit_hash,
+                entryPoint="tutorial.using_data.PnlAggregation",
+                path="examples/models/python/src",
+                priorModel=prior_model_selector))
+
+        job_config = cfg.JobConfig(job_id, job_def)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+
+            trac_runtime = runtime.TracRuntime(self.sys_config, scratch_dir=tmpdir)
+            trac_runtime.pre_start()
+
+            with trac_runtime as rt:
+                rt.submit_job(job_config)
+                rt.wait_for_job(job_id)
+
     def test_run_model_job(self):
 
         job_id, job_config = self._build_run_model_job_config()
