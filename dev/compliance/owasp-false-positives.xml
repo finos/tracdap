@@ -342,4 +342,14 @@
         <cve>CVE-2026-0994</cve>
     </suppress>
 
+    <!-- CVE-2026-54515: jackson-databind case-insensitive deserialization can bypass per-property -->
+    <!-- @JsonIgnoreProperties. Fixed in 2.21.5, which is not yet published to Maven Central; the next -->
+    <!-- available release (2.22.0) is also affected per NVD. TRAC does not use @JsonIgnoreProperties -->
+    <!-- or polymorphic / default typing, so this is not reachable in our usage. -->
+    <!-- Time-boxed: remove this suppression and bump jackson-databind to 2.21.5+ once it is released. -->
+    <suppress until="2026-08-15Z">
+        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
+        <cve>CVE-2026-54515</cve>
+    </suppress>
+
 </suppressions>
