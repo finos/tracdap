@@ -32,7 +32,7 @@ public class JsonBigIntConsumer extends BaseJsonConsumer<BigIntVector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        long value = parser.getLongValue();
+        long value = JsonParsing.parseLong(parser);
         vector.set(currentIndex++, value);
         return true;
     }

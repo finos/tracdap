@@ -33,7 +33,7 @@ public class JsonUInt4Consumer extends BaseJsonConsumer<UInt4Vector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        long value = parser.getLongValue();
+        long value = JsonParsing.parseLong(parser);
 
         if (value < 0 || value > 0xFFFFFFFFL) {
             throw new EDataCorruption("Value out of range for UINT4: " + value);
