@@ -17,8 +17,11 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
+import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.metadata.ImportModelJob;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
@@ -106,6 +109,78 @@ public abstract class ImportModelTest {
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
+    }
+
+    @Test
+    void importModelAsNewVersion() throws Exception {
+
+        log.info("Running IMPORT_MODEL job as new version...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.schema_files.PnlAggregationSchemas")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("import_model_as_new_version:schema_files"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("import_model_as_new_version:schema_files"))
+                .build());
+
+        // Import version 1
+        var modelV1Tag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelV1Header = modelV1Tag.getHeader();
+        Assertions.assertEquals(1, modelV1Header.getObjectVersion());
+
+        // Import version 2 — same entry point, priorModel set to v1
+        var orchClient = platform.orchClientBlocking();
+        var metaClient = platform.metaClientBlocking();
+
+        var importModelV2 = ImportModelJob.newBuilder()
+                .setLanguage(modelStub.getLanguage())
+                .setRepository(modelStub.getRepository())
+                .setPath(modelStub.getPath())
+                .setEntryPoint(modelStub.getEntryPoint())
+                .setVersion(modelStub.getVersion())
+                .setPriorModel(MetadataUtil.selectorFor(modelV1Header))
+                .addAllModelAttrs(modelAttrs)
+                .build();
+
+        var jobV2Request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_MODEL)
+                        .setImportModel(importModelV2))
+                .addAllJobAttrs(jobAttrs)
+                .build();
+
+        var jobV2Id = Helpers.startJob(orchClient, jobV2Request).getJobId();
+        Helpers.waitForJob(orchClient, TEST_TENANT, jobV2Id);
+
+        // Read version 2 directly and verify it is a new version of the same object
+        var v2Selector = TagSelector.newBuilder()
+                .setObjectType(ObjectType.MODEL)
+                .setObjectId(modelV1Header.getObjectId())
+                .setObjectVersion(2)
+                .setLatestTag(true)
+                .build();
+
+        var modelV2Tag = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(v2Selector)
+                .build());
+
+        Assertions.assertEquals(modelV1Header.getObjectId(), modelV2Tag.getHeader().getObjectId());
+        Assertions.assertEquals(2, modelV2Tag.getHeader().getObjectVersion());
+        Assertions.assertEquals(modelStub.getEntryPoint(), modelV2Tag.getDefinition().getModel().getEntryPoint());
     }
 
     // Let other tests in this suite use this to import models
