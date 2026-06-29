@@ -35,8 +35,11 @@ ext {
 
     // Data technologies
     arrow_version = '18.3.0'
-    jackson_version = '2.19.2'
-    jackson_databind_version = '2.19.2'
+    jackson_version = '2.21.4'
+    jackson_databind_version = '2.21.4'
+    // jackson-annotations versions independently of core/databind and dropped its
+    // patch number from Jackson 2.20 onwards (see jackson-bom), so it is 2.21 not 2.21.4
+    jackson_annotations_version = '2.21'
 
     // Util libraries
     slf4j_version = '2.0.17'

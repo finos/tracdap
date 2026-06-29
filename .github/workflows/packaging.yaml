@@ -362,6 +362,11 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: tracdap_python_dist/
+          # Skip any distributions already present on PyPI rather than failing the
+          # whole upload. This makes the publish idempotent and lets a re-run (or a
+          # release that re-publishes some unchanged packages) complete instead of
+          # aborting on the first "file already exists" error.
+          skip-existing: true
 
   publish_to_npm:
 

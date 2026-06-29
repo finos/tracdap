@@ -37,7 +37,7 @@ public class JsonUInt8Consumer extends BaseJsonConsumer<UInt8Vector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        BigInteger value = parser.getBigIntegerValue();
+        BigInteger value = JsonParsing.parseBigInteger(parser);
 
         if (value.compareTo(MIN_VALUE) < 0 || value.compareTo(MAX_UINT64) > 0) {
             throw new EDataCorruption("Value out of range for UINT8: " + value);
