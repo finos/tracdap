@@ -202,7 +202,11 @@ jobs:
       - name: Build runtime package
         env:
           TRAC_PYTHON_BUILD_ISOLATION: false
-        run: python tracdap-runtime/python/build_runtime.py --target dist ext
+        # Build only the extension plugins that we publish.
+        # The "pypi" plugin (tracdap-ext-pypi) is intentionally excluded from publishing.
+        # Its source and tests remain in the repo and are still built/tested elsewhere
+        # (build.yaml, integration.yaml); it is simply not packaged for release.
+        run: python tracdap-runtime/python/build_runtime.py --target dist ext --plugin git http openai
 
       - name: Save artifacts
         uses: actions/upload-artifact@v4
