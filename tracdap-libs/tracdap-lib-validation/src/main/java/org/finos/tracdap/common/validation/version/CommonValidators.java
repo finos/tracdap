@@ -71,6 +71,22 @@ public class CommonValidators {
         return ctx;
     }
 
+    public static ValidationContext mustChange(Object current, Object prior, ValidationContext ctx) {
+
+        var equal = Objects.equals(prior, current);
+
+        if (equal) {
+
+            var err = String.format(
+                    "Value of [%s] must change between versions: prior = [%s], new = [%s]",
+                    ctx.fieldName(), displayValue(prior), displayValue(current));
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
     public static ValidationContext equalOrGreater(Integer current, Integer prior, ValidationContext ctx) {
 
         if (current < prior) {

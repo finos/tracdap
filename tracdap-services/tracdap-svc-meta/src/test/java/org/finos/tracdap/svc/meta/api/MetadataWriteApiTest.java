@@ -786,7 +786,8 @@ abstract class MetadataWriteApiTest {
         var CHANGING_ATTRS = List.of(
                 "trac_schema_field_count",
                 "trac_file_name",
-                "trac_file_size");
+                "trac_file_size",
+                "trac_model_version");
 
         for (var attr : expectedTag.getAttrsMap().keySet()) {
 
@@ -837,6 +838,37 @@ abstract class MetadataWriteApiTest {
     @Test
     void updateObject_badVersionIncrememnt() {
 
+        // Attempt to create a new version from a prior that is no longer the latest.
+        // After v1 → v2 succeeds, v1 is superseded (isLatestObject = false).
+        // Trying to write v3 using v1 as the prior must be rejected before the store is touched.
+
+        var v1SavedTag = updateObject_prepareV1(ObjectType.CUSTOM);
+        var v1Selector = selectorForTag(v1SavedTag);
+
+        var v2Obj = SampleMetadata.dummyVersionForType(v1SavedTag.getDefinition());
+        var v2WriteRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v2Obj)
+                .build();
+
+        assertDoesNotThrow(() -> internalApi.updateObject(v2WriteRequest));
+
+        // v1 is now superseded — any attempt to use it as a prior must be rejected
+        var v3Obj = SampleMetadata.dummyVersionForType(v2Obj);
+        var v3FromV1Request = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setPriorVersion(v1Selector)
+                .setDefinition(v3Obj)
+                .build();
+
+        var error = assertThrows(StatusRuntimeException.class, () -> internalApi.updateObject(v3FromV1Request));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+
+        var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v3FromV1Request));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     // For the remaining corner and error cases around versions, we use the CUSTOM object type
@@ -1037,13 +1069,15 @@ abstract class MetadataWriteApiTest {
 
         assertDoesNotThrow(() -> internalApi.updateObject(v2WriteRequest));
 
-        // Trying to create V2 a second time is an error
+        // Trying to create V2 a second time is an error — v1 is now superseded so the
+        // prior-must-be-latest guard fires before the store is touched (FAILED_PRECONDITION,
+        // not ALREADY_EXISTS from the store)
 
         var error = assertThrows(StatusRuntimeException.class, () -> internalApi.updateObject(v2WriteRequest));
-        assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
 
         var error2 = assertThrows(StatusRuntimeException.class, () -> publicApi.updateObject(v2WriteRequest));
-        assertEquals(Status.Code.ALREADY_EXISTS, error2.getStatus().getCode());
+        assertEquals(Status.Code.FAILED_PRECONDITION, error2.getStatus().getCode());
     }
 
     @Test

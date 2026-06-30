@@ -32,6 +32,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,12 +136,14 @@ public abstract class ImportModelTest {
                 .setValue(MetadataCodec.encodeValue("import_model_as_new_version:schema_files"))
                 .build());
 
-        // Import version 1
-        var modelV1Tag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        // Import version 1 — use the prior commit so v1 and v2 have distinct commit SHAs
+        var priorCommit = GitHelpers.getPriorCommit();
+        var modelV1Stub = modelStub.toBuilder().setVersion(priorCommit).build();
+        var modelV1Tag = Helpers.doModelImport(platform, TEST_TENANT, modelV1Stub, modelAttrs, jobAttrs);
         var modelV1Header = modelV1Tag.getHeader();
         Assertions.assertEquals(1, modelV1Header.getObjectVersion());
 
-        // Import version 2 — same entry point, priorModel set to v1
+        // Import version 2 — same entry point but current commit, priorModel set to v1
         var orchClient = platform.orchClientBlocking();
         var metaClient = platform.metaClientBlocking();
 
@@ -149,7 +152,7 @@ public abstract class ImportModelTest {
                 .setRepository(modelStub.getRepository())
                 .setPath(modelStub.getPath())
                 .setEntryPoint(modelStub.getEntryPoint())
-                .setVersion(modelStub.getVersion())
+                .setVersion(modelStub.getVersion())  // current commit — differs from v1
                 .setPriorModel(MetadataUtil.selectorFor(modelV1Header))
                 .addAllModelAttrs(modelAttrs)
                 .build();
@@ -181,6 +184,140 @@ public abstract class ImportModelTest {
         Assertions.assertEquals(modelV1Header.getObjectId(), modelV2Tag.getHeader().getObjectId());
         Assertions.assertEquals(2, modelV2Tag.getHeader().getObjectVersion());
         Assertions.assertEquals(modelStub.getEntryPoint(), modelV2Tag.getDefinition().getModel().getEntryPoint());
+    }
+
+    @Test
+    void importModelSameCommitRejected() throws Exception {
+
+        log.info("Running IMPORT_MODEL new-version job with same commit — expecting failure...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.schema_files.PnlAggregationSchemas")
+                .setVersion(modelVersion)
+                .build();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("import_model_same_commit_rejected:schema_files"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("import_model_same_commit_rejected:schema_files"))
+                .build());
+
+        // Import version 1
+        var modelV1Tag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
+        var modelV1Header = modelV1Tag.getHeader();
+
+        // Attempt version 2 with the same commit SHA — must be rejected
+        var orchClient = platform.orchClientBlocking();
+
+        var importModelV2 = ImportModelJob.newBuilder()
+                .setLanguage(modelStub.getLanguage())
+                .setRepository(modelStub.getRepository())
+                .setPath(modelStub.getPath())
+                .setEntryPoint(modelStub.getEntryPoint())
+                .setVersion(modelStub.getVersion())  // same commit as v1
+                .setPriorModel(MetadataUtil.selectorFor(modelV1Header))
+                .addAllModelAttrs(modelAttrs)
+                .build();
+
+        var jobV2Request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_MODEL)
+                        .setImportModel(importModelV2))
+                .addAllJobAttrs(jobAttrs)
+                .build();
+
+        var jobV2Id = Helpers.startJob(orchClient, jobV2Request).getJobId();
+
+        Executable waitForV2 = () -> Helpers.waitForJob(orchClient, TEST_TENANT, jobV2Id);
+        Assertions.assertThrows(RuntimeException.class, waitForV2);
+    }
+
+    @Test
+    void importModelNonLatestPriorRejected() throws Exception {
+
+        log.info("Running IMPORT_MODEL new-version job with non-latest prior — expecting failure...");
+
+        var modelVersion = GitHelpers.getCurrentCommit();
+        var priorCommit = GitHelpers.getPriorCommit();
+
+        var modelAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_model")
+                .setValue(MetadataCodec.encodeValue("import_model_non_latest_prior_rejected:schema_files"))
+                .build());
+
+        var jobAttrs = List.of(TagUpdate.newBuilder()
+                .setAttrName("e2e_test_job")
+                .setValue(MetadataCodec.encodeValue("import_model_non_latest_prior_rejected:schema_files"))
+                .build());
+
+        // Import version 1
+        var modelV1Stub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.schema_files.PnlAggregationSchemas")
+                .setVersion(priorCommit)
+                .build();
+
+        var modelV1Tag = Helpers.doModelImport(platform, TEST_TENANT, modelV1Stub, modelAttrs, jobAttrs);
+        var modelV1Header = modelV1Tag.getHeader();
+
+        // Import version 2 successfully (priorModel = v1)
+        var orchClient = platform.orchClientBlocking();
+
+        var importModelV2 = ImportModelJob.newBuilder()
+                .setLanguage(modelV1Stub.getLanguage())
+                .setRepository(modelV1Stub.getRepository())
+                .setPath(modelV1Stub.getPath())
+                .setEntryPoint(modelV1Stub.getEntryPoint())
+                .setVersion(modelVersion)
+                .setPriorModel(MetadataUtil.selectorFor(modelV1Header))
+                .addAllModelAttrs(modelAttrs)
+                .build();
+
+        var jobV2Request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_MODEL)
+                        .setImportModel(importModelV2))
+                .addAllJobAttrs(jobAttrs)
+                .build();
+
+        var jobV2Id = Helpers.startJob(orchClient, jobV2Request).getJobId();
+        Helpers.waitForJob(orchClient, TEST_TENANT, jobV2Id);
+
+        // Now attempt version 3 using v1 (not v2, the latest) as priorModel — must be rejected
+        var importModelV3FromV1 = ImportModelJob.newBuilder()
+                .setLanguage(modelV1Stub.getLanguage())
+                .setRepository(modelV1Stub.getRepository())
+                .setPath(modelV1Stub.getPath())
+                .setEntryPoint(modelV1Stub.getEntryPoint())
+                .setVersion(priorCommit + "-alt")  // distinct version string
+                .setPriorModel(MetadataUtil.selectorFor(modelV1Header))  // v1, not the latest v2
+                .addAllModelAttrs(modelAttrs)
+                .build();
+
+        var jobV3Request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_MODEL)
+                        .setImportModel(importModelV3FromV1))
+                .addAllJobAttrs(jobAttrs)
+                .build();
+
+        var jobV3Id = Helpers.startJob(orchClient, jobV3Request).getJobId();
+
+        Executable waitForV3 = () -> Helpers.waitForJob(orchClient, TEST_TENANT, jobV3Id);
+        Assertions.assertThrows(RuntimeException.class, waitForV3);
     }
 
     // Let other tests in this suite use this to import models
