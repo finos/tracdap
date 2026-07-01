@@ -37,7 +37,10 @@ public class ImportModelJob implements IJobLogic {
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
 
-        // No extra metadata needed for an import_model job
+        var importModel = job.getImportModel();
+
+        if (importModel.hasPriorModel())
+            return List.of(importModel.getPriorModel());
 
         return List.of();
     }
@@ -99,7 +102,10 @@ public class ImportModelJob implements IJobLogic {
     @Override
     public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
-        // Allocate a single ID for the new model
+        // When saving as a new version, no fresh ID is needed — the runtime will increment the prior version
+        if (job.getImportModel().hasPriorModel())
+            return Map.of();
+
         return Map.of(ObjectType.MODEL, 1);
     }
 
