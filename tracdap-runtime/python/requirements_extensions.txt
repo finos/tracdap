@@ -4,7 +4,7 @@
 # Dependencies that are already in the core requirements.txt are not relisted here
 
 # tracdap-ext-git
-dulwich == 0.23.2
+dulwich == 1.2.5
 
 # tracdap-ext-openai
 openai ~= 1.0
