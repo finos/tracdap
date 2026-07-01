@@ -19,6 +19,7 @@ package org.finos.tracdap.gateway.routing;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.util.LoggingHelpers;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.gateway.exec.Redirect;
 import org.finos.tracdap.gateway.exec.Route;
 import org.finos.tracdap.gateway.proxy.grpc.GrpcProtocol;
@@ -55,15 +56,17 @@ public class Http1Router extends CoreRouter {
     private static final ThreadLocal<Logger> logMap = new ThreadLocal<>();
     private final Logger log = LoggingHelpers.threadLocalLogger(this, logMap);
 
+    private final PlatformConfig platformConfig;
     private final Map<Long, RequestState> requests;
 
     private long currentInboundRequest;
     private long currentOutboundRequest;
 
-    public Http1Router(List<Route> routes, List<Redirect> redirects, int connId) {
+    public Http1Router(List<Route> routes, List<Redirect> redirects, int connId, PlatformConfig platformConfig) {
 
         super(routes, redirects, connId, "HTTP/1");
 
+        this.platformConfig = platformConfig;
         this.requests = new HashMap<>();
 
         this.currentInboundRequest = -1;
@@ -298,7 +301,8 @@ public class Http1Router extends CoreRouter {
 
                 return new InternalProxyBuilder(
                         routeConfig.getConfig(), link, connId,
-                        HttpProtocol.HTTP_1_1);
+                        HttpProtocol.HTTP_1_1, platformConfig,
+                        ctx.channel().remoteAddress());
 
             case HTTP:
 
