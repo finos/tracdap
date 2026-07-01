@@ -410,6 +410,7 @@ public class SampleMetadata {
         return origDef.toBuilder()
                 .setModel(origDef.getModel()
                 .toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putParameters("param3", ModelParameter.newBuilder().setParamType(TypeSystem.descriptor(BasicType.DATE)).build()))
                 .build();
     }

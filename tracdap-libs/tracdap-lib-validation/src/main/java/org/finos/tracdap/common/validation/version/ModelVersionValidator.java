@@ -82,7 +82,7 @@ public class ModelVersionValidator {
                 .pop();
 
         ctx = ctx.push(MD_VERSION)
-                .apply(CommonValidators::exactMatch)
+                .apply(CommonValidators::mustChange)
                 .pop();
 
         ctx = ctx.push(MD_PATH)
