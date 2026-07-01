@@ -19,11 +19,10 @@ import pathlib
 import subprocess as sp
 
 import tracdap.rt.config as cfg
-import tracdap.rt.metadata as meta
 import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
-import tracdap.rt._impl.core.type_system as types  # noqa
+import tracdap.rt._impl.core.metadata as meta  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
 
@@ -177,9 +176,9 @@ class CoreJobsTest(unittest.TestCase):
             runModel=meta.RunModelJob(
                 model=util.selector_for(model_id),
                 parameters={
-                    "eur_usd_rate": meta.Value(floatValue=1.0, type=types.TypeMapping.python_to_trac(float)),
-                    "default_weighting": meta.Value(floatValue=2.0, type=types.TypeMapping.python_to_trac(float)),
-                    "filter_defaults": meta.Value(booleanValue=True, type=types.TypeMapping.python_to_trac(bool))
+                    "eur_usd_rate": meta.Value(floatValue=1.0, type=meta.MetadataTypes.python_to_trac(float)),
+                    "default_weighting": meta.Value(floatValue=2.0, type=meta.MetadataTypes.python_to_trac(float)),
+                    "filter_defaults": meta.Value(booleanValue=True, type=meta.MetadataTypes.python_to_trac(bool))
                 },
                 # Let dev mode translator sort out the data / storage definitions
                 inputs={"customer_loans": "inputs/loan_final313_100.csv"},  # noqa
@@ -196,9 +195,9 @@ class CoreJobsTest(unittest.TestCase):
                 entryPoint="tutorial.using_data.PnlAggregation",
                 path="examples/models/python/src",
                 parameters={
-                    "eur_usd_rate": meta.ModelParameter(paramType=types.TypeMapping.python_to_trac(float)),
-                    "default_weighting": meta.ModelParameter(paramType=types.TypeMapping.python_to_trac(float)),
-                    "filter_defaults": meta.ModelParameter(paramType=types.TypeMapping.python_to_trac(bool)),
+                    "eur_usd_rate": meta.ModelParameter(paramType=meta.MetadataTypes.python_to_trac(float)),
+                    "default_weighting": meta.ModelParameter(paramType=meta.MetadataTypes.python_to_trac(float)),
+                    "filter_defaults": meta.ModelParameter(paramType=meta.MetadataTypes.python_to_trac(bool)),
                 },
                 inputs={
                     "customer_loans": meta.ModelInputSchema(

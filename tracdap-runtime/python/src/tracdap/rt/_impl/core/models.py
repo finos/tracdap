@@ -13,21 +13,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import typing as tp
 import pathlib
 import copy
 
 import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
-import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.shim as _shim
-import tracdap.rt._impl.core.type_system as _types
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -225,7 +222,7 @@ class ModelLoader:
             _val.quick_validate_model_def(model_def)
 
             for attr_name, attr_value in attributes.items():
-                self.__log.info(f"Attribute [{attr_name}] - {_types.MetadataCodec.decode_value(attr_value)}")
+                self.__log.info(f"Attribute [{attr_name}] - {_meta.MetadataCodec.decode_value(attr_value)}")
 
             for name, param in model_def.parameters.items():
                 self.__log.info(f"Parameter [{name}] - {param.paramType.basicType.name}")
@@ -290,7 +287,7 @@ class ModelLoader:
             elif isinstance(raw_value, _meta.Value):
                 encoded_props[key] = raw_value
             else:
-                encoded_props[key] = _types.MetadataCodec.encode_value(raw_value)
+                encoded_props[key] = _meta.MetadataCodec.encode_value(raw_value)
 
         return encoded_props
 

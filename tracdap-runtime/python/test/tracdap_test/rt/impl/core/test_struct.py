@@ -28,9 +28,8 @@ except ModuleNotFoundError:
 
 import tracdap.rt.api.experimental as _api
 import tracdap.rt.exceptions as _ex
-import tracdap.rt.metadata as _meta
 import tracdap.rt._impl.core.struct as _struct  # noqa
-import tracdap.rt._impl.core.type_system as _meta_types  # noqa
+import tracdap.rt._impl.core.metadata as _meta  # noqa
 
 if sys.version_info >= (3, 10):
     python_310_compat = True
@@ -164,40 +163,40 @@ def define_struct_schema(sub_struct_type: type):
 
             _meta.FieldSchema(
                 fieldName="boolField", fieldOrder=0, fieldType=_meta.BasicType.BOOLEAN, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(True)),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(True)),
 
             _meta.FieldSchema(
                 fieldName="intField", fieldOrder=1, fieldType=_meta.BasicType.INTEGER, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(1)),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(1)),
 
             _meta.FieldSchema(
                 fieldName="floatField", fieldOrder=2, fieldType=_meta.BasicType.FLOAT, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(1.0)),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(1.0)),
 
             _meta.FieldSchema(
                 fieldName="decimalField", fieldOrder=3, fieldType=_meta.BasicType.DECIMAL, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(decimal.Decimal(1.0))),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(decimal.Decimal(1.0))),
 
             _meta.FieldSchema(
                 fieldName="strField", fieldOrder=4, fieldType=_meta.BasicType.STRING, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value("hello")),
+                label="", defaultValue=_meta.MetadataCodec.encode_value("hello")),
 
             _meta.FieldSchema(
                 fieldName="dateField", fieldOrder=5, fieldType=_meta.BasicType.DATE, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(_DEFAULT_DATE)),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(_DEFAULT_DATE)),
 
             _meta.FieldSchema(
                 fieldName="datetimeField", fieldOrder=6, fieldType=_meta.BasicType.DATETIME, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(_DEFAULT_DATETIME)),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(_DEFAULT_DATETIME)),
 
             _meta.FieldSchema(
                 fieldName="enumField", fieldOrder=7, fieldType=_meta.BasicType.STRING, categorical=True, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value(ExampleEnum.VALUE1.name),
+                label="", defaultValue=_meta.MetadataCodec.encode_value(ExampleEnum.VALUE1.name),
                 namedEnum=f"{ExampleEnum.__module__}.{ExampleEnum.__name__}"),
 
             _meta.FieldSchema(
                 fieldName="quotedField", fieldOrder=8, fieldType=_meta.BasicType.STRING, notNull=True,
-                label="", defaultValue=_meta_types.MetadataCodec.encode_value("hello")),
+                label="", defaultValue=_meta.MetadataCodec.encode_value("hello")),
 
             _meta.FieldSchema(
                 fieldName="optionalField", fieldOrder=9, fieldType=_meta.BasicType.STRING, notNull=False,

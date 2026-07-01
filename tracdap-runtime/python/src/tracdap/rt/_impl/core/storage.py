@@ -29,14 +29,12 @@ import pyarrow.fs as pa_fs
 import pyarrow.lib as pa_lib
 
 import tracdap.rt.api as _api
-import tracdap.rt.metadata as _meta
-import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.plugins as plugins
-import tracdap.rt._impl.core.config_parser as _cfg_p
+import tracdap.rt._impl.core.config as _cfg
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.core.type_system as _meta_ts
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -107,7 +105,7 @@ class StorageLayout(metaclass=abc.ABCMeta):
             if update:
                 layout_key = cls.__BACKWARDS_COMPATIBLE_LAYOUT
             else:
-                default_layout = _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT
+                default_layout = _cfg.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT
                 layout_key = _meta.StorageLayout.__members__[default_layout]
 
         layout = cls.__LAYOUTS.get(layout_key)
@@ -199,11 +197,11 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
         data_def = self._add_new_snap(new_data_def, data_item, part_key, snap_index, data_id.objectTimestamp)
 
         # Take default location from the storage config
-        storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        storage_key = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
         if trac_schema.schemaType == _meta.SchemaType.STRUCT_SCHEMA:
             storage_format = "application/json"
         else:
-            storage_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "text/csv")
+            storage_format = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_FORMAT, "text/csv")
         storage_path = self._data_storage_path(data_id, context_key, trac_schema, part_key, snap_index, 0, storage_format, prior_copy=None)
 
         storage_copy = _meta.StorageCopy(
@@ -275,7 +273,7 @@ class BaseLayout(StorageLayout, metaclass=abc.ABCMeta):
             storageId=_util.selector_for_latest(storage_id),
             size=0)
 
-        storage_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        storage_key = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
         storage_format = file_def.mimeType
         storage_path = self._file_storage_path(file_id, file_def, prior_copy=None)
 
@@ -461,7 +459,7 @@ class DateSnapLayout(BaseLayout):
         if delta_index != 0:
             raise _ex.ETracInternal("Delta updates not yet supported")
 
-        timestamp = _meta_ts.MetadataCodec.decode_datetime_value(data_id.objectTimestamp)
+        timestamp = _meta.MetadataCodec.decode_datetime_value(data_id.objectTimestamp)
         delta_suffix = self.__random.randint(0, 1 << 24)
         extension = FormatManager.primary_extension(storage_format)
 
@@ -472,7 +470,7 @@ class DateSnapLayout(BaseLayout):
 
     def _file_storage_path(self, file_id, file_def, prior_copy):
 
-        timestamp = _meta_ts.MetadataCodec.decode_datetime_value(file_id.objectTimestamp)
+        timestamp = _meta.MetadataCodec.decode_datetime_value(file_id.objectTimestamp)
         version_suffix = self.__random.randint(0, 1 << 24)
 
         return self.__FILE_STORAGE_TEMPLATE.format(
@@ -548,7 +546,7 @@ def build_data_spec(
         -> _data.DataSpec:
 
     if prior_spec is None:
-        layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
+        layout_key = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
         layout = StorageLayout.select(layout_key)
         spec = layout.new_data_spec(data_id, storage_id, context_key, trac_schema, sys_config)
     else:
@@ -569,7 +567,7 @@ def build_file_spec(
         -> _data.DataSpec:
 
     if prior_spec is None:
-        layout_key = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg_p.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
+        layout_key = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LAYOUT, _cfg.ConfigKDefaults.STORAGE_DEFAULT_LAYOUT)
         layout = StorageLayout.select(layout_key)
         spec = layout.new_file_spec(file_id, storage_id, context_key, file_type, sys_config)
 
@@ -604,8 +602,8 @@ class StorageManager:
         self.__external: tp.List[str] = list()
         self.__sys_config = sys_config
 
-        self.__default_location = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
-        self.__default_format = _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
+        self.__default_location = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+        self.__default_format = _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
 
         for storage_key, storage_config in sys_config.resources.items():
 
