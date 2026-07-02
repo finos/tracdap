@@ -71,12 +71,37 @@ class ModelVersionValidationTest extends BaseValidatorTest {
     }
 
     @Test
+    void versionChangesCommit() {
+
+        var modelV1 = SampleMetadata.dummyModelDef();
+
+        var modelV2 = modelV1.toBuilder()
+                .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1"))
+                .build();
+
+        expectValidVersion(modelV2, modelV1);
+    }
+
+    @Test
+    void versionSameCommit() {
+
+        var modelV1 = SampleMetadata.dummyModelDef();
+
+        // Version field unchanged — importing the same commit as a new version is not allowed
+        var modelV2 = modelV1.toBuilder().build();
+
+        expectInvalidVersion(modelV2, modelV1);
+    }
+
+    @Test
     void versionAddsParameter() {
 
         var modelV1 = SampleMetadata.dummyModelDef();
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putParameters("a_new_parameter", ModelParameter.newBuilder()
                         .setParamType(TypeSystem.descriptor(BasicType.BOOLEAN))
                         .setLabel("A new parameter not in the prior version")
@@ -98,6 +123,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putParameters("param1", param1V2))
                 .build();
 
@@ -120,6 +146,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putInputs("an_extra_input", newInput))
                 .build();
 
@@ -142,6 +169,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putInputs("input1", input1V2))
                 .build();
 
@@ -164,6 +192,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putInputs("input1", input1V2))
                 .build();
 
@@ -186,6 +215,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putOutputs("an_extra_output", newOutput))
                 .build();
 
@@ -208,6 +238,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putOutputs("output1", output1V2))
                 .build();
 
@@ -230,6 +261,7 @@ class ModelVersionValidationTest extends BaseValidatorTest {
 
         var modelV2 = modelV1.toBuilder()
                 .setModel(modelV1.getModel().toBuilder()
+                .setVersion("trac-test-repo-1.2.4-RC1")
                 .putOutputs("output1", output1V2))
                 .build();
 

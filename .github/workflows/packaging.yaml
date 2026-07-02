@@ -153,8 +153,14 @@ jobs:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_KEY_PASSPHRASE: ${{ secrets.GPG_KEY_PASSPHRASE }}
 
+      # Publishing to Maven Central is disabled - TRAC Java artifacts are no longer published there.
+      # The step is retained (rather than deleted) so it can be re-enabled easily if that changes:
+      # restore the condition to
+      #   if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+      # The "Build Maven artifacts" step above is kept, so the artifacts are still built and signed
+      # (publishToMavenLocal) on every release to catch packaging regressions - they are just not published.
       - name: Publish to Maven Central
-        if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        if: false
         run: |
           mkdir -p ~/.gnupg/
           printf "$GPG_KEY_BASE64" | base64 --decode > ~/.gnupg/keyring.gpg

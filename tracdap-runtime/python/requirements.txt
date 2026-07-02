@@ -8,11 +8,11 @@
 
 # Core data framework is based on Arrow
 # This needs to support the Python versions listed in setup.cfg
-pyarrow == 22.0.0
+pyarrow == 23.0.1
 
 # Core protobuf support for metadata / config classes
 # This should match the Java Protobuf version, if possible
-protobuf == 6.33.0
+protobuf == 6.33.5
 
 # PyYAML is used to load config supplied in YAML format
 pyyaml == 6.0.3

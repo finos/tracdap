@@ -166,6 +166,39 @@ public class JobValidationTest {
     }
 
     @Test
+    public void importModel_priorModelOk() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_model_prior_model_ok"))
+                .build());
+
+        var priorModelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(ImportModelJob.newBuilder()
+                        .setLanguage("python")
+                        .setRepository("UNIT_TEST_REPO")
+                        .setVersion("v2.0.0")
+                        .setPath("src/")
+                        .setEntryPoint("acme.models.test_model.BasicTestModel")
+                        .setPriorModel(priorModelSelector));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var response = orchClient.validateJob(request);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+    }
+
+    @Test
     public void importModel_missingResources() {
 
         var job = JobDefinition.newBuilder()
