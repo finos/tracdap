@@ -4,11 +4,10 @@ This file lists the maintainers of this repository.
 
 ## Current maintainers
 
-| GitHub Username | Name | Organization | Email |
-|----------------|------|--------------|-------|
-| @fintrac-alex-hewson | *please add name* | *please add organization* | *please add email* |
-| @greg-wiltshire | Greg Wiltshire | Accenture | *please add email* |
-| @martin-traverse | Martin Traverse | finTRAC | *please add email* |
+| GitHub Username      | Name        | Organization | Email                     |
+|----------------------|-------------|--------------|---------------------------|
+| @a-frankl            | Alex Frankl | finTRAC Ltd  | alex@fintrac.co.uk        |
+| @fintrac-alex-hewson | Alex Hewson | finTRAC Ltd  | alex.hewson@fintrac.co.uk |
 
 For information about maintainer responsibilities and resources, see the [FINOS Maintainers Cheatsheet](https://community.finos.org/docs/finos-maintainers-cheatsheet).
 
