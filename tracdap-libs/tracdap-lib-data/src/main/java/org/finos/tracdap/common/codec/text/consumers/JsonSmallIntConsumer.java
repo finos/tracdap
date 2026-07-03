@@ -32,7 +32,7 @@ public class JsonSmallIntConsumer extends BaseJsonConsumer<SmallIntVector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        short value = parser.getShortValue();
+        short value = JsonParsing.parseShort(parser);
         vector.set(currentIndex++, value);
         return true;
     }

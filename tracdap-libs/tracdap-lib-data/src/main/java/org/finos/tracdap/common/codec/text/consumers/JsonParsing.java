@@ -24,6 +24,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -61,6 +62,104 @@ public class JsonParsing {
         }
 
         throw new JsonParseException(parser, "Invalid boolean value", parser.currentLocation());
+    }
+
+    // Integer parsing helpers
+    //
+    // These accept both numeric tokens (VALUE_NUMBER_INT / VALUE_NUMBER_FLOAT) and string tokens.
+    // String tokens must be handled because the CSV parser presents typed columns as strings
+    // (jackson-dataformat-csv stopped emitting numeric tokens for schema NUMBER columns in 2.21).
+    // This mirrors the handling already used for floating point and decimal values below.
+
+    public static byte parseByte(JsonParser parser) throws IOException {
+
+        var token = parser.currentToken();
+
+        try {
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+                return parser.getByteValue();
+            else if (token == JsonToken.VALUE_STRING)
+                return Byte.parseByte(parser.getValueAsString());
+            else
+                throw integerParseError(parser, token);
+        }
+        catch (NumberFormatException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    public static short parseShort(JsonParser parser) throws IOException {
+
+        var token = parser.currentToken();
+
+        try {
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+                return parser.getShortValue();
+            else if (token == JsonToken.VALUE_STRING)
+                return Short.parseShort(parser.getValueAsString());
+            else
+                throw integerParseError(parser, token);
+        }
+        catch (NumberFormatException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    public static int parseInt(JsonParser parser) throws IOException {
+
+        var token = parser.currentToken();
+
+        try {
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+                return parser.getIntValue();
+            else if (token == JsonToken.VALUE_STRING)
+                return Integer.parseInt(parser.getValueAsString());
+            else
+                throw integerParseError(parser, token);
+        }
+        catch (NumberFormatException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    public static long parseLong(JsonParser parser) throws IOException {
+
+        var token = parser.currentToken();
+
+        try {
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+                return parser.getLongValue();
+            else if (token == JsonToken.VALUE_STRING)
+                return Long.parseLong(parser.getValueAsString());
+            else
+                throw integerParseError(parser, token);
+        }
+        catch (NumberFormatException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    public static BigInteger parseBigInteger(JsonParser parser) throws IOException {
+
+        var token = parser.currentToken();
+
+        try {
+            if (token == VALUE_NUMBER_INT || token == JsonToken.VALUE_NUMBER_FLOAT)
+                return parser.getBigIntegerValue();
+            else if (token == JsonToken.VALUE_STRING)
+                return new BigInteger(parser.getValueAsString());
+            else
+                throw integerParseError(parser, token);
+        }
+        catch (NumberFormatException e) {
+            throw new JsonParseException(parser, e.getMessage(), parser.currentLocation(), e);
+        }
+    }
+
+    private static JsonParseException integerParseError(JsonParser parser, JsonToken token) {
+
+        var msg = "Parsing failed: Expected an integer value, got [" + token.name() + "]";
+        return new JsonParseException(parser, msg, parser.currentLocation());
     }
 
     public static float parseFloat4(JsonParser parser) throws IOException {

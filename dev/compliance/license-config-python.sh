@@ -21,6 +21,7 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT License"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT No Attribution License (MIT-0)"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD License"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-2-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};BSD-3-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};3-Clause BSD License;"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Python Software Foundation License"
@@ -31,9 +32,15 @@ ALLOWED_LICENSES="${ALLOWED_LICENSES};The Unlicense (Unlicense)"
 # Some packages specify dual licensing as a string with both licenses
 # The license checker can't separate them out, so they are listed here
 ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND Python-2.0"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MIT AND PSF-2.0"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-3-Clause"
+ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR BSD-2-Clause"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND MIT"
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 AND CNRI-Python"
+
+# tqdm is dual-licensed MPL-2.0 and MIT (we are relying on the MIT terms)
+# MPL-2.0 is file-level copyleft and safe to consume as a dependency
+ALLOWED_LICENSES="${ALLOWED_LICENSES};MPL-2.0 AND MIT"
 
 # Dual licensing for Dulwich is Apache or GPL (we are choosing Apache)
 ALLOWED_LICENSES="${ALLOWED_LICENSES};Apache-2.0 OR GPL-2.0-or-later"
@@ -61,3 +68,9 @@ IGNORE_LICENSE="${IGNORE_LICENSE} aiohappyeyeballs"
 # https://github.com/pallets/click/?tab=BSD-3-Clause-1-ov-file#readme
 
 IGNORE_LICENSE="${IGNORE_LICENSE} click"
+
+# google-crc32c is a BSD-3-Clause licensed package pulled in as a GCP SDK transitive dependency
+# pip-licenses reports its license as UNKNOWN due to a non-standard metadata declaration
+# https://github.com/googleapis/python-crc32c
+
+IGNORE_LICENSE="${IGNORE_LICENSE} google-crc32c"

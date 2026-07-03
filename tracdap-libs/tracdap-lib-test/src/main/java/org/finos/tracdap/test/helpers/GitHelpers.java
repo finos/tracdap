@@ -39,4 +39,22 @@ public class GitHelpers {
             proc.destroy();
         }
     }
+
+    public static String getPriorCommit() throws Exception {
+
+        var pb = new ProcessBuilder();
+        pb.command("git", "rev-parse", "HEAD~1");
+
+        var proc = pb.start();
+
+        try {
+            proc.waitFor(10, TimeUnit.SECONDS);
+
+            var procResult = proc.getInputStream().readAllBytes();
+            return new String(procResult, StandardCharsets.UTF_8).strip();
+        }
+        finally {
+            proc.destroy();
+        }
+    }
 }

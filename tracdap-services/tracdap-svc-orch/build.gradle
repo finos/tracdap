@@ -73,7 +73,7 @@ dependencies {
     }
 
     // gRPC testing requires Jackson annotations
-    testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "$jackson_databind_version"
+    testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "$jackson_annotations_version"
 }
 
 // Add any plugin dependencies enabled at build time

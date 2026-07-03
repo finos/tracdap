@@ -32,7 +32,7 @@ public class JsonIntConsumer extends BaseJsonConsumer<IntVector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        int value =  parser.getIntValue();
+        int value = JsonParsing.parseInt(parser);
         vector.set(currentIndex++, value);
         return true;
     }

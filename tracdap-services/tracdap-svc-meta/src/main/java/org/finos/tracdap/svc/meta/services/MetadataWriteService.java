@@ -28,6 +28,7 @@ import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
+import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
 
@@ -228,6 +229,16 @@ public class MetadataWriteService {
 
             // TODO: Apply the version validator in bulk across a batch of updates
             // Will need an update in the validator, currently 50 object updates -> 50 separate validation passes
+
+            if (!priorVersion.getHeader().getIsLatestObject()) {
+
+                var err = String.format(
+                        "Cannot create a new version from a superseded object: prior version [%d] is not the latest version of [%s]",
+                        priorVersion.getHeader().getObjectVersion(),
+                        priorVersion.getHeader().getObjectId());
+
+                throw new EVersionValidation(err);
+            }
 
             validator.validateVersion(
                     request.getDefinition(),

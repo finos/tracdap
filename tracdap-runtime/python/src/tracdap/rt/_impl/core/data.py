@@ -625,7 +625,7 @@ if pandas is not None:
         __PANDAS_MAJOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[0])
         __PANDAS_MINOR_VERSION = int(__PANDAS_VERSION_ELEMENTS[1])
 
-        if __PANDAS_MAJOR_VERSION == 2:
+        if __PANDAS_MAJOR_VERSION >= 2:
 
             __PANDAS_DATE_TYPE = pandas.to_datetime([dt.date(2000, 1, 1)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
             __PANDAS_DATETIME_TYPE = pandas.to_datetime([dt.datetime(2000, 1, 1, 0, 0, 0)]).as_unit(DataMapping.DEFAULT_TIMESTAMP_UNIT).dtype
@@ -701,7 +701,7 @@ if pandas is not None:
                 DataConformance.check_duplicate_fields(table.schema.names, False)
 
                 # Use Arrow's built-in function to convert to Pandas
-            return table.to_pandas(
+            df = table.to_pandas(
 
                 # Mapping for arrow -> pandas types for core types
                 types_mapper=self.__ARROW_TO_PANDAS_TYPE_MAPPING.get,
@@ -716,6 +716,16 @@ if pandas is not None:
                 # Do not consolidate memory across columns when preparing the Pandas vectors
                 # This is a significant performance win for very wide datasets
                 split_blocks=True)  # noqa
+
+            # In pandas 3.x, Float64Dtype stores NaN as pd.NA, losing the NaN/null distinction.
+            # For float columns that contain actual NaN values (not null), restore them as
+            # Python float objects (dtype=object) so None (null) and float('nan') remain distinguishable.
+            if self.__PANDAS_MAJOR_VERSION >= 3:
+                for i, field in enumerate(table.schema):
+                    if pa.types.is_floating(field.type) and pc.any(pc.is_nan(table.column(i))).as_py():
+                        df[field.name] = pandas.Series(table.column(i).to_pylist(), dtype=object, index=df.index)
+
+            return df
 
         def to_internal(self, df: pandas.DataFrame, schema: tp.Optional[pa.Schema] = None) -> pa.Table:
 
@@ -732,6 +742,27 @@ if pandas is not None:
             if len(df) > 0:
 
                 table = pa.Table.from_pandas(df, columns=column_filter, preserve_index=False)  # noqa
+
+                # In pandas 3.x, object-dtype float columns (used to preserve NaN vs null) are
+                # converted to Arrow null by from_pandas. Rebuild those columns with an explicit
+                # null mask so float('nan') becomes Arrow NaN and None becomes Arrow null.
+                if self.__PANDAS_MAJOR_VERSION >= 3 and schema is not None:
+                    cols = column_filter if column_filter else list(df.columns)
+                    for col_name in cols:
+                        if col_name not in df.columns or df[col_name].dtype != object:
+                            continue
+                        if col_name not in schema.names:
+                            continue
+                        field = schema.field(col_name)
+                        if not pa.types.is_floating(field.type):
+                            continue
+                        vals = df[col_name].tolist()
+                        null_mask = [v is None for v in vals]
+                        float_vals = [float(v) if v is not None else 0.0 for v in vals]
+                        arrow_col = pa.array(float_vals, type=field.type, mask=null_mask)
+                        col_idx = table.schema.get_field_index(col_name)
+                        if col_idx >= 0:
+                            table = table.set_column(col_idx, col_name, arrow_col)
 
             # Special case handling for converting an empty dataframe
             # These must flow through the pipe with valid schemas, like any other dataset

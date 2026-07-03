@@ -162,10 +162,16 @@ class GraphBuilder:
 
     def build_import_model_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
-        # TRAC object ID for the new model
-        model_id = self._allocate_id(_meta.ObjectType.MODEL)
-
         import_details = job_def.importModel
+
+        # When saving as a new version, reuse the prior model's object ID with an incremented version;
+        # otherwise allocate a fresh ID (mirrors the prior-output pattern in _build_data_output)
+        if import_details.priorModel is not None:
+            prior_header = _util.get_job_mapping(import_details.priorModel, self._job_config)
+            model_id = _util.new_object_version(prior_header)
+        else:
+            model_id = self._allocate_id(_meta.ObjectType.MODEL)
+
         import_scope = self._job_key
 
         # Graph node ID for the import operation

@@ -173,6 +173,8 @@ message ImportModelJob {
   string path = 3;
 
   repeated TagUpdate modelAttrs = 6;
+
+  optional TagSelector priorModel = 9;
 }
 
 /**

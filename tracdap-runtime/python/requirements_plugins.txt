@@ -75,7 +75,7 @@ aiohttp >= 3.9.5
 
 # Azure client libraries
 
-azure-core == 1.35.0
+azure-core == 1.38.0
 azure-identity == 1.23.1
 azure-storage-blob == 12.26.0
 

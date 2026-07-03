@@ -32,7 +32,7 @@ public class JsonTinyIntConsumer extends BaseJsonConsumer<TinyIntVector> {
     @Override
     public boolean consumeElement(JsonParser parser) throws IOException {
 
-        byte value = parser.getByteValue();
+        byte value = JsonParsing.parseByte(parser);
         vector.set(currentIndex++, value);
         return true;
     }
