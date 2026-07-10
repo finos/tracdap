@@ -355,10 +355,13 @@
         <cve>CVE-2026-56876</cve>
     </suppress>
 
-    <!-- CVE-2026-54399, CVE-2026-54428: Apache HttpComponents httpcore 4.x, no fix available. -->
-    <!-- httpcore 4.4.16 is the final release of the (EOL) 4.x line; the fix, if any, is in httpcore5. -->
-    <!-- It is a transitive dependency of the AWS SDK and google-http-client-apache-v2, pulled in only -->
-    <!-- by the cloud storage plugins for cloud provider HTTP transport. -->
+    <!-- CVE-2026-54399, CVE-2026-54428: FALSE POSITIVE against httpcore 4.x. -->
+    <!-- Both are vulnerabilities in Apache HttpComponents Core 5.x (5.4.2 and earlier): the HTTP/1.1 -->
+    <!-- message parser (54399) and the HTTP/2 HPACK decoder (54428). They do not affect the 4.x line - -->
+    <!-- httpcore 4.x has no HTTP/2 implementation, so the HPACK issue cannot apply, and 4.4.16 is not -->
+    <!-- in the affected 5.x range. OWASP mis-matches them to the 4.x artifact because both lines share -->
+    <!-- the CPE apache:httpcomponents_core. httpcore 4.4.16 (transitive via the AWS SDK and -->
+    <!-- google-http-client-apache-v2, used by the cloud storage plugins) is not vulnerable. -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@.*$</packageUrl>
         <cve>CVE-2026-54399</cve>
