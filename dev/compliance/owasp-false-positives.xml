@@ -346,4 +346,13 @@
         <cve>CVE-2026-54515</cve>
     </suppress>
 
+    <!-- CVE-2026-56876: extract-zip, no fixed release available (2.0.1 is the latest). -->
+    <!-- It is a build-only transitive dependency of owasp-dependency-check (the compliance tool -->
+    <!-- itself), used to extract the dependency-check CLI from a trusted GitHub release archive. -->
+    <!-- It is not part of the shipped web API package, so the issue is not reachable in our usage. -->
+    <suppress>
+        <packageUrl regex="true">^pkg:npm/extract\-zip@.*$</packageUrl>
+        <cve>CVE-2026-56876</cve>
+    </suppress>
+
 </suppressions>
