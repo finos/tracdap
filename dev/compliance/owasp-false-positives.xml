@@ -330,12 +330,6 @@
         <cve>CVE-2026-42582</cve>
     </suppress>
 
-    <!-- CVE-2026-42198: PostgreSQL JDBC driver, no fix available at time of writing -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@.*$</packageUrl>
-        <cve>CVE-2026-42198</cve>
-    </suppress>
-
     <!-- CVE-2026-0994: protobuf-java, no fix available at time of writing -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf\-java.*@.*$</packageUrl>
