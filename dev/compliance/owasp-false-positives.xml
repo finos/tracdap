@@ -330,12 +330,6 @@
         <cve>CVE-2026-42582</cve>
     </suppress>
 
-    <!-- CVE-2026-42198: PostgreSQL JDBC driver, no fix available at time of writing -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@.*$</packageUrl>
-        <cve>CVE-2026-42198</cve>
-    </suppress>
-
     <!-- CVE-2026-0994: protobuf-java, no fix available at time of writing -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf\-java.*@.*$</packageUrl>
@@ -350,6 +344,28 @@
     <suppress until="2026-08-15Z">
         <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
         <cve>CVE-2026-54515</cve>
+    </suppress>
+
+    <!-- CVE-2026-56876: extract-zip, no fixed release available (2.0.1 is the latest). -->
+    <!-- It is a build-only transitive dependency of owasp-dependency-check (the compliance tool -->
+    <!-- itself), used to extract the dependency-check CLI from a trusted GitHub release archive. -->
+    <!-- It is not part of the shipped web API package, so the issue is not reachable in our usage. -->
+    <suppress>
+        <packageUrl regex="true">^pkg:npm/extract\-zip@.*$</packageUrl>
+        <cve>CVE-2026-56876</cve>
+    </suppress>
+
+    <!-- CVE-2026-54399, CVE-2026-54428: FALSE POSITIVE against httpcore 4.x. -->
+    <!-- Both are vulnerabilities in Apache HttpComponents Core 5.x (5.4.2 and earlier): the HTTP/1.1 -->
+    <!-- message parser (54399) and the HTTP/2 HPACK decoder (54428). They do not affect the 4.x line - -->
+    <!-- httpcore 4.x has no HTTP/2 implementation, so the HPACK issue cannot apply, and 4.4.16 is not -->
+    <!-- in the affected 5.x range. OWASP mis-matches them to the 4.x artifact because both lines share -->
+    <!-- the CPE apache:httpcomponents_core. httpcore 4.4.16 (transitive via the AWS SDK and -->
+    <!-- google-http-client-apache-v2, used by the cloud storage plugins) is not vulnerable. -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@.*$</packageUrl>
+        <cve>CVE-2026-54399</cve>
+        <cve>CVE-2026-54428</cve>
     </suppress>
 
 </suppressions>
