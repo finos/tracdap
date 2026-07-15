@@ -24,6 +24,11 @@ import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.gateway.builders.ServiceInfo;
 import org.finos.tracdap.gateway.proxy.http.HttpProtocol;
 
+import io.grpc.ManagedChannel;
+import io.grpc.health.v1.HealthCheckRequest;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.health.v1.HealthGrpc;
+import io.grpc.netty.NettyChannelBuilder;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -32,9 +37,7 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.Socket;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -162,19 +165,47 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
 
     private boolean probeService(String serviceKey) {
 
+        // A bare TCP connection only proves the service has bound its port, not that it can serve
+        // requests. Instead, issue a standard gRPC health check (grpc.health.v1.Health/Check): the
+        // service reports SERVING only once its startup sequence has fully completed.
+
+        ManagedChannel channel = null;
+
         try {
             var target = RoutingUtils.serviceTarget(platformConfig, serviceKey);
             var host = target.getHost();
             var port = (int) target.getPort();
 
-            try (var socket = new Socket()) {
-                socket.connect(new InetSocketAddress(host, port), PROBE_TIMEOUT_MS);
-                return true;
-            }
+            // Internal gateway -> service hops are plaintext (see RoutingUtils.serviceTarget), matching
+            // the previous TCP probe. Terminating TLS at the edge is handled separately by the gateway.
+            channel = NettyChannelBuilder.forAddress(host, port)
+                    .usePlaintext()
+                    .build();
+
+            var healthCheck = HealthGrpc.newBlockingStub(channel)
+                    .withDeadlineAfter(PROBE_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+
+            // Empty service name = overall server health
+            var request = HealthCheckRequest.newBuilder().setService("").build();
+            var response = healthCheck.check(request);
+
+            return response.getStatus() == ServingStatus.SERVING;
         }
-        catch (IOException e) {
-            log.debug("Service [{}] probe failed: {}", serviceKey, e.getMessage());
+        catch (Exception e) {
+            // Not reachable, health not yet SERVING, or no health service -> treat as unavailable
+            log.debug("Service [{}] health probe failed: {}", serviceKey, e.getMessage());
             return false;
+        }
+        finally {
+            if (channel != null) {
+                channel.shutdownNow();
+                try {
+                    channel.awaitTermination(1, TimeUnit.SECONDS);
+                }
+                catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
     }
 

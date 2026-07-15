@@ -23,6 +23,9 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.ETrac;
 
+import io.grpc.BindableService;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.HealthStatusManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.core.LoggerContext;
 import org.apache.logging.log4j.core.config.Configurator;
@@ -164,6 +167,31 @@ public abstract class TracServiceBase {
     private final Duration startupTimeout = DEFAULT_STARTUP_TIMEOUT;
     private final Duration shutdownTimeout = DEFAULT_SHUTDOWN_TIMEOUT;
 
+    // Standard gRPC health service (grpc.health.v1), starts as NOT_SERVING and flips to SERVING
+    // only once doStartup() has completed successfully (see start() / stop()).
+    private final HealthStatusManager healthStatusManager = initHealthStatusManager();
+
+    private static HealthStatusManager initHealthStatusManager() {
+        var manager = new HealthStatusManager();
+        manager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+        return manager;
+    }
+
+    /**
+     * The standard gRPC health service (grpc.health.v1) for this service.
+     *
+     * <p>Services must register this on their gRPC server, e.g.
+     * {@code serverBuilder.addService(getHealthService())}. The base class reports NOT_SERVING
+     * until doStartup() completes successfully, then SERVING, and NOT_SERVING again once shutdown
+     * begins. The gateway /availablez endpoint uses this to report true service readiness rather
+     * than a bare TCP connection (which only confirms the port is bound).</p>
+     *
+     * @return The gRPC health service to register on the service's server
+     */
+    protected BindableService getHealthService() {
+        return healthStatusManager.getHealthService();
+    }
+
     /**
      * Entry point for spawning a new service
      *
@@ -266,6 +294,9 @@ public abstract class TracServiceBase {
 
             timedSequence(t -> {doStartup(t); return null;}, startupTimeout, "startup");
 
+            // Startup completed successfully - report SERVING on the gRPC health service
+            healthStatusManager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+
             // If requested, install a shutdown handler for a graceful exit
             // This is needed when running a real server instance, but not when running embedded tests
             if (registerShutdownHook) {
@@ -315,6 +346,9 @@ public abstract class TracServiceBase {
         try {
 
             log.info("Service is going down...");
+
+            // Report NOT_SERVING as soon as shutdown begins, so readiness probes stop treating this service as available
+            healthStatusManager.enterTerminalState();
 
             var exitCode = timedSequence(this::doShutdown, shutdownTimeout, "shutdown");
 
