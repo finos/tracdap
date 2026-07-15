@@ -42,6 +42,7 @@ import org.finos.tracdap.tools.secrets.SecretTool;
 import org.finos.tracdap.test.config.ConfigHelpers;
 
 import io.grpc.*;
+import io.grpc.health.v1.HealthGrpc;
 import io.grpc.stub.AbstractStub;
 import io.grpc.netty.NettyChannelBuilder;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -232,6 +233,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
         var channel = serviceChannels.get(serviceKey);
         var client = clientFactory.apply(channel);
         return clientConcerns.configureClient(client);
+    }
+
+    public HealthGrpc.HealthBlockingStub healthClientBlocking(String serviceKey) {
+        if (!serviceChannels.containsKey(serviceKey))
+            throw new ETracInternal("Client not started for service key [" + serviceKey + "]");
+        // Deliberately without client concerns - this matches the gateway /availablez probe,
+        // which issues a bare, unauthenticated gRPC health check directly to each service.
+        return HealthGrpc.newBlockingStub(serviceChannels.get(serviceKey));
     }
 
     public TracMetadataApiGrpc.TracMetadataApiFutureStub metaClientFuture() {
