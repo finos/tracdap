@@ -171,6 +171,11 @@ public abstract class TracServiceBase {
     // only once doStartup() has completed successfully (see start() / stop()).
     private final HealthStatusManager healthStatusManager = initHealthStatusManager();
 
+    // Protocol-neutral view of the same readiness state, for services that do not expose gRPC
+    // (e.g. HTTP / Jetty services that serve their own /availablez endpoint). True only while the
+    // service has completed startup and is not shutting down - see start() / stop().
+    private volatile boolean serving = false;
+
     private static HealthStatusManager initHealthStatusManager() {
         var manager = new HealthStatusManager();
         manager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
@@ -190,6 +195,21 @@ public abstract class TracServiceBase {
      */
     protected BindableService getHealthService() {
         return healthStatusManager.getHealthService();
+    }
+
+    /**
+     * Whether the service has completed startup and is ready to serve requests.
+     *
+     * <p>Returns true only after doStartup() has completed successfully, and false again once
+     * shutdown begins. This is the protocol-neutral equivalent of the gRPC health SERVING status,
+     * intended for HTTP services that expose their own readiness endpoint (e.g. /availablez).
+     * Because doStartup() brings up critical dependencies (a service that cannot reach its database
+     * fails startup and never becomes serving), a serving service is genuinely able to do its job.</p>
+     *
+     * @return true if the service is started and not shutting down
+     */
+    protected boolean isServing() {
+        return serving;
     }
 
     /**
@@ -296,6 +316,7 @@ public abstract class TracServiceBase {
 
             // Startup completed successfully - report SERVING on the gRPC health service
             healthStatusManager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+            serving = true;
 
             // If requested, install a shutdown handler for a graceful exit
             // This is needed when running a real server instance, but not when running embedded tests
@@ -348,6 +369,7 @@ public abstract class TracServiceBase {
             log.info("Service is going down...");
 
             // Report NOT_SERVING as soon as shutdown begins, so readiness probes stop treating this service as available
+            serving = false;
             healthStatusManager.enterTerminalState();
 
             var exitCode = timedSequence(this::doShutdown, shutdownTimeout, "shutdown");

@@ -39,7 +39,10 @@ import org.slf4j.Logger;
 import javax.annotation.Nonnull;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -131,9 +134,8 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
         var probes = new LinkedHashMap<String, CompletableFuture<Boolean>>();
 
         for (var service : services) {
-            var serviceKey = service.serviceKey();
-            var probe = CompletableFuture.supplyAsync(() -> probeService(serviceKey));
-            probes.put(serviceKey, probe);
+            var probe = CompletableFuture.supplyAsync(() -> probeService(service));
+            probes.put(service.serviceKey(), probe);
         }
 
         // Wait for all probes to complete
@@ -163,21 +165,33 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
         return sb.toString();
     }
 
-    private boolean probeService(String serviceKey) {
+    private boolean probeService(ServiceInfo service) {
 
         // A bare TCP connection only proves the service has bound its port, not that it can serve
-        // requests. Instead, issue a standard gRPC health check (grpc.health.v1.Health/Check): the
-        // service reports SERVING only once its startup sequence has fully completed.
+        // requests. Instead, probe each service using its own protocol so the answer reflects real
+        // readiness: gRPC services expose the standard gRPC health service (grpc.health.v1.Health),
+        // and HTTP services serve their own /availablez endpoint. In both cases the service only
+        // reports ready once its startup sequence (including its critical dependencies) has completed.
+
+        var serviceKey = service.serviceKey();
+
+        // Internal gateway -> service hops are plaintext (see RoutingUtils.serviceTarget), matching
+        // the previous TCP probe. Terminating TLS at the edge is handled separately by the gateway.
+        var target = RoutingUtils.serviceTarget(platformConfig, serviceKey);
+        var host = target.getHost();
+        var port = (int) target.getPort();
+
+        if (service.hasGrpc())
+            return probeGrpcHealth(serviceKey, host, port);
+        else
+            return probeHttpAvailability(serviceKey, host, port);
+    }
+
+    private boolean probeGrpcHealth(String serviceKey, String host, int port) {
 
         ManagedChannel channel = null;
 
         try {
-            var target = RoutingUtils.serviceTarget(platformConfig, serviceKey);
-            var host = target.getHost();
-            var port = (int) target.getPort();
-
-            // Internal gateway -> service hops are plaintext (see RoutingUtils.serviceTarget), matching
-            // the previous TCP probe. Terminating TLS at the edge is handled separately by the gateway.
             channel = NettyChannelBuilder.forAddress(host, port)
                     .usePlaintext()
                     .build();
@@ -193,7 +207,7 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
         }
         catch (Exception e) {
             // Not reachable, health not yet SERVING, or no health service -> treat as unavailable
-            log.debug("Service [{}] health probe failed: {}", serviceKey, e.getMessage());
+            log.debug("Service [{}] gRPC health probe failed: {}", serviceKey, e.getMessage());
             return false;
         }
         finally {
@@ -206,6 +220,38 @@ public class AvailabilityHandler extends ChannelInboundHandlerAdapter {
                     Thread.currentThread().interrupt();
                 }
             }
+        }
+    }
+
+    private boolean probeHttpAvailability(String serviceKey, String host, int port) {
+
+        // HTTP services serve their own /availablez, returning "<serviceKey>=yes|no" - the same
+        // plain-text format the gateway uses. The service is ready only when the body reports "=yes".
+
+        try {
+            var client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofMillis(PROBE_TIMEOUT_MS))
+                    .build();
+
+            var uri = URI.create("http://" + host + ":" + port + "/" + PROTOCOL);
+            var request = java.net.http.HttpRequest.newBuilder(uri)
+                    .timeout(Duration.ofMillis(PROBE_TIMEOUT_MS))
+                    .GET()
+                    .build();
+
+            var response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+
+            return response.statusCode() == 200 && response.body().contains("=yes");
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.debug("Service [{}] HTTP availability probe interrupted", serviceKey);
+            return false;
+        }
+        catch (Exception e) {
+            // Not reachable or not ready -> treat as unavailable
+            log.debug("Service [{}] HTTP availability probe failed: {}", serviceKey, e.getMessage());
+            return false;
         }
     }
 
