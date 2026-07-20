@@ -60,38 +60,34 @@ Commercially supported deployments of the TRAC platform are available separately
     .. grid-item-card::
         :class-footer: sd-border-0
 
-        **Build applications and workflows**
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        **Metadata Listing**
+        ^^^^^^^^^^^^^^^^^^^^
 
-        Connect web or desktop applications to the TRAC services and metadata catalog.
-
-        *(Also relevant for system-to-system integration).*
+        Auto-generated reference for the TRAC metadata model.
 
         +++
-        .. button-ref:: app_dev/index
+        .. button-ref:: reference/metadata_listing
             :color: primary
             :outline:
             :expand:
 
-            App development
+            Metadata Listing
 
     .. grid-item-card::
         :class-footer: sd-border-0
 
+        **Service Listing**
+        ^^^^^^^^^^^^^^^^^^^
 
-        **Deploy and manage TRAC D.A.P.**
-        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-        Explore deployment, configuration and integration,
-        for dev-ops engineers and systems administrators.
+        Auto-generated reference for the TRAC platform service APIs.
 
         +++
-        .. button-ref:: deployment/index
+        .. button-ref:: reference/service_listing
             :color: primary
             :outline:
             :expand:
 
-            Deployment
+            Service Listing
 
 
 .. toctree::
@@ -100,9 +96,8 @@ Commercially supported deployments of the TRAC platform are available separately
 
     overview/index
     modelling/index
-    app_dev/index
-    deployment/index
-    reference/index
+    reference/metadata_listing
+    reference/service_listing
 
 
 .. rubric:: Can't find what you're looking for?

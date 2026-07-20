@@ -12,3 +12,4 @@ Modelling
     :maxdepth: 3
 
     tutorial/index
+    ../reference/model_api_python
