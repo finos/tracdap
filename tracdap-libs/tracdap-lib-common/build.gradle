@@ -60,6 +60,9 @@ dependencies {
     api group: 'io.grpc', name: 'grpc-protobuf', version: "$grpc_version"
     api group: 'io.grpc', name: 'grpc-context', version: "$grpc_version"
 
+    // Standard gRPC health service (grpc.health.v1) - used for service readiness / the gateway /availablez probe
+    api group: 'io.grpc', name: 'grpc-services', version: "$grpc_version"
+
     // CLI is implemented with Apache Commons CLI
     implementation group: 'commons-cli', name: 'commons-cli', version: "$commons_cli_version"
 

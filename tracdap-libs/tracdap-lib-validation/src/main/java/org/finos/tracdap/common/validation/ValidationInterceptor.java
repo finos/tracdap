@@ -82,16 +82,29 @@ public class ValidationInterceptor extends DelayedExecutionInterceptor {
             this.loggingEnabled = loggingEnabled;
 
             // Look up the descriptor for this call, to use for validation
+            // Methods that are not TRAC API methods (e.g. the standard gRPC health service) are not
+            // registered and have no validation rules - findMethodDescriptor returns null for those,
+            // and onMessage() passes them straight through without validation.
             var grpcDescriptor = serverCall.getMethodDescriptor();
             var grpcMethodName = grpcDescriptor.getFullMethodName();
 
-            this.methodDescriptor = serviceRegister.getMethodDescriptor(grpcMethodName);
+            this.methodDescriptor = serviceRegister.findMethodDescriptor(grpcMethodName);
         }
 
         @Override
         public void onMessage(ReqT req) {
 
             if (!validated) {
+
+                // Non-TRAC methods (e.g. the gRPC health service) have no registered validator -
+                // pass them straight through without validation.
+                if (methodDescriptor == null) {
+
+                    validated = true;
+                    startCall();
+                    delegate().onMessage(req);
+                    return;
+                }
 
                 try {
 

@@ -37,6 +37,10 @@ public class RouteBuilder {
     public static final String HEALTH_CHECK_KEY = "healthz";
     public static final String HEALTH_CHECK_PATH = "/healthz";
 
+    public static final String AVAILABLE_NAME = "Service Availability";
+    public static final String AVAILABLE_KEY = "availablez";
+    public static final String AVAILABLE_PATH = "/availablez";
+
     private static final Logger log = LoggerFactory.getLogger(RouteBuilder.class);
 
     private static final ClassLoader API_CLASSLOADER = RouteBuilder.class.getClassLoader();
@@ -63,6 +67,13 @@ public class RouteBuilder {
         if (!customHealth) {
             var healthCheckRoute = buildHealthCheckRoute();
             routes.add(healthCheckRoute);
+        }
+
+        var customAvailable = customRoutes.stream().anyMatch(route -> route.getRouteKey().equals(AVAILABLE_KEY));
+
+        if (!customAvailable) {
+            var availableRoute = buildAvailableRoute();
+            routes.add(availableRoute);
         }
 
         for (var serviceInfo : services) {
@@ -121,6 +132,27 @@ public class RouteBuilder {
         var matcher = (IRouteMatcher) (method, url) ->
                 url.getPath().equals(HEALTH_CHECK_PATH) &&
                 (method == HttpMethod.HEAD || method == HttpMethod.GET);
+
+        return new Route(routeIndex, routeConfig, matcher);
+    }
+
+    private Route buildAvailableRoute() {
+
+        var routeIndex = nextRouteIndex++;
+
+        var routeConfig = RouteConfig.newBuilder()
+                .setRouteKey(AVAILABLE_KEY)
+                .setRouteName(AVAILABLE_NAME)
+                .setRouteType(RoutingProtocol.INTERNAL)
+                .addProtocols(RoutingProtocol.HTTP)
+                .setMatch(RoutingMatch.newBuilder()
+                        .setPath(AVAILABLE_PATH))
+                .setTarget(RoutingTarget.newBuilder()
+                        .setScheme(AVAILABLE_KEY))
+                .build();
+
+        var matcher = (IRouteMatcher) (method, url) ->
+                url.getPath().equals(AVAILABLE_PATH) && method == HttpMethod.GET;
 
         return new Route(routeIndex, routeConfig, matcher);
     }
