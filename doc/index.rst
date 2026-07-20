@@ -44,18 +44,18 @@ Commercially supported deployments of the TRAC platform are available separately
     .. grid-item-card::
         :class-footer: sd-border-0
 
-        **Build and run models**
-        ^^^^^^^^^^^^^^^^^^^^^^^^
+        **Service Listing**
+        ^^^^^^^^^^^^^^^^^^^
 
-        Use the TRAC runtime APIs to build portable, self-describing models.
+        Auto-generated reference for the TRAC platform service APIs.
 
         +++
-        .. button-ref:: modelling/index
+        .. button-ref:: reference/service_listing
             :color: primary
             :outline:
             :expand:
 
-            Modelling
+            Service Listing
 
     .. grid-item-card::
         :class-footer: sd-border-0
@@ -76,18 +76,34 @@ Commercially supported deployments of the TRAC platform are available separately
     .. grid-item-card::
         :class-footer: sd-border-0
 
-        **Service Listing**
-        ^^^^^^^^^^^^^^^^^^^
+        **Model API**
+        ^^^^^^^^^^^^^
 
-        Auto-generated reference for the TRAC platform service APIs.
+        Auto-generated reference for the TRAC Python runtime API.
 
         +++
-        .. button-ref:: reference/service_listing
+        .. button-ref:: reference/model_api_python
             :color: primary
             :outline:
             :expand:
 
-            Service Listing
+            Model API
+
+    .. grid-item-card::
+        :class-footer: sd-border-0
+
+        **Modelling Tutorial**
+        ^^^^^^^^^^^^^^^^^^^^^^
+
+        Use the TRAC runtime APIs to build portable, self-describing models.
+
+        +++
+        .. button-ref:: modelling/tutorial/index
+            :color: primary
+            :outline:
+            :expand:
+
+            Modelling Tutorial
 
 
 .. toctree::
@@ -95,9 +111,10 @@ Commercially supported deployments of the TRAC platform are available separately
     :maxdepth: 1
 
     overview/index
-    modelling/index
-    reference/metadata_listing
     reference/service_listing
+    reference/metadata_listing
+    reference/model_api_python
+    modelling/tutorial/index
 
 
 .. rubric:: Can't find what you're looking for?

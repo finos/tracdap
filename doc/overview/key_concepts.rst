@@ -118,7 +118,7 @@ schema function.
       - The schema of the output data which the model generates.
 
 .. note::
-    See :doc:`/modelling/index` for more details on how to build TRAC-ready models.
+    See :doc:`/modelling/tutorial/index` for more details on how to build TRAC-ready models.
 
 
 The existence of a properly declared model schema is confirmed when importing a model onto TRAC using
