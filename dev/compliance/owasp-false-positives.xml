@@ -325,18 +325,6 @@
         <cve>CVE-2026-0994</cve>
     </suppress>
 
-    <!-- CVE-2026-54515: jackson-databind case-insensitive deserialization can bypass per-property -->
-    <!-- @JsonIgnoreProperties. There is no fixed 2.x release: 2.21.5 and 2.22.1 are both still listed -->
-    <!-- as affected by the revised advisory, and the only patched line is Jackson 3.x (tools.jackson -->
-    <!-- 3.1.4+), which requires a Java 17 baseline and a group/package migration across TRAC. -->
-    <!-- Not reachable in our usage regardless: TRAC does not use @JsonIgnoreProperties or polymorphic / -->
-    <!-- default typing (the only databind use reads into plain Object in ConfigParser). Revisit if a -->
-    <!-- fixed 2.x release appears or as part of a future Jackson 3.x / Java 17 migration. -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
-        <cve>CVE-2026-54515</cve>
-    </suppress>
-
     <!-- CVE-2026-56876: extract-zip, no fixed release available (2.0.1 is the latest). -->
     <!-- It is a build-only transitive dependency of owasp-dependency-check (the compliance tool -->
     <!-- itself), used to extract the dependency-check CLI from a trusted GitHub release archive. -->
