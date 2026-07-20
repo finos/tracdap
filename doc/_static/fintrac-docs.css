@@ -177,6 +177,17 @@ a.reference:not(:disabled):not(.disabled).active,
     background-color: #F2F2F2;
 }
 
+/* Let long, unbreakable identifiers wrap instead of forcing the sidebar wider.
+   .col-lg-3 has flex-shrink:0, so without this, a long nav entry (e.g. some
+   tracdap.api class names) can push the sidebar past its 25% width and wrap
+   the whole row, stacking the main content below it. */
+.site-toc .toc a {
+    display: block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
 
 /* Sphinx Design Elements */
 
