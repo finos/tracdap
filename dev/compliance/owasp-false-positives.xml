@@ -313,12 +313,6 @@
         <cve>CVE-2026-33117</cve>
     </suppress>
 
-    <!-- CVE-2026-0994: protobuf-java, no fix available at time of writing -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf\-java.*@.*$</packageUrl>
-        <cve>CVE-2026-0994</cve>
-    </suppress>
-
     <!-- CVE-2026-56876: extract-zip, no fixed release available (2.0.1 is the latest). -->
     <!-- It is a build-only transitive dependency of owasp-dependency-check (the compliance tool -->
     <!-- itself), used to extract the dependency-check CLI from a trusted GitHub release archive. -->
