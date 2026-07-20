@@ -106,6 +106,10 @@ service TracStorageApi {
   rpc writeSmallFile(StorageWriteRequest) returns (StorageOkResponse);
 }
 
+/**
+ * Identifies a file or directory in TRAC storage, for calls that do not send or
+ * receive file content (exists(), size(), stat(), ls(), mkdir(), rm(), rmdir()).
+ */
 message StorageRequest {
 
   string tenant = 1;
@@ -113,6 +117,9 @@ message StorageRequest {
   string storagePath = 3;
 }
 
+/**
+ * Identifies a file to read from TRAC storage, for readFile() and readSmallFile().
+ */
 message StorageReadRequest {
 
   string tenant = 1;
@@ -120,6 +127,12 @@ message StorageReadRequest {
   string storagePath = 3;
 }
 
+/**
+ * Identifies a file to write in TRAC storage, together with its content.
+ *
+ * Used as a single message for writeSmallFile(), or as a stream of messages
+ * (each carrying one chunk of content) for writeFile().
+ */
 message StorageWriteRequest {
 
   string tenant = 1;
@@ -129,37 +142,62 @@ message StorageWriteRequest {
   bytes content = 4;
 }
 
+/**
+ * Result of an exists() call, indicating whether the given path was found.
+ */
 message StorageExistsResponse {
 
   bool exists = 1;
 }
 
+/**
+ * Result of a size() call, giving the size of a file in bytes.
+ */
 message StorageSizeResponse {
 
   int64 size = 1;
 }
 
+/**
+ * Result of a stat() call, giving metadata for a file or directory.
+ */
 message StorageStatResponse {
 
   FileStat stat = 1;
 }
 
+/**
+ * Result of an ls() call, listing the metadata for each entry in a directory.
+ */
 message StorageLsResponse {
 
   repeated FileStat stat = 1;
 }
 
+/**
+ * The content of a file read from TRAC storage, together with its metadata.
+ *
+ * Used as a single message for readSmallFile(), or as a stream of messages
+ * (each carrying one chunk of content) for readFile().
+ */
 message StorageReadResponse {
 
   FileStat stat = 1;
   bytes content = 2;
 }
 
+/**
+ * Result of a storage operation that does not return file content, such as
+ * mkdir(), rm() or rmdir().
+ */
 message StorageOkResponse {
 
   FileStat stat = 1;
 }
 
+/**
+ * Metadata for a file or directory in TRAC storage.
+ */
 message FileStat {
 
   string storagePath = 1;
@@ -171,6 +209,9 @@ message FileStat {
   optional metadata.DatetimeValue atime = 6;
 }
 
+/**
+ * Distinguishes files from directories in FileStat.
+ */
 enum FileType {
   FILE_TYPE_NOT_SET = 0;
   FILE = 1;
