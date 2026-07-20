@@ -301,7 +301,13 @@
         <cve>CVE-2024-35255</cve>
     </suppress>
 
-    <!-- CVE-2026-25087: Apache Arrow vulnerability, no fix available at time of writing -->
+    <!-- CVE-2026-25087: FALSE POSITIVE against the Java library. This is a use-after-free in the -->
+    <!-- Apache Arrow *C++* IPC reader (pre-buffering + variadic buffers), fixed in Arrow C++ 23.0.1. -->
+    <!-- TRAC depends only on pure-Java arrow modules (arrow-vector, arrow-memory-*, arrow-format, -->
+    <!-- arrow-algorithm) - no JNI/C++-bundling modules (arrow-dataset/gandiva/c-data/orc) - so the -->
+    <!-- vulnerable C++ code is not present. A version bump does not clear the finding: arrow-java is -->
+    <!-- versioned independently of Arrow C++ (latest arrow-java is 19.0.0, there is no arrow-java -->
+    <!-- 23.0.1), and the CVE's CPE range (15.0.0-23.0.0) still covers all current arrow-java versions. -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/.*@.*$</packageUrl>
         <cve>CVE-2026-25087</cve>
