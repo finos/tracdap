@@ -1,7 +1,7 @@
 
-**************************************
-Chapter 5 - Optional Inputs & Outputs
-**************************************
+****************
+Optional Schemas
+****************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 

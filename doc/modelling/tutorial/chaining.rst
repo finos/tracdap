@@ -1,7 +1,7 @@
 
-***************************
-Chapter 4 - Chaining Models
-***************************
+***************
+Chaining Models
+***************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 

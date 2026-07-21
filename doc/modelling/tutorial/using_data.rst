@@ -1,13 +1,10 @@
 
-**********************
-Chapter 3 - Using Data
-**********************
+****************************
+Wrapping Models & Using Data
+****************************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 
-
-Wrap existing code
-------------------
 
 In the previous tutorial, model code was written directly in the :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`
 method of the model class. An alternative approach is to put the model code in a separate class or function,
@@ -30,7 +27,7 @@ the top-level class or function as parameters, as shown in this example.
 Defining model requirements
 ---------------------------
 
-Now let's write the model wrapper class. The previous tutorial showed how to define parameters
+Now let's write the model wrapper class. :doc:`hello_world` showed how to define parameters
 so we can use the same syntax. We'll define the three parameters needed by the model function:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
@@ -197,7 +194,7 @@ Input and output paths are always relative to the data storage location, it is n
 absolute paths for model inputs and outputs in a job config. This is part of how the TRAC D.A.P. framework
 operates, data is always accessed from a storage location, with locations defined in the system config.
 
-The model parameters are also set in the job config, in the same way as the previous tutorial.
+The model parameters are also set in the job config, in the same way as in :doc:`hello_world`.
 
 .. literalinclude:: ../../../examples/models/python/config/using_data.yaml
     :caption: config/using_data.yaml

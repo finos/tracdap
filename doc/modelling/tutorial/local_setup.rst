@@ -1,9 +1,15 @@
 
-***********************
-Chapter 1 - Local Setup
-***********************
+***********
+Local Setup
+***********
 
 This tutorial is based on example code which can be found in the |examples_repo|.
+
+These tutorials show how to build models using the TRAC D.A.P. runtime locally, in a context
+such as an IDE or the command line, without needing a running TRAC platform to hand. A model
+built this way needs no code changes to run on the platform - the same model class can be
+deployed and executed there as-is. This is possible because of the runtime's dev mode, explained
+in the next tutorial.
 
 
 Requirements
@@ -12,8 +18,8 @@ Requirements
 The TRAC D.A.P. runtime for Python has these requirements:
 
 * Python: 3.10 or later
-* Pandas: 1.3 or later (optional)
-* NumPy: 1.22 or later (optional, required by Pandas)
+* Pandas: 1.3 up to 2.3.x (optional)
+* NumPy: 1.22 up to 2.3.x (optional, required by Pandas)
 * Polars: 1.X (optional)
 
 3rd party libraries may impose additional constraints on supported versions of key libraries.
@@ -133,13 +139,23 @@ The runtime package can be installed directly from PyPI:
 
     pip install tracdap-runtime
 
-The runtime depends on Pandas and PySpark, so these libraries will be pulled in as
-dependencies. If you want to target particular versions, you can install them explicitly:
+The core runtime package does not include a dataframe library - Pandas and Polars are both
+optional extras, so install whichever your model needs:
 
 .. code-block::
     :class: container
 
-    pip install "pandas == 2.1.4"
+    pip install "tracdap-runtime[pandas]"
+    pip install "tracdap-runtime[polars]"
+
+The *pandas* extra also pulls in NumPy automatically - there is no separate extra to install for it.
+
+If you want to target a particular version of Pandas, pin it alongside the extra:
+
+.. code-block::
+    :class: container
+
+    pip install "tracdap-runtime[pandas]" "pandas == 2.1.4"
 
 Alternatively, you can create *requirements.txt* in the root of your project folder and record
 projects requirements there.
@@ -147,10 +163,22 @@ projects requirements there.
 .. note::
 
     The runtime supports both Pandas 1.X and 2.X. Models written for 1.X might not work with 2.X and vice versa.
-    From TRAC D.A.P. 0.6 onward, new installations default to Pandas 2.X. To change the version of Pandas in your
-    sandbox environment, you can use the pip install command:
+    Installing the *pandas* extra without pinning a version will pull in the latest compatible release,
+    currently Pandas 2.X. To use Pandas 1.X in your local environment instead, pin the version explicitly:
 
     .. code-block::
         :class: container
 
-        pip install "pandas == 1.5.3"
+        pip install "tracdap-runtime[pandas]" "pandas == 1.5.3"
+
+
+Installing other packages
+-------------------------
+
+The dataframe extras above are the only packages the runtime itself knows how to exchange data
+with, through methods like :py:meth:`get_pandas_table() <tracdap.rt.api.TracContext.get_pandas_table>`.
+A model is free to use any other third-party package for its own logic - for example the
+:doc:`file_io` tutorial uses Matplotlib to render a chart as a model output. Packages like this
+have nothing to do with the runtime's extras mechanism; install them the same way you would for
+any Python project, and record them in your own project's *requirements.txt* alongside the
+runtime itself.

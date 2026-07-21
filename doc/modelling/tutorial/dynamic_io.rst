@@ -1,7 +1,7 @@
 
-***************************
-Chapter 6 - Dynamic Schemas
-***************************
+***************
+Dynamic Schemas
+***************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 

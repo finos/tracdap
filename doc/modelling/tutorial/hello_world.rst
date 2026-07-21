@@ -1,7 +1,7 @@
 
-***********************
-Chapter 2 - Hello World
-***********************
+***********
+Hello World
+***********
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 
@@ -11,7 +11,7 @@ Writing a model
 
 To write a model, start by importing the runtime's API package and inheriting from the
 :py:class:`TracModel <tracdap.rt.api.TracModel>` base class. This class is the entry point
-for running code with the runtime, both on the platform and using the local development sandbox.
+for running code with the runtime, both on the platform and when running locally.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/hello_world.py
     :caption: src/tutorial/hello_world.py
@@ -86,8 +86,15 @@ To run the model, we need to supply two configuration files:
 
 When models are deployed to run on the platform, the runtime generates the job configuration according to scheduled
 instructions and/or user input. A full set of metadata is assembled for every object and setting that goes
-into a job, so that execution can be strictly controlled and validated. In development mode most of this
-configuration can be inferred, so the config needed to run models is kept short and readable.
+into a job, so that execution can be strictly controlled and validated.
+
+Running locally uses **dev mode**, where the runtime infers and fills in this metadata itself instead of
+requiring it up front - object IDs, storage definitions and schemas are generated from whatever is available
+(parameters, file paths, the model class itself), rather than assembled from a governed catalog. This is why
+the config needed to run a model locally can be kept short and readable, at the cost of the strict validation
+a platform deployment enforces. :py:func:`launch_model() <tracdap.rt.launch.launch_model>` runs in dev mode by
+default; the command-line launcher used in later tutorials (see :doc:`chaining`) needs the ``--dev-mode`` flag
+to enable it explicitly.
 
 For our Hello World model, we only need to supply a single parameter in the job configuration:
 
