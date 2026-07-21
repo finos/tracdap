@@ -1,6 +1,6 @@
 <div align="center">
 
-![TRAC the modern model platform](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
+<img alt="tracdap-runtime" src="https://github.com/finos/tracdap/raw/main/doc/_images/runtime_logo.png" width="400" />
 
   <br />
 
@@ -25,14 +25,12 @@
 
 # Git Extension for the TRAC Model Runtime
 
-This extension allows TRAC to load models dynamically from Git repositories.
+This extension allows the tracdap-runtime to load models dynamically from Git repositories.
 
 - Includes a pure-Python implementation using the excellent [dulwich](https://pypi.org/project/dulwich/) library
 - Includes a native Git implementation that wraps a Git binaries on the host system
 - Support for private repositories using tokens
 - Handles corporate firewalls, proxies and SSL
-
-This extension is a pre-release and will be finalized inTRAC 0.10.
 
 
 ## Installing
@@ -69,7 +67,7 @@ By default the extension will use the pure-python implementation of Git, to use 
 `password` properties, or the `token` property. In production deployments these properties should be
 supplied using the TRAC secrets mechanism.
 
-Using the pure-Python implementation, all of TRAC's network properties are respected.
+Using the pure-Python implementation, all of the runtime's network properties are respected.
 In particular, to supply an enterprise root trust certificate you can set
 `network.ssl.caCertificates` to the path of a certificate in PEM format.
 Setting `network.ssl.publicCertificates: true` will  include the global, public CAs
@@ -81,5 +79,5 @@ setting `git.http.sslCAInfo` will set the `sslCAInfo` property in the `http` sec
 Git configuration. This is an alternate way of specifying SSL details that works with the
 native Git implementation, but can also be used to set arbitrary Git configuration values
 with either implementation. Some Git config values may not be respected by Dulwich, so it
-is recommended to use the TRAC config settings with the pure-Python implementation and
+is recommended to use the runtime's config settings with the pure-Python implementation and
 native Git config settings with the native Git implementation.
