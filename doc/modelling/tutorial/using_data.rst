@@ -1,6 +1,6 @@
 
 **********************
-Chapter 2 - Using Data
+Chapter 3 - Using Data
 **********************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
@@ -12,7 +12,7 @@ Wrap existing code
 In the previous tutorial, model code was written directly in the :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`
 method of the model class. An alternative approach is to put the model code in a separate class or function,
 which can be called by :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`. This can be useful
-if you have a library of existing model code that you want to wrap with the TRAC model API.
+if you have a library of existing model code that you want to wrap with the runtime's model API.
 
 If you are wrapping code in this way, it is important that all the required inputs are passed to
 the top-level class or function as parameters, as shown in this example.
@@ -30,7 +30,7 @@ the top-level class or function as parameters, as shown in this example.
 Defining model requirements
 ---------------------------
 
-Now let's write the TRAC model wrapper class. The previous tutorial showed how to define parameters
+Now let's write the model wrapper class. The previous tutorial showed how to define parameters
 so we can use the same syntax. We'll define the three parameters needed by the model function:
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/using_data.py
@@ -43,7 +43,7 @@ so we can use the same syntax. We'll define the three parameters needed by the m
 
 The example model function has one data input, which is a table called *customer_loans*.
 The function :py:func:`define_output_table() <tracdap.rt.api.define_output_table>` in the
-TRAC API allows us to define a tabular dataset for use as a model input, which is exactly
+runtime's API allows us to define a tabular dataset for use as a model input, which is exactly
 what is needed. Each field is defined using the shorthand function :py:func:`trac.F() <tracdap.rt.api.F>`.
 This approach works well for small models with simple schemas (the next tutorial discusses
 managing more complex models using schema files).
@@ -57,18 +57,18 @@ Business key fields cannot contain nulls or duplicate records. Defining a busine
 optional, if the dataset doesn't have a natural business key there is no need to create one.
 There are two categorical fields in this dataset which can be marked in the schema as well.
 Setting business key and categorical flags will allow for more meaningful outputs, for example
-by making information available to a UI for sorting and filtering. TRAC may also perform some
+by making information available to a UI for sorting and filtering. The runtime may also perform some
 optimisations using these flags. As a general rule, define business key or categorical fields
 where they are a natural expression of the data.
 
-When the *customer_loans* dataset is accessed at runtime, TRAC will guarantee the dataset is supplied
+When the *customer_loans* dataset is accessed, the runtime will guarantee the dataset is supplied
 with exactly this arrangement of columns: the order, case and data types will be exactly as defined.
 Order and case are treated leniently - if the incoming dataset has a different field order or casing,
 the fields will be reordered and renamed. Any extra fields will be dropped. Data types are also guaranteed
 to match what is in the schema.
 
 For models running locally, the *--dev-mode* option will enable a more lenient handling of data types.
-In this mode, TRAC will attempt to convert data to use the specified field types, for example by parsing
+In this mode, the runtime will attempt to convert data to use the specified field types, for example by parsing
 dates stored as strings or casting integers to floats. Conversions that fail or lose data will not be allowed.
 If the conversion succeeds, the dataset presented to the model is guaranteed to match the schema.
 This option can be very useful for local development if data is held in CSV files. Models launched using
@@ -136,9 +136,9 @@ they can be passed straight into the model code.
 The model code has produced a Pandas dataframe that we want to record as an output. To do this, we can use
 :py:meth:`put_pandas_table() <tracdap.rt.api.TracContext.put_pandas_table>`. The dataframe should match
 exactly with what is defined in the output schema. If any columns are missing or have the wrong data type,
-TRAC will report a runtime validation error. When considering data types for outputs TRAC does provide some
+the runtime will report a runtime validation error. When considering data types for outputs the runtime does provide some
 leniency. For example, if a timestamp field is supplied with the wrong precision, or an integer column is
-supplied in place of decimals, TRAC will perform conversions. Any conversion that would result in loss of
+supplied in place of decimals, the runtime will perform conversions. Any conversion that would result in loss of
 data (e.g. values outside the allowed range) will result in an error. The output dataset passed on to the
 platform is guaranteed to have the correct data types as specified in
 :py:meth:`define_outputs() <tracdap.rt.api.TracModel.define_outputs>`.
@@ -194,7 +194,7 @@ section. In this example we are using CSV files and just specify a simple path f
 and output.
 
 Input and output paths are always relative to the data storage location, it is not possible to use
-absolute paths for model inputs and outputs in a job config. This is part of how the TRAC framework
+absolute paths for model inputs and outputs in a job config. This is part of how the TRAC D.A.P. framework
 operates, data is always accessed from a storage location, with locations defined in the system config.
 
 The model parameters are also set in the job config, in the same way as the previous tutorial.
@@ -218,7 +218,7 @@ Schema files
 
 For small models like this example defining schemas in code is simple, however for more complex
 models in real-world situations the schemas are often quite large and can be reused across a set
-of related models. To cater for more complex schemas, TRAC allows schemas to be defined in schema
+of related models. To cater for more complex schemas, the runtime allows schemas to be defined in schema
 files.
 
 A schema file is just a CSV file that lists the field names, types and labels for a dataset as well as
@@ -234,7 +234,7 @@ as you can see they provide the same information that was defined in code earlie
    :header-rows: 1
 
 The default values for the field flags are categorical = false, business_key = false and not_null = true
-if business_key = true, otherwise not_null = false. The TRAC platform ignores the format_code field,
+if business_key = true, otherwise not_null = false. TRAC D.A.P. ignores the format_code field,
 but it can be used to describe how data is displayed in client applications.
 
 To use schema files, they must be included as part of your Python package structure. That means they

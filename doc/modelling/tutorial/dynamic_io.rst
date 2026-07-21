@@ -1,70 +1,10 @@
 
-****************************
-Chapter 4 - Inputs & Outputs
-****************************
+***************************
+Chapter 6 - Dynamic Schemas
+***************************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 
-
-Optional Inputs & Outputs
--------------------------
-
-Optional inputs and outputs provide a way for a model to react to the available data.
-If an input is marked as optional then it may not be supplied, the model code must check
-at runtime to see if it is available. When an output is marked as optional the model can
-choose whether to provide that output or not, for example in response to the input data
-or a boolean flag supplied as a model parameter.
-
-Here is an example of defining an optional input, using schemas read from schema files:
-
-.. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
-    :caption: src/tutorial/optional_io.py
-    :name: optional_io_part_1
-    :language: python
-    :lines: 39 - 49
-    :linenos:
-    :lineno-start: 39
-
-Schemas defined in code can also be marked as optional, let's use that approach to define an
-optional output:
-
-.. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
-    :name: optional_io_part_2
-    :language: python
-    :class: container
-    :lines: 51 - 67
-    :linenos:
-    :lineno-start: 51
-
-Now let's see how to use optional inputs and outputs in :py:meth:`run_model() <tracdap.rt.api.TracModel.run_model>`.
-Since the input is optional we will need to check if it is available before we can use it.
-TRAC provides the :py:meth:`has_dataset() <tracdap.rt.api.TracContext.has_dataset>`
-method for this purpose. If the optional dataset exists we will use it to apply
-some filtering to the customer accounts list, then produce the optional output
-dataset with some stats on the filtered accounts. Here is what that looks like:
-
-.. literalinclude:: ../../../examples/models/python/src/tutorial/optional_io.py
-    :name: optional_io_part_3
-    :language: python
-    :class: container
-    :lines: 77 - 86
-    :linenos:
-    :lineno-start: 77
-
-In this example the optional output is only produced when the optional input is
-supplied - that is not a requirement and the model can decide whether to
-provide optional outputs based on whatever criteria are appropriate.
-If an optional output is not going to be produced, then simply do not output the
-dataset and TRAC will understand it has been omitted. If an optional output is
-produced then it is subject to all the same validation rules as any other dataset.
-
-.. seealso::
-    Full source code is available for the
-    :example:`Optional IO example on GitHub <src/tutorial/optional_io.py>`.
-
-
-Dynamic Inputs & Outputs
-------------------------
 
 Dynamic inputs and outputs allow a model to work with data when the schema is not known
 in advance. This allows one model to work with a wide range of data inputs, which can be
@@ -79,22 +19,22 @@ monitoring and data quality reporting.
 
 .. admonition:: Good to know
 
-    TRAC normally performs schema validation before a job is executed, to make sure the models
+    The runtime normally performs schema validation before a job is executed, to make sure the models
     and data are compatible. When models are defined with dynamic schemas validation is delayed
     until runtime. This means validation errors will be reported when the job executes, rather
-    than before it starts. For jobs with a mix of static and dynamic schemas TRAC will still
+    than before it starts. For jobs with a mix of static and dynamic schemas the runtime will still
     validate the static schemas up front, validation is only delayed for the dynamic schemas.
 
 
 Schema Inspection
-^^^^^^^^^^^^^^^^^
+------------------
 
 This example use a dynamic input to get some information about the schema of an unknown dataset.
 This approach allows for building common reports that can run on a large collection of datasets
 with varied schemas.
 
 .. note::
-    The TRAC metadata store already holds an entry for every dataset on the platform,
+    TRAC D.A.P.'s metadata store already holds an entry for every dataset on the platform,
     you don't need to write a model just to get the schema of a dataset!
     However, the technique illustrated here can be used to build more detailed reports,
     such as data quality reports, model monitoring reports etc.
@@ -128,7 +68,7 @@ Now let's see how to use these datasets in the model.
     :lineno-start: 42
 
 The model gets the source dataset as normal, but it also gets the schema of the dataset using
-:py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` which returns aTRAC
+:py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` which returns a
 :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` object. The schema will
 agree precisely with the contents of the dataset, including the field order and casing, so we
 can use the information in the schema to operate on the dataset. In this example we just perform
@@ -147,7 +87,7 @@ type, nullability and the categorical flag:
 
 .. note::
     Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` returns a copy of
-    the TRAC schema object. If you want to manipulate it in your model code, for example to add
+    the schema object. If you want to manipulate it in your model code, for example to add
     or remove fields, that is perfectly fine and will not cause any adverse effects. This can be
     useful to create a dynamic output schema based on the contents of a dynamic input. Calling
     :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` a second time at some later
@@ -155,9 +95,9 @@ type, nullability and the categorical flag:
 
 **Using dynamic inputs locally**
 
-TRAC holds schema information for every dataset and passes this information on to models when
+TRAC D.A.P. holds schema information for every dataset and passes this information on to models when
 they run on the platform, which provides the schema for a dynamic input. When models run locally
-in the IDE, TRAC has to do schema inference so the input files need to hold schema information.
+in the IDE, the runtime has to do schema inference so the input files need to hold schema information.
 Today, the most popular format for storing data files with schema information is Parquet.
 
 Here is a sample job configuration for this model, using a Parquet file as the dynamic input.
@@ -171,14 +111,14 @@ the model will tell you about its schema.
     :linenos:
 
 .. note::
-    TRAC does not currently allow using CSV files as dynamic inputs when running locally. This is
+    The runtime does not currently allow using CSV files as dynamic inputs when running locally. This is
     because of the need to do schema inference, which is not reliable for CSV files. You can create
     Parquet files to test dynamic inputs by running a model with the output defined as a .parquet file
     in the job configuration.
 
 
 Data Generation
-^^^^^^^^^^^^^^^
+----------------
 
 Another use for dynamic schemas is to generate datasets based on some criteria. In this example
 the model receives one input which is a list of columns, and produces a output dataset which contains
@@ -224,14 +164,14 @@ as part of the call to :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_sc
 
 .. note::
     Calling :py:meth:`put_schema() <tracdap.rt.api.TracContext.put_schema>` creates a copy of
-    the TRAC schema object. Any changes made to the schema after it is saved will not be picked
-    up by TRAC. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` after
+    the schema object. Any changes made to the schema after it is saved will not be picked
+    up by the runtime. Calling :py:meth:`get_schema() <tracdap.rt.api.TracContext.get_schema>` after
     a schema has been set will always return the schema as it was saved.
 
-Once the schema is set the output can be saved as normal and TRAC will validate against the new schema.
+Once the schema is set the output can be saved as normal and the runtime will validate against the new schema.
 
 Dynamic Filtering
-^^^^^^^^^^^^^^^^^
+-------------------
 
 Lastly, let's see how to use dynamic schemas to create a generic data filtering model. This model
 will exclude records from a dataset, based on some filter criteria passed in as parameters. There
