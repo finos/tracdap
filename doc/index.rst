@@ -1,19 +1,17 @@
 
-###############################
-TRAC: The Modern Model Platform
-###############################
+###########
+TRAC D.A.P.
+###########
 
-TRAC is a universal model orchestration solution for managing the most complex, critical and highly governed workflows.
-
-TRAC D.A.P. is the open-source data & analytics toolkit which provides the core capabilities of TRAC.
-It is maintained by `finTRAC Limited <https://fintrac.co.uk/>`_
+TRAC D.A.P. is an open-source model orchestration toolkit for building, running and governing
+models. It is maintained by `finTRAC Limited <https://fintrac.co.uk/>`__
 in association with `FINOS <https://www.finos.org/>`_
 and is available to download and use for free under the
 `Apache License, Version 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.
 
-This documentation describes how to build models and client applications using the TRAC D.A.P. toolkit.
-Commercially supported deployments of the TRAC platform are available separately from
-`finTRAC Limited <https://www.fintrac.co.uk>`_.
+This documentation describes the TRAC D.A.P. project: its metadata model, how to build and run
+models against it, and the reference for its APIs. Commercially supported deployments of the
+TRAC platform are available separately from `finTRAC Limited <https://www.fintrac.co.uk>`__.
 
 .. note::
     You can see the current development status of TRAC D.A.P. and a roadmap for the platform on the
@@ -28,10 +26,10 @@ Commercially supported deployments of the TRAC platform are available separately
     .. grid-item-card::
         :class-footer: sd-border-0
 
-        **Learn about TRAC**
-        ^^^^^^^^^^^^^^^^^^^^
+        **About TRAC D.A.P.**
+        ^^^^^^^^^^^^^^^^^^^^^
 
-        Learn about the TRAC, the metadata model, virtual deployment framework and the TRAC Guarantee.
+        What TRAC D.A.P. is, its metadata model, and how self-describing models work.
 
         +++
         .. button-ref:: overview/introduction
@@ -39,7 +37,7 @@ Commercially supported deployments of the TRAC platform are available separately
             :outline:
             :expand:
 
-            Platform overview
+            About TRAC D.A.P.
 
     .. grid-item-card::
         :class-footer: sd-border-0
