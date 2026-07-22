@@ -96,4 +96,13 @@ public class GrpcServiceRegister {
 
         return descriptor;
     }
+
+    public Descriptors.MethodDescriptor findMethodDescriptor(String methodName) {
+
+        // Returns null instead of throwing when the method is not registered. Some methods on a
+        // TRAC server are not TRAC API methods (e.g. the standard gRPC health service), and callers
+        // may legitimately need to handle those rather than treating them as an error.
+
+        return methodMap.get(methodName);
+    }
 }

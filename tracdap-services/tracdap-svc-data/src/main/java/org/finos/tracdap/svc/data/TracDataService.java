@@ -206,7 +206,8 @@ public class TracDataService extends TracServiceBase {
                     // Services
                     .addService(dataApi)
                     .addService(storageApi)
-                    .addService(messageProcessor);
+                    .addService(messageProcessor)
+                    .addService(getHealthService());
 
             // Apply common concerns
             this.server =  commonConcerns

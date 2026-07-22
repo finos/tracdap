@@ -301,7 +301,13 @@
         <cve>CVE-2024-35255</cve>
     </suppress>
 
-    <!-- CVE-2026-25087: Apache Arrow vulnerability, no fix available at time of writing -->
+    <!-- CVE-2026-25087: FALSE POSITIVE against the Java library. This is a use-after-free in the -->
+    <!-- Apache Arrow *C++* IPC reader (pre-buffering + variadic buffers), fixed in Arrow C++ 23.0.1. -->
+    <!-- TRAC depends only on pure-Java arrow modules (arrow-vector, arrow-memory-*, arrow-format, -->
+    <!-- arrow-algorithm) - no JNI/C++-bundling modules (arrow-dataset/gandiva/c-data/orc) - so the -->
+    <!-- vulnerable C++ code is not present. A version bump does not clear the finding: arrow-java is -->
+    <!-- versioned independently of Arrow C++ (latest arrow-java is 19.0.0, there is no arrow-java -->
+    <!-- 23.0.1), and the CVE's CPE range (15.0.0-23.0.0) still covers all current arrow-java versions. -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/.*@.*$</packageUrl>
         <cve>CVE-2026-25087</cve>
@@ -311,30 +317,6 @@
     <suppress>
         <packageUrl regex="true">^pkg:maven/com\.azure/.*@.*$</packageUrl>
         <cve>CVE-2026-33117</cve>
-    </suppress>
-
-    <!-- CVE-2026-42582: Netty 4.1.x, no fix available at time of writing -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@.*$</packageUrl>
-        <cve>CVE-2026-42582</cve>
-    </suppress>
-
-    <!-- CVE-2026-0994: protobuf-java, no fix available at time of writing -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.google\.protobuf/protobuf\-java.*@.*$</packageUrl>
-        <cve>CVE-2026-0994</cve>
-    </suppress>
-
-    <!-- CVE-2026-54515: jackson-databind case-insensitive deserialization can bypass per-property -->
-    <!-- @JsonIgnoreProperties. There is no fixed 2.x release: 2.21.5 and 2.22.1 are both still listed -->
-    <!-- as affected by the revised advisory, and the only patched line is Jackson 3.x (tools.jackson -->
-    <!-- 3.1.4+), which requires a Java 17 baseline and a group/package migration across TRAC. -->
-    <!-- Not reachable in our usage regardless: TRAC does not use @JsonIgnoreProperties or polymorphic / -->
-    <!-- default typing (the only databind use reads into plain Object in ConfigParser). Revisit if a -->
-    <!-- fixed 2.x release appears or as part of a future Jackson 3.x / Java 17 migration. -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
-        <cve>CVE-2026-54515</cve>
     </suppress>
 
     <!-- CVE-2026-56876: extract-zip, no fixed release available (2.0.1 is the latest). -->
