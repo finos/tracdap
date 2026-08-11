@@ -29,10 +29,9 @@ try:
 except ModuleNotFoundError:
     _pyd = None
 
-import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.logging as _logging
-import tracdap.rt._impl.core.type_system as _meta_types
+import tracdap.rt._impl.core.metadata as _meta
 
 
 class StructProcessor:
@@ -294,17 +293,17 @@ class StructProcessor:
 
         if dc_field is not None:
             if dc_field.default not in [_dc.MISSING, None]:
-                default_value = _meta_types.MetadataCodec.encode_value(dc_field.default)
+                default_value = _meta.MetadataCodec.encode_value(dc_field.default)
             elif dc_field.default_factory not in [_dc.MISSING, None]:
                 native_value = dc_field.default_factory()
-                default_value = _meta_types.MetadataCodec.encode_value(native_value)
+                default_value = _meta.MetadataCodec.encode_value(native_value)
 
         elif pyd_field is not None:
             if pyd_field.default not in [_pyd.fields.PydanticUndefined, None]:
-                default_value = _meta_types.MetadataCodec.encode_value(pyd_field.default)
+                default_value = _meta.MetadataCodec.encode_value(pyd_field.default)
             elif pyd_field.default_factory not in [_pyd.fields.PydanticUndefined, None]:
                 native_value = pyd_field.default_factory()
-                default_value = _meta_types.MetadataCodec.encode_value(native_value)
+                default_value = _meta.MetadataCodec.encode_value(native_value)
 
         return _meta.FieldSchema(
             fieldName=name,
@@ -322,10 +321,10 @@ class StructProcessor:
         default_value = None
 
         if dc_field is not None and  dc_field.default not in [_dc.MISSING, None]:
-            default_value = _meta_types.MetadataCodec.encode_value(dc_field.default.name)
+            default_value = _meta.MetadataCodec.encode_value(dc_field.default.name)
 
         if pyd_field is not None and pyd_field.default not in [_pyd.fields.PydanticUndefined, None]:
-            default_value = _meta_types.MetadataCodec.encode_value(pyd_field.default.name)
+            default_value = _meta.MetadataCodec.encode_value(pyd_field.default.name)
 
         return _meta.FieldSchema(
             fieldName=name,
@@ -468,7 +467,7 @@ class StructConformance:
                 self._error(location, f"Field [{trac_field.fieldName}] cannot be null")
             return None
 
-        if _meta_types.TypeMapping.is_primitive(trac_field.fieldType):
+        if _meta.MetadataTypes.is_primitive(trac_field.fieldType):
             if trac_field.categorical:
                 return self._conform_categorical(location, raw_value, trac_field, trac_schema)
             else:
@@ -487,7 +486,7 @@ class StructConformance:
 
     def _conform_primitive(self, location: str, raw_value: _tp.Any, trac_field):
 
-        python_type = _meta_types.TypeMapping.trac_to_python_basic_type(trac_field.fieldType)
+        python_type = _meta.MetadataTypes.trac_to_python_basic_type(trac_field.fieldType)
 
         try:
             if isinstance(raw_value, python_type):

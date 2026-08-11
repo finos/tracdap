@@ -18,9 +18,8 @@ import pathlib
 import tempfile
 import random
 
-import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.core.config_parser as cfg_p  # noqa
+import tracdap.rt._impl.core.config as cfg  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
@@ -45,7 +44,7 @@ class ConfigParserTest(unittest.TestCase):
     def test_example_sys_config_ok(self):
 
         config_file = PYTHON_EXAMPLES_DIR.joinpath("config/sys_config.yaml").resolve()
-        config_mgr = cfg_p.ConfigManager.for_root_config(config_file)
+        config_mgr = cfg.ConfigManager.for_root_config(config_file)
 
         sys_config = config_mgr.load_root_object( cfg.RuntimeConfig, config_file_name="system")
 
@@ -55,7 +54,7 @@ class ConfigParserTest(unittest.TestCase):
 
         # Sample job config uses dev mode configuration, so supply DEV_MODE_JOB_CONFIG
 
-        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
+        config_mgr = cfg.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
 
         job_config = config_mgr.load_config_object(
             "config/using_data.yaml", cfg.JobConfig,
@@ -68,7 +67,7 @@ class ConfigParserTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
 
-            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
+            config_mgr = cfg.ConfigManager.for_root_dir(td)
 
             yaml_path = pathlib.Path(td).joinpath("empty.yaml")
             yaml_path.touch()
@@ -86,7 +85,7 @@ class ConfigParserTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
 
-            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
+            config_mgr = cfg.ConfigManager.for_root_dir(td)
 
             yaml_path = pathlib.Path(td).joinpath("empty.yaml")
             yaml_path.touch()
@@ -102,7 +101,7 @@ class ConfigParserTest(unittest.TestCase):
 
     def test_invalid_path(self):
 
-        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
+        config_mgr = cfg.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
 
         self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(None))      # noqa
         self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(object()))  # noqa
@@ -117,14 +116,14 @@ class ConfigParserTest(unittest.TestCase):
 
         nonexistent_path = PYTHON_EXAMPLES_DIR.joinpath("nonexistent.yaml")
 
-        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
+        config_mgr = cfg.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
 
         self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file(nonexistent_path))
         self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_object(nonexistent_path, cfg.RuntimeConfig))
 
     def test_config_file_is_a_folder(self):
 
-        config_mgr = cfg_p.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
+        config_mgr = cfg.ConfigManager.for_root_dir(PYTHON_EXAMPLES_DIR)
 
         self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_file("config"))
         self.assertRaises(ex.EConfigLoad, lambda: config_mgr.load_config_object("config", cfg.RuntimeConfig))
@@ -136,7 +135,7 @@ class ConfigParserTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
 
-            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
+            config_mgr = cfg.ConfigManager.for_root_dir(td)
 
             yaml_path = pathlib.Path(td).joinpath("garbled.yaml")
             yaml_path.write_bytes(noise)
@@ -156,7 +155,7 @@ class ConfigParserTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
 
-            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
+            config_mgr = cfg.ConfigManager.for_root_dir(td)
 
             # Write YAML into a JSON file
 
@@ -171,7 +170,7 @@ class ConfigParserTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as td:
 
-            config_mgr = cfg_p.ConfigManager.for_root_dir(td)
+            config_mgr = cfg.ConfigManager.for_root_dir(td)
 
             # Config files with unknown config values
 
