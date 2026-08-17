@@ -149,7 +149,7 @@ jobs:
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd tracdap-runtime/python
-          safety check --ignore 70612 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          c --ignore 70612 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
           safety check --ignore 70612 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       # Always save the reports - they are especially needed when the checks have failed!
@@ -159,6 +159,9 @@ jobs:
         with:
           name: compliance-reports-python
           path: build/compliance/**
+
+      # Run pippaudit: see https://github.com/marketplace/actions/gh-action-pip-audit
+      - uses: pypa/gh-action-pip-audit@v1.1.0
 
   web_api_compliance:
 
