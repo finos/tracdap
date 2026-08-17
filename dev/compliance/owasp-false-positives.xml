@@ -308,11 +308,11 @@
     <!-- vulnerable C++ code is not present. A version bump does not clear the finding: arrow-java is -->
     <!-- versioned independently of Arrow C++ (latest arrow-java is 19.0.0, there is no arrow-java -->
     <!-- 23.0.1), and the CVE's CPE range (15.0.0-23.0.0) still covers all current arrow-java versions. -->
-    <suppress>
+<!--     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/.*@.*$</packageUrl>
         <cve>CVE-2026-25087</cve>
     </suppress>
-
+ -->
     <!-- CVE-2026-33117: FALSE POSITIVE against the artifacts listed below. The vulnerability is an -->
     <!-- incorrect authentication tag comparison in the local cryptography path of the Azure SDK for -->
     <!-- Java Key Vault Keys library (azure-security-keyvault-keys), fixed in 4.10.6. TRAC does not -->
