@@ -345,10 +345,10 @@
     <!-- in the affected 5.x range. OWASP mis-matches them to the 4.x artifact because both lines share -->
     <!-- the CPE apache:httpcomponents_core. httpcore 4.4.16 (transitive via the AWS SDK and -->
     <!-- google-http-client-apache-v2, used by the cloud storage plugins) is not vulnerable. -->
-    <suppress>
+<!--     <suppress>
         <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@.*$</packageUrl>
         <cve>CVE-2026-54399</cve>
         <cve>CVE-2026-54428</cve>
     </suppress>
-
+ -->
 </suppressions>
