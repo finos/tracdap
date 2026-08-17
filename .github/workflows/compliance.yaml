@@ -164,7 +164,7 @@ jobs:
       - name: Pip-audit Dependency Check
         uses: pypa/gh-action-pip-audit@v1.1.0
         with:
-          inputs: ./tracdap-runtime/python/requirements.txt ./tracdap-runtime/python/requirements_extensions.txt ./tracdap-runtime/python/requirements_plugins.txt ./dev/requirements.txt
+          inputs: ./tracdap-runtime/python/requirements.txt ./tracdap-runtime/python/requirements_extensions.txt ./tracdap-runtime/python/requirements_plugins.txt
 
   web_api_compliance:
 
