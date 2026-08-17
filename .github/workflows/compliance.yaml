@@ -160,6 +160,11 @@ jobs:
           name: compliance-reports-python
           path: build/compliance/**
 
+      # Run pippaudit: see https://github.com/marketplace/actions/gh-action-pip-audit
+      - uses: pypa/gh-action-pip-audit@v1.1.0
+        with:
+          inputs: ./tracdap-runtime/python/requirements.txt ./tracdap-runtime/python/requirements_extensions.txt ./tracdap-runtime/python/requirements_plugins.txt
+
   web_api_compliance:
 
     runs-on: ubuntu-latest
