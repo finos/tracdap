@@ -1,7 +1,7 @@
 # Requirements for all the Python build scripts
 
 # Protoc is required for the codegen scripts which work off the API proto files
-protobuf ~= 6.31.1
+protobuf ~= 6.33.5
 grpcio-tools ~= 1.74.0
 protoc-wheel-0 >= 30.2
 
