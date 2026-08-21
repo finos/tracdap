@@ -143,6 +143,12 @@ jobs:
           pip-licenses --format=html --ignore-packages $IGNORE_LICENSE > ../../build/compliance/python-runtime-licenses/python-runtime-licenses.html
           pip-licenses --allow-only="$ALLOWED_LICENSES" --ignore-packages $IGNORE_LICENSE
 
+      # Not strictly necessary but very helpful for figuring out the source of transitive dependencies
+      - name: Dump Python dependency tree
+        run: |
+          pip install pipdeptree
+          pipdeptree
+
       # CVE-2019-8341 (safety id: 70612) is a vulnerability in the latest version of Jinja2, no fix is available
       # It is only pulled in as a dependency of safety check itself, it is not a dependency of the dist wheels
       - name: Safety check
