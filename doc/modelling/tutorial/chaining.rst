@@ -1,7 +1,7 @@
 
-***************************
-Chapter 3 - Chaining Models
-***************************
+***************
+Chaining Models
+***************
 
 This tutorial is based on example code which can be found in the |examples_repo|.
 
@@ -11,7 +11,7 @@ Adding a second model
 
 In :doc:`using_data` we wrote a simple model to perform PnL aggregation on
 some customer accounts. In this example we add a second model, to pre-filter the account
-data. We can chain these two models together to create a FLOW. TRAC will run the flow
+data. We can chain these two models together to create a FLOW. The runtime will run the flow
 for us as a single job.
 
 First, here is a new model that we can use to build the chain:
@@ -30,7 +30,7 @@ dataset that match that region. The schema of the input and output datasets are 
 Notice that that input dataset key, ``customer_loans``, is the same key we used in the
 ``PnLAggregation`` model. Since this input is expected to refer to the same dataset, it
 makes sense to give it the same key. The output key, ``filtered_loans``, is different so
-we will have to tell TRAC how to connect these models together.
+we will have to tell the runtime how to connect these models together.
 
 
 Defining a flow
@@ -46,10 +46,10 @@ that wires together the customer data filter with our PnL aggregation model:
 
 The flow describes the chain of models as a graph, with **nodes** and **edges**. This example has
 one input, two models and one output, which are defined as the flow *nodes*. Additionally,
-the model nodes have to include the names of their inputs and outputs, so that TRAC can
+the model nodes have to include the names of their inputs and outputs, so that the runtime can
 understand the shape of the graph. The model inputs and outputs are called **sockets**.
 
-TRAC wires up the *edges* of the graph based on name. If all the names are consistent and unique,
+The runtime wires up the *edges* of the graph based on name. If all the names are consistent and unique,
 you might not need to define any edges at all! In this case we only need to define a single edge,
 to connect the ``filtered_loans`` output of the filter model to the ``customer_loans`` input of
 the aggregation model.
@@ -94,7 +94,7 @@ output nodes in the flow.
 
 In the models section, we specify which model to use for every model node in the flow.
 It is important to use the fully-qualified name for each model, which means the Python
-package structure should be set up correctly. See :doc:`hello_world` for a refresher on
+package structure should be set up correctly. See :doc:`local_setup` for a refresher on
 setting up the repository layout and package structure.
 
 
@@ -114,8 +114,8 @@ so just the job config and sys config files are required:
     :lineno-start: 53
 
 This approach works well in some simple cases, such as this example, but for large codebases with
-lots of models and multiple flows it is usually easier to launch thw flow directly. You can launch
-a TRAC flow from the command line like this:
+lots of models and multiple flows it is usually easier to launch the flow directly. You can launch
+a flow from the command line like this:
 
 .. code-block::
     :class: container
@@ -127,5 +127,5 @@ in debug mode, which will let you debug into all the models in the chain. For ex
 you can set this command up as a Run Configuration.
 
 .. note::
-    Launching TRAC from the command line does not enable dev mode by default,
+    Launching the runtime from the command line does not enable dev mode by default,
     always use the ``--dev-mode`` flag for local development.

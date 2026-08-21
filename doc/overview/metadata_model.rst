@@ -3,8 +3,8 @@ Metadata Model
 ==============
 
 
-The TRAC metadata model is a structured data model that records and catalogs every asset and
-traceable action [#tracable]_ known to the TRAC platform. It consists of two layers:
+TRAC D.A.P. is build around a structured metadata model that records and catalogs every asset and
+traceable action [#tracable]_ on the platform. It consists of two layers:
 
     *   Objects are the structural element of the model, they represent assets and actions. Data, models
         and jobs are all described by metadata objects. Each type of object has a metadata structure that is
@@ -15,9 +15,9 @@ traceable action [#tracable]_ known to the TRAC platform. It consists of two lay
         edited by users.
 
 Both objects and tags are versioned with an immutable, time-indexed version history, "updates" are performed
-by creating a new version of the object or tag with the required changes. Because of this, the TRAC metadata
-provides a fully consistent historical view of the platform for any previous point in time. It also provides
-a complete audit history that is both machine and human readable, with no manual effort.
+by creating a new version of the object or tag with the required changes. Because of this, the TRAC D.A.P.
+metadata provides a fully consistent historical view of the platform for any previous point in time. It also
+provides a complete audit history that is both machine and human readable, with no manual effort.
 
 Where objects refer to external resources such as models and data, those resources are also immutable [#mutable]_.
 This is achieved using e.g. GitHub tags or Nexus binary versions for models, and data areas owned by TRAC with
@@ -26,12 +26,10 @@ TRAC to recreate any previous calculation that has run on the platform. As a res
 data can often be discarded and recreated later if needed.
 
 
-.. [#tracable]
-    *Traceable actions are actions that create assets, such as running jobs or data imports. Read-only
-    actions such as querying data or metadata searches are not currently recorded in the TRAC metadata.*
+.. [#tracable] Traceable actions are actions that create assets, such as running jobs or data imports. Read-only
+    actions such as querying data or metadata searches are not currently recorded in TRAC D.A.P metadata.*
 
-.. [#mutable]
-    *TRAC objects can refer to mutable resources, however these cannot be used to build repeatable
+.. [#mutable] Objects can refer to mutable resources, however these cannot be used to build repeatable
     calculation jobs or workflows. Typically mutable objects are used as a source for import jobs.*
 
 .. seealso::
@@ -81,8 +79,7 @@ calculation job is put together and some of the things that are then possible to
       - None, jobs refer to other metadata objects but not directly to external resources
       - Metadata is always immutable
 
-.. [#extref]
-    *References to physical locations are not stored directly in the metadata.
+.. [#extref] References to physical locations are not stored directly in the metadata.
     Instead the metadata refers to location keys which are described in the platform configuration,
     so resource locations can be moved when the platform is migrated or re-deployed.*
 
@@ -185,15 +182,15 @@ More object types
 .. seealso::
 
     For a comprehensive reference of metadata objects, see the metadata listings for
-    :class:`ObjectType<trac.metadata.ObjectType>` and
-    :class:`ObjectDefinition<trac.metadata.ObjectDefinition>`.
+    :class:`ObjectType<tracdap.metadata.ObjectType>` and
+    :class:`ObjectDefinition<tracdap.metadata.ObjectDefinition>`.
 
 
 Tags
 ----
 
 
-:class:`Tags<trac.metadata.Tag>` are the core informational element of TRAC’s metadata model, they are
+:class:`Tags<tracdap.metadata.Tag>` are the core informational element of TRAC’s metadata model, they are
 used to index, describe and control objects. Every object has a tag and each tag refers to a single object,
 i.e. there is a one-to-one association.
 
@@ -244,7 +241,7 @@ Here is an example of a set of tag attributes to illustrate some ways they can b
     trac_create_user_id: "jane.doe"
     trac_create_user_name: "Jane Doe"
 
-Tag attributes are created and updated using :class:`TagUpdate<trac.metadata.TagUpdate>` operations.
+Tag attributes are created and updated using :class:`TagUpdate<tracdap.metadata.TagUpdate>` operations.
 Tag updates are instructions to add, replace, append (for multi-valued attributes) or delete an attribute.
 These instructions can be supplied when an object is created or updated, in which case TRAC will fill
 in some attributes automatically (timestamp, sign-off state etc). It is also possible to update tags
@@ -290,7 +287,7 @@ timestamp can be used to uniquely identify versions for both objects and tags.
 Selectors
 ---------
 
-A :class:`TagSelector <trac.metadata.TagSelector>` refers to a single object ID and identifies a specific
+A :class:`TagSelector <tracdap.metadata.TagSelector>` refers to a single object ID and identifies a specific
 object version and tag version for that object. They are used throughout the TRAC platform whenever an
 object is referenced, so it is always possible to specify versions using these selection criteria. The
 available criteria are:
@@ -377,5 +374,5 @@ required. Using this feature allows clients to show a consistent historical view
 functionality that relies on metadata queries.
 
 For the full API reference on metadata searches, see the reference pages for
-:class:`SearchParameters<trac.metadata.SearchParameters>` and
-:meth:`TracMetadataApi.search()<trac.api.TracMetadataApi.search>`.
+:class:`SearchParameters<tracdap.metadata.SearchParameters>` and
+:meth:`TracMetadataApi.search()<tracdap.api.TracMetadataApi.search>`.

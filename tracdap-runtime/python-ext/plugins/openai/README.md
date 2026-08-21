@@ -1,6 +1,6 @@
 <div align="center">
 
-![TRAC the modern model platform](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
+<img alt="tracdap-runtime" src="https://github.com/finos/tracdap/raw/main/doc/_images/runtime_logo.png" width="400" />
 
   <br />
 
@@ -27,13 +27,11 @@
 This extension makes the OpenAI Python SDK available to use from inside a TRAC model.
 
 - Use the native OpenAI client classes directly in TRAC model code
-- Connection settings managed by TRAC for both local and deployed models
+- Connection settings managed by the runtime for both local and deployed models
 - Supports both OpenAI and AzureOpenAI clients
 
 Models that make external calls are not considered repeatable,
 and will be flagged as not repeatable when they run on the TRAC platform.
-
-This extension is a pre-release and will be finalized inTRAC 0.10.
 
 
 ## Installing

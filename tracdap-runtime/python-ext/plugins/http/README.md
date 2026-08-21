@@ -1,6 +1,6 @@
 <div align="center">
 
-![TRAC the modern model platform](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
+<img alt="tracdap-runtime" src="https://github.com/finos/tracdap/raw/main/doc/_images/runtime_logo.png" width="400" />
 
   <br />
 
@@ -24,16 +24,14 @@
 
 # HTTP Extension for the TRAC Model Runtime
 
-This extension allows TRAC models to make calls to external systems using HTTP and HTTPS.
+This extension allows tracdap-runtime models to make calls to external systems using HTTP and HTTPS.
 
 - Make HTTP endpoints available to models, to use directly in model code
-- Connection settings managed by TRAC for both local and deployed models
+- Connection settings managed by the runtime for both local and deployed models
 - Supports http.client and urllib3
 
 Models that make external calls are not considered repeatable,
 and will be flagged as not repeatable when they run on the TRAC platform.
-
-This extension is a pre-release and will be finalized inTRAC 0.10.
 
 
 ## Installing

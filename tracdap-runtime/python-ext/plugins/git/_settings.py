@@ -14,5 +14,5 @@
 # limitations under the License.
 
 PROJECT_NAME = "tracdap-ext-git"
-PROJECT_DESCRIPTION = "An extension for TRAC D.A.P. that loads models from Git repositories"
+PROJECT_DESCRIPTION = "An extension for tracdap-runtime that loads models from Git repositories"
 PROJECT_ROOT_PACKAGE = "tracdap.ext.git"

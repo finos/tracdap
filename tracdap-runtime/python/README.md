@@ -1,6 +1,6 @@
 <div align="center">
 
-![TRAC the modern model platform](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
+<img alt="tracdap-runtime" src="https://github.com/finos/tracdap/raw/main/doc/_images/runtime_logo.png" width="400" />
 
   <br />
 
@@ -23,14 +23,15 @@
 </div>
 
 
-# TRAC Model Runtime for Python
+# Universal Model Runtime (Python)
 
-The TRAC Model Runtime is a lightweight package for building portable,
+The tracdap-runtime is a lightweight package for building portable,
 production-grade Python models. Models created with the runtime can be
 executed anywhere, from local development environments to enterprise
-production systems. The runtime can be used independently of the broader
-TRAC platform and provides a simple framework in which to build, ship,
-and share models.
+production systems.
+
+The runtime can be used independently of the trac platform and provides a
+simple framework in which to build, ship, and share models.
 
 Each model defines its parameters, inputs and outputs, and the runtime
 provides the execution context, ensuring that models always receive valid
@@ -39,7 +40,7 @@ and formatting out of the model code allows developers to focus on model
 logic, safe in the knowledge that the model will behave consistently
 across environments.
 
-For a complete guide to writing models in the TRAC framework, see the
+For a complete guide to writing models in the trac framework, see the
 [online documentation](https://docs.fintrac.co.uk/versions/latest/modelling).
 
 
@@ -56,7 +57,7 @@ for example, Pandas 1.5 is not available for Python 3.12 or later.*
 
 ## 🚀 Quick start
 
-TRAC can be added to a new or existing Python project using [pip](https://pip.pypa.io):
+tracdap-runtime can be added to a new or existing Python project using [pip](https://pip.pypa.io):
 
 ```shell
 $ pip install tracdap-runtime
@@ -101,7 +102,7 @@ class QuickStartModel(trac.TracModel):
 
     def run_model(self, ctx: trac.TracContext):
 
-        # Parameters and inputs are loaded and validated by TRAC
+        # Parameters and inputs are loaded and validated by the runtime
         exchange_rate = ctx.get_parameter("exchange_rate")
         customer_loans = ctx.get_pandas_table("customer_loans")
 
@@ -115,7 +116,7 @@ class QuickStartModel(trac.TracModel):
         # Logs written to ctx.log are captured by the platform
         ctx.log().info("Aggregated loans for %d regions", len(loans_by_region))
 
-        # Outputs are handed back to TRAC for validation and saving
+        # Outputs are handed back to the runtime for validation and saving
         ctx.put_pandas_table("loans_by_region", loans_by_region)
 
 # Use the desktop launcher to run, test and debug models locally
@@ -148,8 +149,8 @@ resources:
 
 The job config file supplies the model with the parameters, inputs and outputs that it needs to run.
 The default data location from ``sys_config.yaml`` is used to load input data and save output data.
-TRAC checks the types and schemas of every parameter and input dataset, types are cast automatically
-where it is safe to do so, otherwise TRAC will raise an error if the inputs are not valid.
+The runtime checks the types and schemas of every parameter and input dataset, types are cast automatically
+where it is safe to do so, otherwise the runtime will raise an error if the inputs are not valid.
 
 *quick_start.yaml*
 ```yaml
@@ -174,8 +175,8 @@ will be created inside your data folder.
 ## 📖 Documentation
 
 See the [online documentation](https://docs.fintrac.co.uk/versions/latest/modelling)
-for a complete guide to writing models in the TRAC framework,
-including tutorials and an API reference.
+for a complete guide to writing models in the trac framework,
+including tutorials and the full Model API.
 
 
 ## ✋ Contributing
@@ -190,7 +191,7 @@ and the [FINOS code of conduct](https://www.finos.org/code-of-conduct).
 
 ## 📜 License
 
-The TRAC model runtime is maintained by [finTRAC Ltd](https://fintrac.co.uk/) in association with
+The TRAC model runtime is maintained by [Fintrac Limited](https://fintrac.co.uk/) in association with
 the [Fintech Open Source Foundation](https://www.finos.org/) (FINOS) and distributed under the terms of
 the [Apache License, Version 2.0](http://www.apache.org/licenses/LICENSE-2.0).
 
@@ -202,5 +203,5 @@ see the [NOTICE](https://github.com/finos/tracdap/blob/main/NOTICE) file.
 
 ## 🏢 Enterprise
 
-Professional support for TRAC is available from [finTRAC Ltd](https://fintrac.co.uk/),
-for more information please [contact us](https://fintrac.co.uk/contact).
+Professional support for the trac platform is available from [Fintrac Limited](https://fintrac.co.uk/),
+for more information about this please [contact us](https://fintrac.co.uk/contact).

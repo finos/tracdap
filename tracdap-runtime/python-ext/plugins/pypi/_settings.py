@@ -14,5 +14,5 @@
 # limitations under the License.
 
 PROJECT_NAME = "tracdap-ext-pypi"
-PROJECT_DESCRIPTION = "An extension for TRAC D.A.P. that loads models from PyPI or a compatible proxy"
+PROJECT_DESCRIPTION = "An extension for tracdap-runtime that loads models from PyPI or a compatible proxy"
 PROJECT_ROOT_PACKAGE = "tracdap.ext.pypi"
