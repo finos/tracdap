@@ -147,7 +147,8 @@ public class TracMetadataService extends TracServiceBase {
                     .executor(executor)
                     .addService(publicApi)
                     .addService(internalApi)
-                    .addService(messageProcessor);
+                    .addService(messageProcessor)
+                    .addService(getHealthService());
 
             // Apply common concerns
             this.server = commonConcerns

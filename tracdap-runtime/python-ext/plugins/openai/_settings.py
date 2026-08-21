@@ -14,5 +14,5 @@
 # limitations under the License.
 
 PROJECT_NAME = "tracdap-ext-openai"
-PROJECT_DESCRIPTION = "An extension for TRAC D.A.P. that lets models connect to OpenAI endpoints"
+PROJECT_DESCRIPTION = "An extension for tracdap-runtime that lets models connect to OpenAI endpoints"
 PROJECT_ROOT_PACKAGE = "tracdap.ext.openai"

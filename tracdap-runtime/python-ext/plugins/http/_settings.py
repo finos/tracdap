@@ -14,5 +14,5 @@
 # limitations under the License.
 
 PROJECT_NAME = "tracdap-ext-http"
-PROJECT_DESCRIPTION = "An extension for TRAC D.A.P. that lets models connect to HTTP endpoints"
+PROJECT_DESCRIPTION = "An extension for tracdap-runtime that lets models connect to HTTP endpoints"
 PROJECT_ROOT_PACKAGE = "tracdap.ext.http"

@@ -207,7 +207,8 @@ public class TracOrchestratorService extends TracServiceBase {
 
                     // The main service
                     .addService(new TracOrchestratorApi(registry, commonConcerns))
-                    .addService(new MessageProcessor(tenantState));
+                    .addService(new MessageProcessor(tenantState))
+                    .addService(getHealthService());
 
             // Apply common concerns
             this.server = commonConcerns

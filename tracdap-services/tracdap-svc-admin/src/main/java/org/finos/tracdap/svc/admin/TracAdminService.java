@@ -102,7 +102,8 @@ public class TracAdminService extends TracServiceBase {
                     .forPort(servicePort)
                     .executor(executor)
                     .addService(adminApi)
-                    .addService(new MessageProcessor());
+                    .addService(new MessageProcessor())
+                    .addService(getHealthService());
 
             // Apply common concerns
             this.server = commonConcerns

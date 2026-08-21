@@ -67,27 +67,62 @@ Exceptions
             {% endif %}
             {% set visible_classes = visible_children|selectattr("type", "equalto", "class")|list %}
             {% if visible_classes %}
-               {% if "class" in own_page_types or "show-module-summary" in autoapi_options %}
-Classes
--------
+               {% set ns = namespace(services=[], messages=[]) %}
+               {% for klass in visible_classes %}
+                  {% set klass_methods = klass.children|selectattr("type", "equalto", "method")|list %}
+                  {% set klass_is_enum = "enum" in (klass.bases|join(",")|lower) %}
+                  {% if klass_methods and not klass_is_enum %}
+                     {% set ns.services = ns.services + [klass] %}
+                  {% else %}
+                     {% set ns.messages = ns.messages + [klass] %}
+                  {% endif %}
+               {% endfor %}
+               {% if ns.services %}
+                  {% if "class" in own_page_types or "show-module-summary" in autoapi_options %}
+Services
+--------
 
-                  {% if "class" in own_page_types %}
+                     {% if "class" in own_page_types %}
 .. toctree::
    :class: toc-hidden
 
-                     {% for klass in visible_classes %}
+                        {% for klass in ns.services %}
    {{ klass.include_path }}
-                     {% endfor %}
+                        {% endfor %}
 
-                  {% endif %}
+                     {% endif %}
 .. autoapisummary::
 
-                  {% for klass in visible_classes %}
+                     {% for klass in ns.services %}
    {{ klass.id }}
-                  {% endfor %}
+                     {% endfor %}
+                  {% endif %}
+
+
                {% endif %}
+               {% if ns.messages %}
+                  {% if "class" in own_page_types or "show-module-summary" in autoapi_options %}
+Messages
+--------
+
+                     {% if "class" in own_page_types %}
+.. toctree::
+   :class: toc-hidden
+
+                        {% for klass in ns.messages %}
+   {{ klass.include_path }}
+                        {% endfor %}
+
+                     {% endif %}
+.. autoapisummary::
+
+                     {% for klass in ns.messages %}
+   {{ klass.id }}
+                     {% endfor %}
+                  {% endif %}
 
 
+               {% endif %}
             {% endif %}
             {% set visible_functions = visible_children|selectattr("type", "equalto", "function")|list %}
             {% if visible_functions %}
