@@ -1,6 +1,6 @@
 <div align="center">
 
-![TRAC the modern model platform](https://github.com/finos/tracdap/raw/main/doc/_images/tracmmp_horizontal_400.png)
+<img alt="tracdap-runtime" src="https://github.com/finos/tracdap/raw/main/doc/_images/runtime_logo.png" width="400" />
 
   <br />
 
@@ -25,14 +25,12 @@
 
 # PyPI Extension for the TRAC Model Runtime
 
-This extension allows TRAC to load models dynamically from PyPI repositories,
+This extension allows the tracdap-runtime to load models dynamically from PyPI repositories,
 or a compatible proxy such as Nexus or Artifactory.
 
 - Support for JSON, Simple JSON and Simple HTML query formats
 - Support for private repositories using tokens
 - Handles corporate firewalls, proxies and SSL
-
-This extension is a pre-release and will be finalized inTRAC 0.10.
 
 
 

@@ -34,6 +34,13 @@ import "google/api/annotations.proto";
  */
 service TracOrchestratorApi {
 
+  /**
+   * Check whether a job request is valid, without submitting it for execution.
+   *
+   * Validation covers similar checks to those applied when a job is submitted, so
+   * a job that validates successfully can be expected to submit without a
+   * validation error.
+   */
   rpc validateJob (JobRequest) returns (JobStatus) {
     option (google.api.http) = {
       post: "/{tenant}/validate-job"
@@ -41,6 +48,12 @@ service TracOrchestratorApi {
     };
   }
 
+  /**
+   * Submit a job for execution on the TRAC platform.
+   *
+   * The response includes the ID of the newly created job, which can be used to
+   * check on its progress with checkJob() or followJob().
+   */
   rpc submitJob (JobRequest) returns (JobStatus) {
     option (google.api.http) = {
       post: "/{tenant}/submit-job"
@@ -48,6 +61,13 @@ service TracOrchestratorApi {
     };
   }
 
+  /**
+   * Get a snapshot of the current status of a job.
+   *
+   * The job is identified using a tag selector, typically the job ID returned by
+   * submitJob(). This call returns a single status snapshot; use followJob() for
+   * a stream of updates instead.
+   */
   rpc checkJob (JobStatusRequest) returns (JobStatus) {
     option (google.api.http) = {
       post: "/{tenant}/check-job"
@@ -55,8 +75,21 @@ service TracOrchestratorApi {
     };
   }
 
+  /**
+   * Follow the status of a job over time.
+   *
+   * The job is identified using a tag selector, as for checkJob(). This is a
+   * server-streaming equivalent of checkJob(), for clients that want to track a
+   * job's status without polling.
+   */
   rpc followJob (JobStatusRequest) returns (stream JobStatus);
 
+  /**
+   * Request cancellation of a queued or running job.
+   *
+   * The job is identified using a tag selector, as for checkJob(). Use checkJob()
+   * or followJob() to confirm the job's status after requesting cancellation.
+   */
   rpc cancelJob (JobStatusRequest) returns (JobStatus);
 }
 
