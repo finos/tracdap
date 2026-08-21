@@ -313,9 +313,19 @@
         <cve>CVE-2026-25087</cve>
     </suppress>
 
-    <!-- CVE-2026-33117: Azure SDK for Java, no fix available at time of writing -->
+    <!-- CVE-2026-33117: FALSE POSITIVE against the artifacts listed below. The vulnerability is an -->
+    <!-- incorrect authentication tag comparison in the local cryptography path of the Azure SDK for -->
+    <!-- Java Key Vault Keys library (azure-security-keyvault-keys), fixed in 4.10.6. TRAC does not -->
+    <!-- depend on azure-security-keyvault-keys, so the vulnerable code is not present. -->
+    <!-- NVD files the CVE under the generic CPE microsoft:azure_sdk_for_java with the range -->
+    <!-- "up to (excluding) 4.10.6", so OWASP matches every com.azure artifact whose own version -->
+    <!-- number happens to sort below 4.10.6 - here azure-core, azure-core-http-netty, -->
+    <!-- azure-identity and azure-json. The storage artifacts are 12.x and so are not matched. -->
+    <!-- This is deliberately scoped to those four artifacts rather than all of com.azure: a blanket -->
+    <!-- rule would silently hide the real vulnerability if azure-security-keyvault-keys below -->
+    <!-- 4.10.6 were ever pulled in. -->
     <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.azure/.*@.*$</packageUrl>
+        <packageUrl regex="true">^pkg:maven/com\.azure/azure-(core|core-http-netty|identity|json)@.*$</packageUrl>
         <cve>CVE-2026-33117</cve>
     </suppress>
 
@@ -327,18 +337,4 @@
         <packageUrl regex="true">^pkg:npm/extract\-zip@.*$</packageUrl>
         <cve>CVE-2026-56876</cve>
     </suppress>
-
-    <!-- CVE-2026-54399, CVE-2026-54428: FALSE POSITIVE against httpcore 4.x. -->
-    <!-- Both are vulnerabilities in Apache HttpComponents Core 5.x (5.4.2 and earlier): the HTTP/1.1 -->
-    <!-- message parser (54399) and the HTTP/2 HPACK decoder (54428). They do not affect the 4.x line - -->
-    <!-- httpcore 4.x has no HTTP/2 implementation, so the HPACK issue cannot apply, and 4.4.16 is not -->
-    <!-- in the affected 5.x range. OWASP mis-matches them to the 4.x artifact because both lines share -->
-    <!-- the CPE apache:httpcomponents_core. httpcore 4.4.16 (transitive via the AWS SDK and -->
-    <!-- google-http-client-apache-v2, used by the cloud storage plugins) is not vulnerable. -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.httpcomponents/httpcore@.*$</packageUrl>
-        <cve>CVE-2026-54399</cve>
-        <cve>CVE-2026-54428</cve>
-    </suppress>
-
 </suppressions>
