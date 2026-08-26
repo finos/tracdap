@@ -960,6 +960,13 @@ public class JobValidationTest {
     }
 
     private TagSelector createDataImportModel(List<TagUpdate> tags) {
+        return createDataImportModel(tags, Map.of(), Map.of());
+    }
+
+    private TagSelector createDataImportModel(
+            List<TagUpdate> tags,
+            Map<String, BasicType> paramTypes,
+            Map<String, SchemaDefinition> inputSchemas) {
 
         var modelDef = ModelDefinition.newBuilder()
                 .setLanguage("python")
@@ -971,8 +978,20 @@ public class JobValidationTest {
                 .putOutputs("output_data", ModelOutputSchema.newBuilder()
                         .setObjectType(ObjectType.DATA)
                         .setSchema(SampleData.BASIC_TABLE_SCHEMA)
-                        .build())
-                .build();
+                        .build());
+
+        for (var param : paramTypes.entrySet()) {
+            modelDef.putParameters(param.getKey(), ModelParameter.newBuilder()
+                    .setParamType(TypeSystem.descriptor(param.getValue()))
+                    .build());
+        }
+
+        for (var input : inputSchemas.entrySet()) {
+            modelDef.putInputs(input.getKey(), ModelInputSchema.newBuilder()
+                    .setObjectType(ObjectType.DATA)
+                    .setSchema(input.getValue())
+                    .build());
+        }
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -989,6 +1008,10 @@ public class JobValidationTest {
     }
 
     private TagSelector createDataExportModel(List<TagUpdate> tags) {
+        return createDataExportModel(tags, Map.of());
+    }
+
+    private TagSelector createDataExportModel(List<TagUpdate> tags, Map<String, BasicType> paramTypes) {
 
         var modelDef = ModelDefinition.newBuilder()
                 .setLanguage("python")
@@ -1000,8 +1023,13 @@ public class JobValidationTest {
                 .putInputs("input_data", ModelInputSchema.newBuilder()
                         .setObjectType(ObjectType.DATA)
                         .setSchema(SampleData.BASIC_TABLE_SCHEMA)
-                        .build())
-                .build();
+                        .build());
+
+        for (var param : paramTypes.entrySet()) {
+            modelDef.putParameters(param.getKey(), ModelParameter.newBuilder()
+                    .setParamType(TypeSystem.descriptor(param.getValue()))
+                    .build());
+        }
 
         var writeRequest = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -1168,6 +1196,84 @@ public class JobValidationTest {
     }
 
     @Test
+    public void importData_missingParameter() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_data_missing_parameter"))
+                .build());
+
+        var modelSelector = createDataImportModel(modelTags, Map.of("storage_key", BasicType.STRING), Map.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(ImportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void importData_wrongParameterType() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_data_wrong_parameter_type"))
+                .build());
+
+        var modelSelector = createDataImportModel(modelTags, Map.of("storage_key", BasicType.STRING), Map.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(ImportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putParameters("storage_key", MetadataCodec.encodeValue(123))  // Wrong type, model expects a string
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void importData_wrongInputSchema() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_data_wrong_input_schema"))
+                .build());
+
+        var modelSelector = createDataImportModel(
+                modelTags, Map.of(), Map.of("reference_data", SampleData.BASIC_TABLE_SCHEMA));
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(ImportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putInputs("reference_data", altDataSelector)  // Wrong schema, model expects basic data
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
     public void exportData_validateOk() {
 
         var modelTags = List.of(TagUpdate.newBuilder()
@@ -1309,6 +1415,85 @@ public class JobValidationTest {
                         .setModel(modelSelector)
                         .putInputs("input_data", basicDataSelector)
                         .addStorageAccess("STORAGE_THAT_IS_NOT_CONFIGURED"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void exportData_missingParameter() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("export_data_missing_parameter"))
+                .build());
+
+        var modelSelector = createDataExportModel(modelTags, Map.of("storage_key", BasicType.STRING));
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.EXPORT_DATA)
+                .setExportData(ExportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putInputs("input_data", basicDataSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void exportData_wrongParameterType() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("export_data_wrong_parameter_type"))
+                .build());
+
+        var modelSelector = createDataExportModel(modelTags, Map.of("storage_key", BasicType.STRING));
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.EXPORT_DATA)
+                .setExportData(ExportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putInputs("input_data", basicDataSelector)
+                        .putParameters("storage_key", MetadataCodec.encodeValue(123))  // Wrong type, model expects a string
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void exportData_wrongInputSchema() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("export_data_wrong_input_schema"))
+                .build());
+
+        var modelSelector = createDataExportModel(modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.EXPORT_DATA)
+                .setExportData(ExportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putInputs("input_data", altDataSelector)  // Wrong schema, model expects basic data
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
 
         var request = JobRequest.newBuilder()
                 .setTenant(TEST_TENANT)

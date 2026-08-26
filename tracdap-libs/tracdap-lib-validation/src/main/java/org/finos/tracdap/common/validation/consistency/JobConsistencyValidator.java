@@ -68,10 +68,16 @@ public class JobConsistencyValidator {
 
     private static final Descriptors.Descriptor IMPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor IDJ_MODEL;
+    private static final Descriptors.FieldDescriptor IDJ_PARAMETERS;
+    private static final Descriptors.FieldDescriptor IDJ_INPUTS;
+    private static final Descriptors.FieldDescriptor IDJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor IDJ_STORAGE_ACCESS;
 
     private static final Descriptors.Descriptor EXPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor EDJ_MODEL;
+    private static final Descriptors.FieldDescriptor EDJ_PARAMETERS;
+    private static final Descriptors.FieldDescriptor EDJ_INPUTS;
+    private static final Descriptors.FieldDescriptor EDJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor EDJ_STORAGE_ACCESS;
 
     static {
@@ -102,10 +108,16 @@ public class JobConsistencyValidator {
 
         IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
         IDJ_MODEL = field(IMPORT_DATA_JOB, ImportDataJob.MODEL_FIELD_NUMBER);
+        IDJ_PARAMETERS = field(IMPORT_DATA_JOB, ImportDataJob.PARAMETERS_FIELD_NUMBER);
+        IDJ_INPUTS = field(IMPORT_DATA_JOB, ImportDataJob.INPUTS_FIELD_NUMBER);
+        IDJ_PRIOR_OUTPUTS = field(IMPORT_DATA_JOB, ImportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
         IDJ_STORAGE_ACCESS = field(IMPORT_DATA_JOB, ImportDataJob.STORAGEACCESS_FIELD_NUMBER);
 
         EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
         EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
+        EDJ_PARAMETERS = field(EXPORT_DATA_JOB, ExportDataJob.PARAMETERS_FIELD_NUMBER);
+        EDJ_INPUTS = field(EXPORT_DATA_JOB, ExportDataJob.INPUTS_FIELD_NUMBER);
+        EDJ_PRIOR_OUTPUTS = field(EXPORT_DATA_JOB, ExportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
         EDJ_STORAGE_ACCESS = field(EXPORT_DATA_JOB, ExportDataJob.STORAGEACCESS_FIELD_NUMBER);
     }
 
@@ -223,6 +235,8 @@ public class JobConsistencyValidator {
     }
 
     @Validator
+    // Suppression is needed because validator method reference accepts a generic type (Map)
+    @SuppressWarnings("unchecked")
     public static ValidationContext importDataJob(ImportDataJob job, ValidationContext ctx) {
 
         var metadata = ctx.getMetadataBundle();
@@ -244,6 +258,19 @@ public class JobConsistencyValidator {
             ctx = ctx.push(IDJ_MODEL).error(message).pop();
         }
 
+        ctx.pushMap(IDJ_PARAMETERS, ImportDataJob::getParametersMap)
+                .apply(JobConsistencyValidator::runModelParameters, Map.class, modelDef.getParametersMap())
+                .pop();
+
+        ctx.pushMap(IDJ_INPUTS, ImportDataJob::getInputsMap)
+                .apply(JobConsistencyValidator::runModelInputs, Map.class, modelDef.getInputsMap())
+                .pop();
+
+        // Prior outputs are optional, however any provided must be valid
+        ctx.pushMap(IDJ_PRIOR_OUTPUTS, ImportDataJob::getPriorOutputsMap)
+                .apply(JobConsistencyValidator::runModelPriorOutputs, Map.class, modelDef.getOutputsMap())
+                .pop();
+
         ctx = ctx.pushRepeated(IDJ_STORAGE_ACCESS)
                 .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
                 .pop();
@@ -252,6 +279,8 @@ public class JobConsistencyValidator {
     }
 
     @Validator
+    // Suppression is needed because validator method reference accepts a generic type (Map)
+    @SuppressWarnings("unchecked")
     public static ValidationContext exportDataJob(ExportDataJob job, ValidationContext ctx) {
 
         var metadata = ctx.getMetadataBundle();
@@ -272,6 +301,19 @@ public class JobConsistencyValidator {
 
             ctx = ctx.push(EDJ_MODEL).error(message).pop();
         }
+
+        ctx.pushMap(EDJ_PARAMETERS, ExportDataJob::getParametersMap)
+                .apply(JobConsistencyValidator::runModelParameters, Map.class, modelDef.getParametersMap())
+                .pop();
+
+        ctx.pushMap(EDJ_INPUTS, ExportDataJob::getInputsMap)
+                .apply(JobConsistencyValidator::runModelInputs, Map.class, modelDef.getInputsMap())
+                .pop();
+
+        // Prior outputs are optional, however any provided must be valid
+        ctx.pushMap(EDJ_PRIOR_OUTPUTS, ExportDataJob::getPriorOutputsMap)
+                .apply(JobConsistencyValidator::runModelPriorOutputs, Map.class, modelDef.getOutputsMap())
+                .pop();
 
         ctx = ctx.pushRepeated(EDJ_STORAGE_ACCESS)
                 .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)

@@ -287,6 +287,8 @@ public class JobValidator {
         return importOrExportJob(ctx, EDJ_PARAMETERS, EDJ_INPUTS, EDJ_OUTPUTS, EDJ_PRIOR_OUTPUTS, EDJ_STORAGE_ACCESS);
     }
 
+    // Duplicates runModelOrFlow's parameters/inputs/outputs/priorOutputs validation blocks
+    // (not shared with RunModelJob/RunFlowJob)
     private static ValidationContext importOrExportJob(
             ValidationContext ctx,
             Descriptors.FieldDescriptor parameters,
