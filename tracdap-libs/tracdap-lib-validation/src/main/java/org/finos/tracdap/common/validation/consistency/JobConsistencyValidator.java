@@ -66,6 +66,14 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
 
+    private static final Descriptors.Descriptor IMPORT_DATA_JOB;
+    private static final Descriptors.FieldDescriptor IDJ_MODEL;
+    private static final Descriptors.FieldDescriptor IDJ_STORAGE_ACCESS;
+
+    private static final Descriptors.Descriptor EXPORT_DATA_JOB;
+    private static final Descriptors.FieldDescriptor EDJ_MODEL;
+    private static final Descriptors.FieldDescriptor EDJ_STORAGE_ACCESS;
+
     static {
 
         JOB_DEFINITION = JobDefinition.getDescriptor();
@@ -91,6 +99,14 @@ public class JobConsistencyValidator {
         RFJ_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTS_FIELD_NUMBER);
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
         RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
+
+        IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
+        IDJ_MODEL = field(IMPORT_DATA_JOB, ImportDataJob.MODEL_FIELD_NUMBER);
+        IDJ_STORAGE_ACCESS = field(IMPORT_DATA_JOB, ImportDataJob.STORAGEACCESS_FIELD_NUMBER);
+
+        EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
+        EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
+        EDJ_STORAGE_ACCESS = field(EXPORT_DATA_JOB, ExportDataJob.STORAGEACCESS_FIELD_NUMBER);
     }
 
     @Validator
@@ -202,6 +218,80 @@ public class JobConsistencyValidator {
         ctx.pushMap(RFJ_OUTPUTS, RunFlowJob::getOutputsMap)
                 .apply(JobConsistencyValidator::runFlowOutputs, Map.class, graph)
                 .pop();
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext importDataJob(ImportDataJob job, ValidationContext ctx) {
+
+        var metadata = ctx.getMetadataBundle();
+        var modelObj = metadata.getObject(job.getModel());
+
+        if (modelObj == null) {
+            var message = "Required metadata is not available for [" + MetadataUtil.objectKey(job.getModel()) + "]";
+            return ctx.push(IDJ_MODEL).error(message).pop();
+        }
+
+        var modelDef = modelObj.getModel();
+
+        if (modelDef.getModelType() != ModelType.DATA_IMPORT_MODEL) {
+
+            var message = String.format(
+                    "Model [%s] is not a data import model (expected %s, got %s)",
+                    MetadataUtil.objectKey(job.getModel()), ModelType.DATA_IMPORT_MODEL, modelDef.getModelType());
+
+            ctx = ctx.push(IDJ_MODEL).error(message).pop();
+        }
+
+        ctx = ctx.pushRepeated(IDJ_STORAGE_ACCESS)
+                .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext exportDataJob(ExportDataJob job, ValidationContext ctx) {
+
+        var metadata = ctx.getMetadataBundle();
+        var modelObj = metadata.getObject(job.getModel());
+
+        if (modelObj == null) {
+            var message = "Required metadata is not available for [" + MetadataUtil.objectKey(job.getModel()) + "]";
+            return ctx.push(EDJ_MODEL).error(message).pop();
+        }
+
+        var modelDef = modelObj.getModel();
+
+        if (modelDef.getModelType() != ModelType.DATA_EXPORT_MODEL) {
+
+            var message = String.format(
+                    "Model [%s] is not a data export model (expected %s, got %s)",
+                    MetadataUtil.objectKey(job.getModel()), ModelType.DATA_EXPORT_MODEL, modelDef.getModelType());
+
+            ctx = ctx.push(EDJ_MODEL).error(message).pop();
+        }
+
+        ctx = ctx.pushRepeated(EDJ_STORAGE_ACCESS)
+                .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext storageAccessIsExternalStorage(String resourceName, ValidationContext ctx) {
+
+        var resource = ctx.getResourceBundle().getResource(resourceName, false);
+
+        if (resource == null)
+            return ctx.error(String.format("Resource is not available for [%s]", resourceName));
+
+        if (resource.getResourceType() != ResourceType.EXTERNAL_STORAGE) {
+            return ctx.error(String.format(
+                    "Resource [%s] is the wrong type (expected %s, got %s)",
+                    resourceName, ResourceType.EXTERNAL_STORAGE, resource.getResourceType()));
+        }
 
         return ctx;
     }
