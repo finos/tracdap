@@ -670,7 +670,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
 
                 var tracRtDistDir = tracRepoDir.resolve(TRAC_RUNTIME_DIST_DIR);
 
-                var corePackages = List.of(pythonExe, "-m", "pip", "install", "pandas", "polars");
+                var corePackages = List.of(pythonExe, "-m", "pip", "install", "pandas", "polars", "pytz");
                 var pipInstall = new ArrayList<>(corePackages);
 
                 try (var tracRtWheels = Files.find(tracRtDistDir, 1, (file, attrs) -> file.toString().endsWith(".whl"))) {
