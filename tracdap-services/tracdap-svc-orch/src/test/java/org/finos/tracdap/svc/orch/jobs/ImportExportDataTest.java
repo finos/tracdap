@@ -249,12 +249,14 @@ public class ImportExportDataTest {
         var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
         var fieldCountAttr = dataTag.getAttrsOrThrow("trac_schema_field_count");
         var rowCountAttr = dataTag.getAttrsOrThrow("trac_data_row_count");
+        var jobTypeAttr = dataTag.getAttrsOrThrow("trac_job_type");
 
         Assertions.assertEquals("import_export_data:customer_loans", MetadataCodec.decodeStringValue(outputAttr));
         Assertions.assertEquals(5, MetadataCodec.decodeIntegerValue(fieldCountAttr));
         Assertions.assertTrue(MetadataCodec.decodeIntegerValue(rowCountAttr) > 0);
         Assertions.assertEquals(1, dataDef.getPartsCount());
         Assertions.assertTrue(dataTag.containsAttrs("trac_create_job"));
+        Assertions.assertEquals(JobType.IMPORT_DATA.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
 
         var storageReq = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
