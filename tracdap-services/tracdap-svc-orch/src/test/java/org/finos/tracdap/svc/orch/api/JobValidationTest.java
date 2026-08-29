@@ -1503,4 +1503,142 @@ public class JobValidationTest {
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
         Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
+
+    @Test
+    public void importData_reservedOutputAttr() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_data_reserved_output_attr"))
+                .build());
+
+        var modelSelector = createDataImportModel(modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(ImportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("trac_import_location_key")
+                                .setValue(MetadataCodec.encodeValue("spoofed_location"))));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void importData_importsMustBeEmpty() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_data_imports_must_be_empty"))
+                .build());
+
+        var modelSelector = createDataImportModel(modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(ImportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
+                        .putImports("import_one", basicDataSelector));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void importData_importAttrsMustBeEmpty() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("import_data_import_attrs_must_be_empty"))
+                .build());
+
+        var modelSelector = createDataImportModel(modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(ImportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
+                        .addImportAttrs(TagUpdate.newBuilder()
+                                .setAttrName("business_date")
+                                .setValue(MetadataCodec.encodeValue("2024-01-01"))));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void exportData_reservedOutputAttr() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("export_data_reserved_output_attr"))
+                .build());
+
+        var modelSelector = createDataExportModel(modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.EXPORT_DATA)
+                .setExportData(ExportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putInputs("input_data", basicDataSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
+                        .addOutputAttrs(TagUpdate.newBuilder()
+                                .setAttrName("trac_job_output")
+                                .setValue(MetadataCodec.encodeValue("spoofed"))));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void exportData_exportsMustBeEmpty() {
+
+        var modelTags = List.of(TagUpdate.newBuilder()
+                .setAttrName("model_key")
+                .setValue(MetadataCodec.encodeValue("export_data_exports_must_be_empty"))
+                .build());
+
+        var modelSelector = createDataExportModel(modelTags);
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.EXPORT_DATA)
+                .setExportData(ExportDataJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putInputs("input_data", basicDataSelector)
+                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
+                        .putExports("export_one", basicDataSelector));
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
 }

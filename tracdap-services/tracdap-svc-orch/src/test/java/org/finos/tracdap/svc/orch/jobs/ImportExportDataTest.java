@@ -250,6 +250,9 @@ public class ImportExportDataTest {
         var fieldCountAttr = dataTag.getAttrsOrThrow("trac_schema_field_count");
         var rowCountAttr = dataTag.getAttrsOrThrow("trac_data_row_count");
         var jobTypeAttr = dataTag.getAttrsOrThrow("trac_job_type");
+        var importLocationAttr = dataTag.getAttrsOrThrow("trac_import_location_key");
+        var originalFileNameAttr = dataTag.getAttrsOrThrow("original_file_name");
+        var originalFileSizeAttr = dataTag.getAttrsOrThrow("original_file_size");
 
         Assertions.assertEquals("import_export_data:customer_loans", MetadataCodec.decodeStringValue(outputAttr));
         Assertions.assertEquals(5, MetadataCodec.decodeIntegerValue(fieldCountAttr));
@@ -257,6 +260,10 @@ public class ImportExportDataTest {
         Assertions.assertEquals(1, dataDef.getPartsCount());
         Assertions.assertTrue(dataTag.containsAttrs("trac_create_job"));
         Assertions.assertEquals(JobType.IMPORT_DATA.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
+        Assertions.assertEquals(EXTERNAL_STORAGE_KEY, MetadataCodec.decodeStringValue(importLocationAttr));
+        Assertions.assertEquals("sample_data.parquet", MetadataCodec.decodeStringValue(originalFileNameAttr));
+        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(originalFileSizeAttr) > 0);
+        Assertions.assertTrue(dataTag.containsAttrs("original_file_modified_date"));
 
         var storageReq = MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)

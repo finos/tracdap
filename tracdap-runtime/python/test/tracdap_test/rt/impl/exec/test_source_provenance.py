@@ -105,13 +105,13 @@ class SourceProvenanceContextTest(unittest.TestCase):
 
         attrs = _attrs_by_name(self.local_ctx["my_dataset"])
         self.assertEqual(
-            {"trac_import_location_key", "original_file_name", "original_file_size", "trac_file_modified_date"},
+            {"trac_import_location_key", "original_file_name", "original_file_size", "original_file_modified_date"},
             set(attrs.keys()))
 
         self.assertEqual(self.FILE_STORAGE_KEY, _types.MetadataCodec.decode_value(attrs["trac_import_location_key"].value))
         self.assertEqual("data.csv", _types.MetadataCodec.decode_value(attrs["original_file_name"].value))
         self.assertEqual(1234, _types.MetadataCodec.decode_value(attrs["original_file_size"].value))
-        self.assertEqual(dt.datetime(2024, 1, 1, 12, 0, 0), _types.MetadataCodec.decode_value(attrs["trac_file_modified_date"].value))
+        self.assertEqual(dt.datetime(2024, 1, 1, 12, 0, 0), _types.MetadataCodec.decode_value(attrs["original_file_modified_date"].value))
 
     def test_set_source_metadata_file_stat_no_mtime(self):
 

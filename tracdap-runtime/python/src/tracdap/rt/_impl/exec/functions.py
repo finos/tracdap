@@ -15,6 +15,7 @@
 
 import abc
 import copy
+import dataclasses as dc
 import io
 import pathlib
 import typing as tp
@@ -460,7 +461,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
             raise _ex.EUnexpected()
 
         if data_item.attrs:
-            saved_spec.attrs.extend(data_item.attrs)
+            saved_spec = dc.replace(saved_spec, attrs=[*saved_spec.attrs, *data_item.attrs])
 
         return saved_spec
 

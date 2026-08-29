@@ -605,19 +605,17 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__val.check_storage_valid_identifier(storage_key)
         self.__val.check_storage_available(self.__storage_map, storage_key)
 
-        storage = self.__storage_map[storage_key]
+        if isinstance(source_info, _eapi.FileStat):
+            self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracFileStorage)
 
-        if isinstance(storage, _eapi.TracFileStorage):
-            if not isinstance(source_info, _eapi.FileStat):
-                self.__val.report_public_error(_ex.ERuntimeValidation(f"Expected storage_info to be a FileStat, [{storage_key}] refers to file storage"))
-
-        if isinstance(storage, _eapi.TracDataStorage):
-            if not isinstance(source_info, str):
-                self.__val.report_public_error(_ex.ERuntimeValidation(f"Expected storage_info to be a table name, [{storage_key}] refers to dadta storage"))
-
-        if not isinstance(source_info, _eapi.FileStat):
+        elif isinstance(source_info, str):
+            self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracDataStorage)
             self.__val.report_public_error(_ex.ERuntimeValidation(
                 "set_source_metadata() for table/SQL sources is not yet supported"))
+
+        else:
+            self.__val.report_public_error(_ex.ERuntimeValidation(
+                f"Expected storage_info to be a FileStat or table name, got [{type(source_info).__name__}]"))
 
         attrs = [_meta.TagUpdate(
             _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
@@ -634,7 +632,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         if source_info.mtime is not None:
             attrs.append(_meta.TagUpdate(
                 _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
-                "trac_file_modified_date", _types.MetadataCodec.encode_value(source_info.mtime)))
+                "original_file_modified_date", _types.MetadataCodec.encode_value(source_info.mtime)))
 
         data_view = self.__local_ctx[dataset_name]
         self.__local_ctx[dataset_name] = data_view.with_attrs(attrs)
