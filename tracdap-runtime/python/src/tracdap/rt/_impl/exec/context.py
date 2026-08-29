@@ -643,6 +643,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
         self.__val.check_item_available_in_context(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_attr_name_not_reserved(attribute_name)
 
         attr_update = _meta.TagUpdate(
             _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
@@ -1009,6 +1010,11 @@ class TracContextValidator(TracContextErrorReporter):
 
         if item_name not in self.__local_ctx:
             self._report_error(f"{item_type} {item_name} is not available in the current context")
+
+    def check_attr_name_not_reserved(self, attribute_name: str):
+
+        if self._RESERVED_IDENTIFIER.match(attribute_name):
+            self._report_error(f"Attribute name {attribute_name} is a reserved identifier")
 
     def check_item_not_available_in_context(self, item_name: str, item_type: str):
 

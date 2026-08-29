@@ -94,6 +94,17 @@ class SourceProvenanceContextTest(unittest.TestCase):
             _ex.ERuntimeValidation,
             lambda: self.ctx.set_attribute("unknown_dataset", "business_date", dt.date(2024, 1, 1)))
 
+    def test_set_attribute_reserved_name(self):
+
+        for reserved_name in ["trac_model_type", "_hidden_attr"]:
+
+            self.assertRaises(
+                _ex.ERuntimeValidation,
+                lambda name=reserved_name: self.ctx.set_attribute("my_dataset", name, "some_value"))
+
+            attrs = _attrs_by_name(self.local_ctx["my_dataset"])
+            self.assertEqual({}, attrs)
+
     def test_set_source_metadata_file_stat_ok(self):
 
         file_stat = trac.FileStat(
