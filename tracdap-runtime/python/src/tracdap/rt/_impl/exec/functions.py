@@ -20,12 +20,11 @@ import pathlib
 import typing as tp
 
 import tracdap.rt.api as _api
-import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.context as _ctx
 import tracdap.rt._impl.exec.graph_builder as _graph
-import tracdap.rt._impl.core.type_system as _types
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.resources as _resources
@@ -404,7 +403,7 @@ class LoadDataFunc( _LoadSaveDataFunc, NodeFunction[_data.DataItem],):
         arrow_schema = _data.DataMapping.trac_to_arrow_schema(trac_schema) if trac_schema else None
 
         storage_options = dict(
-            (opt_key, _types.MetadataCodec.decode_value(opt_value))
+            (opt_key, _meta.MetadataCodec.decode_value(opt_value))
             for opt_key, opt_value in data_spec.storage.storageOptions.items())
 
         storage = self.storage.get_data_storage(data_copy.storageKey)
@@ -484,7 +483,7 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         # Decode options (metadata values) from the storage definition
         options = dict()
         for opt_key, opt_value in data_spec.storage.storageOptions.items():
-            options[opt_key] = _types.MetadataCodec.decode_value(opt_value)
+            options[opt_key] = _meta.MetadataCodec.decode_value(opt_value)
 
         storage = self.storage.get_data_storage(data_copy.storageKey)
         storage.write_table(

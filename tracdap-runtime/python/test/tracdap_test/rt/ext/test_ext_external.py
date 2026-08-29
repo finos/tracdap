@@ -22,12 +22,11 @@ from http.client import HTTPConnection
 import tracdap.rt.api as trac
 import tracdap.rt.exceptions as ex
 import tracdap.rt.launch as launch
-import tracdap.rt.metadata as meta
 import tracdap.rt._impl.runtime as runtime  # noqa
-import tracdap.rt._impl.core.config_parser as cfg  # noqa
+import tracdap.rt._impl.core.config as cfg  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
-import tracdap.rt._impl.core.type_system as trac_types  # noqa
+import tracdap.rt._impl.core.metadata as meta  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 
 ROOT_DIR = pathlib.Path(__file__).parent \

@@ -24,14 +24,13 @@ import traceback
 
 import tracdap.rt.api as _api
 import tracdap.rt.api.experimental as _eapi
-import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
 import tracdap.rt.ext.external as _external
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.struct as _struct
-import tracdap.rt._impl.core.type_system as _types
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -166,7 +165,7 @@ class TracContextImpl(_api.TracContext):
 
         self.__val.check_context_object_type(parameter_name, value, _meta.Value)
 
-        return _types.MetadataCodec.decode_value(value)
+        return _meta.MetadataCodec.decode_value(value)
 
     def has_dataset(self, dataset_name: str) -> bool:
 

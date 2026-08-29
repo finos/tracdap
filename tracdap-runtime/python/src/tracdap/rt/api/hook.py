@@ -13,8 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from __future__ import annotations
-
 import abc as _abc
 import dataclasses as _dc
 import typing as _tp
@@ -40,14 +38,14 @@ class _Named(_tp.Generic[_T]):
 
 class _StaticApiHook(_abc.ABC):
 
-    __static_api_hook: _StaticApiHook = None
+    __static_api_hook: "_StaticApiHook" = None
 
     @classmethod
     def _is_registered(cls) -> bool:
         return cls.__static_api_hook is not None
 
     @classmethod
-    def _register(cls, hook: _StaticApiHook):
+    def _register(cls, hook: "_StaticApiHook"):
 
         if cls._is_registered():
             raise _ex.ETracInternal(f"TRAC API hook registered twice")
@@ -55,7 +53,7 @@ class _StaticApiHook(_abc.ABC):
         cls.__static_api_hook = hook
 
     @classmethod
-    def get_instance(cls) -> _StaticApiHook:
+    def get_instance(cls) -> "_StaticApiHook":
 
         if not cls._is_registered():
             raise _ex.ETracInternal(f"TRAC API hook is not initialized")

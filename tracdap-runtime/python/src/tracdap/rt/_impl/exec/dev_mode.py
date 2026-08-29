@@ -19,16 +19,14 @@ import copy
 import pathlib
 
 import tracdap.rt.api as _api
-import tracdap.rt.config as _cfg
-import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.core.config_parser as _cfg_p
+import tracdap.rt._impl.core.config as _cfg
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.repos as _repos
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.storage as _storage
-import tracdap.rt._impl.core.type_system as _types
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.util as _util
 
 
@@ -56,7 +54,7 @@ class DevModeTranslator:
     _log: tp.Optional[_logging.Logger] = None
 
     @classmethod
-    def translate_sys_config(cls, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg_p.ConfigManager):
+    def translate_sys_config(cls, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg.ConfigManager):
 
         cls._log.info(f"Applying dev mode config translation to system config")
 
@@ -82,9 +80,9 @@ class DevModeTranslator:
     @classmethod
     def _process_storage(
             cls, sys_config: _cfg.RuntimeConfig,
-            config_mgr: _cfg_p.ConfigManager):
+            config_mgr: _cfg.ConfigManager):
 
-        sys_config.properties[_cfg_p.ConfigKeys.STORAGE_DEFAULT_LAYOUT] = _meta.StorageLayout.DEVELOPER_LAYOUT.name
+        sys_config.properties[_cfg.ConfigKeys.STORAGE_DEFAULT_LAYOUT] = _meta.StorageLayout.DEVELOPER_LAYOUT.name
 
         for resource_key, resource in sys_config.resources.items():
             if resource.resourceType in [_meta.ResourceType.INTERNAL_STORAGE, _meta.ResourceType.EXTERNAL_STORAGE]:
@@ -94,7 +92,7 @@ class DevModeTranslator:
         return sys_config
 
     @classmethod
-    def _resolve_storage_location(cls, bucket_key, bucket_config: _meta.ResourceDefinition, config_mgr: _cfg_p.ConfigManager):
+    def _resolve_storage_location(cls, bucket_key, bucket_config: _meta.ResourceDefinition, config_mgr: _cfg.ConfigManager):
 
         if bucket_config.protocol != "LOCAL":
             return bucket_config
@@ -131,7 +129,7 @@ class DevModeTranslator:
 
 
     def __init__(
-            self, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg_p.ConfigManager, scratch_dir: pathlib.Path = None,
+            self, sys_config: _cfg.RuntimeConfig, config_mgr: _cfg.ConfigManager, scratch_dir: pathlib.Path = None,
             model_loader: _models.ModelLoader = None, storage_manager: _storage.StorageManager = None):
 
         self._sys_config = sys_config
@@ -822,7 +820,7 @@ class DevModeTranslator:
 
                 try:
                     cls._log.info(f"Encoding parameter [{p_name}] as {p_spec.paramType.basicType.name}")
-                    encoded_value = _types.MetadataCodec.convert_value(p_value, p_spec.paramType)
+                    encoded_value = _meta.MetadataCodec.convert_value(p_value, p_spec.paramType)
                     encoded_values[p_name] = encoded_value
 
                 except Exception as e:
@@ -898,7 +896,7 @@ class DevModeTranslator:
 
         if isinstance(data_value, str):
             storage_path = data_value
-            storage_key = _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+            storage_key = _util.read_property(self._sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
             storage_format = self.infer_format(storage_path, self._sys_config, schema)
 
         elif isinstance(data_value, dict):
@@ -908,7 +906,7 @@ class DevModeTranslator:
             if not storage_path:
                 raise _ex.EConfigParse(f"Invalid configuration for input [{data_key}] (missing required value 'path'")
 
-            storage_key = data_value.get("storageKey") or _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+            storage_key = data_value.get("storageKey") or _util.read_property(self._sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
             storage_format = data_value.get("format") or self.infer_format(storage_path, self._sys_config, schema)
 
         else:
@@ -961,12 +959,12 @@ class DevModeTranslator:
 
         if isinstance(file_value, str):
 
-            storage_key = _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+            storage_key = _util.read_property(self._sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
             storage_path = file_value
 
         elif isinstance(file_value, dict):
 
-            storage_key = file_value.get("storageKey") or _util.read_property(self._sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_LOCATION)
+            storage_key = file_value.get("storageKey") or _util.read_property(self._sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_LOCATION)
             storage_path = file_value.get("path")
 
             if not storage_path:
@@ -1027,7 +1025,7 @@ class DevModeTranslator:
                 return extension[1:] if extension.startswith(".") else extension
 
         else:
-            return _util.read_property(sys_config.properties, _cfg_p.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
+            return _util.read_property(sys_config.properties, _cfg.ConfigKeys.STORAGE_DEFAULT_FORMAT, "CSV")
 
     def _find_latest_version(self, storage_key, storage_path):
 
@@ -1130,7 +1128,7 @@ class DevModeTranslator:
         storage_def.layout = _meta.StorageLayout.DEVELOPER_LAYOUT
 
         if storage_format.lower() == "csv":
-            storage_def.storageOptions["lenient_csv_parser"] = _types.MetadataCodec.encode_value(True)
+            storage_def.storageOptions["lenient_csv_parser"] = _meta.MetadataCodec.encode_value(True)
 
         return _meta.ObjectDefinition(objectType=_meta.ObjectType.STORAGE, storage=storage_def)
 
@@ -1144,11 +1142,11 @@ class DevModeTranslator:
 
                 tag = _meta.Tag(header=object_id)
 
-                timestamp = _types.MetadataCodec.convert_datetime_value(object_id.objectTimestamp.isoDatetime)
-                user_id = _types.MetadataCodec.encode_value("local_user")
-                user_name = _types.MetadataCodec.encode_value("Local User")
+                timestamp = _meta.MetadataCodec.convert_datetime_value(object_id.objectTimestamp.isoDatetime)
+                user_id = _meta.MetadataCodec.encode_value("local_user")
+                user_name = _meta.MetadataCodec.encode_value("Local User")
 
-                tag.attrs["trac_dev_mode"] = _types.MetadataCodec.encode_value(True)
+                tag.attrs["trac_dev_mode"] = _meta.MetadataCodec.encode_value(True)
 
                 tag.attrs["trac_create_time"] = timestamp
                 tag.attrs["trac_create_user_id"] = user_id
