@@ -337,4 +337,89 @@
         <packageUrl regex="true">^pkg:npm/extract\-zip@.*$</packageUrl>
         <cve>CVE-2026-56876</cve>
     </suppress>
+
+
+    <!-- OpenTelemetry: pulled in by Google Cloud libs (no update yet available) and io.grpc/grpc-bom -->
+    <!-- (update has breaking API changes) -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.grpc/grpc-opentelemetry@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <!-- OpenTelemetry: pulled in by Google Cloud libs (no update yet available) -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-api@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-common@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-context@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-29181</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-39883</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-24051</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-39882</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-41178</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-common@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-logs@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-metrics@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-trace@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
 </suppressions>
