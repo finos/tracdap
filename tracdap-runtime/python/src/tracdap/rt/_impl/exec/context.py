@@ -605,23 +605,52 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__val.check_storage_valid_identifier(storage_key)
         self.__val.check_storage_available(self.__storage_map, storage_key)
 
-        storage = self.__storage_map[storage_key]
+        if isinstance(source_info, _eapi.FileStat):
+            self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracFileStorage)
 
-        if isinstance(storage, _eapi.TracFileStorage):
-            if not isinstance(source_info, _eapi.FileStat):
-                self.__val.report_public_error(_ex.ERuntimeValidation(f"Expected storage_info to be a FileStat, [{storage_key}] refers to file storage"))
+        elif isinstance(source_info, str):
+            self.__val.check_storage_type(self.__storage_map, storage_key, _eapi.TracDataStorage)
+            self.__val.report_public_error(_ex.ERuntimeValidation(
+                "set_source_metadata() for table/SQL sources is not yet supported"))
 
-        if isinstance(storage, _eapi.TracDataStorage):
-            if not isinstance(source_info, str):
-                self.__val.report_public_error(_ex.ERuntimeValidation(f"Expected storage_info to be a table name, [{storage_key}] refers to dadta storage"))
+        else:
+            self.__val.report_public_error(_ex.ERuntimeValidation(
+                f"Expected storage_info to be a FileStat or table name, got [{type(source_info).__name__}]"))
 
-        pass  # Not implemented yet, only required when imports are sent back to the platform
+        attrs = [_meta.TagUpdate(
+            _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
+            "trac_import_location_key", _types.MetadataCodec.encode_value(storage_key))]
+
+        attrs.append(_meta.TagUpdate(
+            _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
+            "original_file_name", _types.MetadataCodec.encode_value(source_info.file_name)))
+
+        attrs.append(_meta.TagUpdate(
+            _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
+            "original_file_size", _types.MetadataCodec.encode_value(source_info.size)))
+
+        if source_info.mtime is not None:
+            attrs.append(_meta.TagUpdate(
+                _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
+                "original_file_modified_date", _types.MetadataCodec.encode_value(source_info.mtime)))
+
+        data_view = self.__local_ctx[dataset_name]
+        self.__local_ctx[dataset_name] = data_view.with_attrs(attrs)
 
     def set_attribute(self, dataset_name: str, attribute_name: str, value: tp.Any):
 
         _val.validate_signature(self.set_attribute, dataset_name, attribute_name, value)
 
-        pass  # Not implemented yet, only required when imports are sent back to the platform
+        self.__val.check_item_valid_identifier(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_item_available_in_context(dataset_name, TracContextValidator.DATASET)
+        self.__val.check_attr_name_not_reserved(attribute_name)
+
+        attr_update = _meta.TagUpdate(
+            _meta.TagOperation.CREATE_OR_REPLACE_ATTR,
+            attribute_name, _types.MetadataCodec.encode_value(value))
+
+        data_view = self.__local_ctx[dataset_name]
+        self.__local_ctx[dataset_name] = data_view.with_attrs([attr_update])
 
     def set_schema(self, dataset_name: str, schema: _meta.SchemaDefinition):
 
@@ -981,6 +1010,11 @@ class TracContextValidator(TracContextErrorReporter):
 
         if item_name not in self.__local_ctx:
             self._report_error(f"{item_type} {item_name} is not available in the current context")
+
+    def check_attr_name_not_reserved(self, attribute_name: str):
+
+        if self._RESERVED_IDENTIFIER.match(attribute_name):
+            self._report_error(f"Attribute name {attribute_name} is a reserved identifier")
 
     def check_item_not_available_in_context(self, item_name: str, item_type: str):
 

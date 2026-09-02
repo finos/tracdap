@@ -173,11 +173,14 @@ class SimpleDataImport(trac.TracDataImport):
         storage = ctx.get_file_storage(storage_key)
 
         storage_file = ctx.get_parameter("source_file")
+        file_stat = storage.stat(storage_file)
 
         with storage.read_byte_stream(storage_file) as file_stream:
 
             dataset = pd.read_parquet(file_stream)
             ctx.put_pandas_table("customer_loans", dataset)
+
+        ctx.set_source_metadata("customer_loans", storage_key, file_stat)
 
 
 if __name__ == "__main__":
