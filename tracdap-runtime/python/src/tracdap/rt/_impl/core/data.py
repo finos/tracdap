@@ -67,6 +67,7 @@ class DataSpec:
     context_key: tp.Optional[str] = None
 
     metadata: tp.Optional[_api.RuntimeMetadata] = None
+    attrs: tp.List[_meta.TagUpdate] = dc.field(default_factory=list)
 
     @staticmethod
     def create_data_spec(
@@ -137,6 +138,7 @@ class DataItem:
     table: tp.Optional[pa.Table] = None
 
     metadata: tp.Optional[_api.RuntimeMetadata] = None
+    attrs: tp.List[_meta.TagUpdate] = dc.field(default_factory=list)
 
     def is_empty(self) -> bool:
         return self.content is None
@@ -177,6 +179,9 @@ class DataItem:
     def with_metadata(self, metadata: _api.RuntimeMetadata) -> "DataItem":
         return dc.replace(self, metadata=metadata)
 
+    def with_attrs(self, attrs: tp.List[_meta.TagUpdate]) -> "DataItem":
+        return dc.replace(self, attrs=[*self.attrs, *attrs])
+
 
 @dc.dataclass(frozen=True)
 class DataView:
@@ -190,6 +195,7 @@ class DataView:
     file_item: tp.Optional[DataItem] = None
 
     metadata: tp.Optional[_api.RuntimeMetadata] = None
+    attrs: tp.List[_meta.TagUpdate] = dc.field(default_factory=list)
 
     @staticmethod
     def create_empty(object_type: _meta.ObjectType = _meta.ObjectType.DATA) -> "DataView":
@@ -229,6 +235,9 @@ class DataView:
 
     def with_metadata(self, metadata: _api.RuntimeMetadata) -> "DataView":
         return dc.replace(self, metadata=metadata)
+
+    def with_attrs(self, attrs: tp.List[_meta.TagUpdate]) -> "DataView":
+        return dc.replace(self, attrs=[*self.attrs, *attrs])
 
     def get_metadata(self) -> tp.Optional[_api.RuntimeMetadata]:
         if self.metadata:
@@ -460,7 +469,7 @@ class DataMapping:
         deltas = [*prior_deltas, item]
         parts = {**view.parts, part: deltas}
 
-        return DataView(view.object_type, view.trac_schema, view.arrow_schema, parts=parts)
+        return DataView(view.object_type, view.trac_schema, view.arrow_schema, parts=parts, attrs=view.attrs)
 
     @classmethod
     def view_to_arrow(cls, view: DataView, part: DataPartKey) -> pa.Table:

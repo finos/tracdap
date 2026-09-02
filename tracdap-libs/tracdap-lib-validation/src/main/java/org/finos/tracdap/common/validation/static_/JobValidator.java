@@ -36,7 +36,9 @@ public class JobValidator {
     private static final Map<JobDefinition.JobDetailsCase, JobType> JOB_DETAILS_CASE_MAPPING = Map.ofEntries(
             Map.entry(JobDefinition.JobDetailsCase.RUNMODEL, JobType.RUN_MODEL),
             Map.entry(JobDefinition.JobDetailsCase.RUNFLOW, JobType.RUN_FLOW),
-            Map.entry(JobDefinition.JobDetailsCase.IMPORTMODEL, JobType.IMPORT_MODEL));
+            Map.entry(JobDefinition.JobDetailsCase.IMPORTMODEL, JobType.IMPORT_MODEL),
+            Map.entry(JobDefinition.JobDetailsCase.IMPORTDATA, JobType.IMPORT_DATA),
+            Map.entry(JobDefinition.JobDetailsCase.EXPORTDATA, JobType.EXPORT_DATA));
 
     private static final List<ObjectType> ALLOWED_IO_TYPES = List.of(ObjectType.DATA, ObjectType.FILE);
 
@@ -59,6 +61,7 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor RMJ_OUTPUTS;
     private static final Descriptors.FieldDescriptor RMJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RMJ_RESOURCES;
+    private static final Descriptors.FieldDescriptor RMJ_OUTPUT_ATTRS;
 
     private static final Descriptors.Descriptor RUN_FLOW_JOB;
     private static final Descriptors.FieldDescriptor RFJ_FLOW;
@@ -68,6 +71,28 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor RFJ_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
+    private static final Descriptors.FieldDescriptor RFJ_OUTPUT_ATTRS;
+
+    private static final Descriptors.Descriptor IMPORT_DATA_JOB;
+    private static final Descriptors.FieldDescriptor IDJ_MODEL;
+    private static final Descriptors.FieldDescriptor IDJ_PARAMETERS;
+    private static final Descriptors.FieldDescriptor IDJ_INPUTS;
+    private static final Descriptors.FieldDescriptor IDJ_OUTPUTS;
+    private static final Descriptors.FieldDescriptor IDJ_PRIOR_OUTPUTS;
+    private static final Descriptors.FieldDescriptor IDJ_STORAGE_ACCESS;
+    private static final Descriptors.FieldDescriptor IDJ_IMPORTS;
+    private static final Descriptors.FieldDescriptor IDJ_OUTPUT_ATTRS;
+    private static final Descriptors.FieldDescriptor IDJ_IMPORT_ATTRS;
+
+    private static final Descriptors.Descriptor EXPORT_DATA_JOB;
+    private static final Descriptors.FieldDescriptor EDJ_MODEL;
+    private static final Descriptors.FieldDescriptor EDJ_PARAMETERS;
+    private static final Descriptors.FieldDescriptor EDJ_INPUTS;
+    private static final Descriptors.FieldDescriptor EDJ_OUTPUTS;
+    private static final Descriptors.FieldDescriptor EDJ_PRIOR_OUTPUTS;
+    private static final Descriptors.FieldDescriptor EDJ_STORAGE_ACCESS;
+    private static final Descriptors.FieldDescriptor EDJ_EXPORTS;
+    private static final Descriptors.FieldDescriptor EDJ_OUTPUT_ATTRS;
 
     static {
 
@@ -90,6 +115,7 @@ public class JobValidator {
         RMJ_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.OUTPUTS_FIELD_NUMBER);
         RMJ_PRIOR_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.PRIOROUTPUTS_FIELD_NUMBER);
         RMJ_RESOURCES = field(RUN_MODEL_JOB, RunModelJob.RESOURCES_FIELD_NUMBER);
+        RMJ_OUTPUT_ATTRS = field(RUN_MODEL_JOB, RunModelJob.OUTPUTATTRS_FIELD_NUMBER);
 
         RUN_FLOW_JOB = RunFlowJob.getDescriptor();
         RFJ_FLOW = field(RUN_FLOW_JOB, RunFlowJob.FLOW_FIELD_NUMBER);
@@ -99,6 +125,28 @@ public class JobValidator {
         RFJ_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTS_FIELD_NUMBER);
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
         RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
+        RFJ_OUTPUT_ATTRS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTATTRS_FIELD_NUMBER);
+
+        IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
+        IDJ_MODEL = field(IMPORT_DATA_JOB, ImportDataJob.MODEL_FIELD_NUMBER);
+        IDJ_PARAMETERS = field(IMPORT_DATA_JOB, ImportDataJob.PARAMETERS_FIELD_NUMBER);
+        IDJ_INPUTS = field(IMPORT_DATA_JOB, ImportDataJob.INPUTS_FIELD_NUMBER);
+        IDJ_OUTPUTS = field(IMPORT_DATA_JOB, ImportDataJob.OUTPUTS_FIELD_NUMBER);
+        IDJ_PRIOR_OUTPUTS = field(IMPORT_DATA_JOB, ImportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
+        IDJ_STORAGE_ACCESS = field(IMPORT_DATA_JOB, ImportDataJob.STORAGEACCESS_FIELD_NUMBER);
+        IDJ_IMPORTS = field(IMPORT_DATA_JOB, ImportDataJob.IMPORTS_FIELD_NUMBER);
+        IDJ_OUTPUT_ATTRS = field(IMPORT_DATA_JOB, ImportDataJob.OUTPUTATTRS_FIELD_NUMBER);
+        IDJ_IMPORT_ATTRS = field(IMPORT_DATA_JOB, ImportDataJob.IMPORTATTRS_FIELD_NUMBER);
+
+        EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
+        EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
+        EDJ_PARAMETERS = field(EXPORT_DATA_JOB, ExportDataJob.PARAMETERS_FIELD_NUMBER);
+        EDJ_INPUTS = field(EXPORT_DATA_JOB, ExportDataJob.INPUTS_FIELD_NUMBER);
+        EDJ_OUTPUTS = field(EXPORT_DATA_JOB, ExportDataJob.OUTPUTS_FIELD_NUMBER);
+        EDJ_PRIOR_OUTPUTS = field(EXPORT_DATA_JOB, ExportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
+        EDJ_STORAGE_ACCESS = field(EXPORT_DATA_JOB, ExportDataJob.STORAGEACCESS_FIELD_NUMBER);
+        EDJ_EXPORTS = field(EXPORT_DATA_JOB, ExportDataJob.EXPORTS_FIELD_NUMBER);
+        EDJ_OUTPUT_ATTRS = field(EXPORT_DATA_JOB, ExportDataJob.OUTPUTATTRS_FIELD_NUMBER);
     }
 
     @Validator
@@ -158,7 +206,9 @@ public class JobValidator {
                 .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.MODEL)
                 .pop();
 
-        return runModelOrFlow(ctx, RMJ_PARAMETERS, RMJ_INPUTS, RMJ_OUTPUTS, RMJ_PRIOR_OUTPUTS, RMJ_RESOURCES);
+        ctx = runModelOrFlow(ctx, RMJ_PARAMETERS, RMJ_INPUTS, RMJ_OUTPUTS, RMJ_PRIOR_OUTPUTS, RMJ_RESOURCES);
+
+        return outputAttrs(ctx, RMJ_OUTPUT_ATTRS);
     }
 
     @Validator
@@ -178,7 +228,9 @@ public class JobValidator {
                 .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
                 .pop();
 
-        return runModelOrFlow(ctx, RFJ_PARAMETERS, RFJ_INPUTS, RFJ_OUTPUTS, RFJ_PRIOR_OUTPUTS, RFJ_RESOURCES);
+        ctx = runModelOrFlow(ctx, RFJ_PARAMETERS, RFJ_INPUTS, RFJ_OUTPUTS, RFJ_PRIOR_OUTPUTS, RFJ_RESOURCES);
+
+        return outputAttrs(ctx, RFJ_OUTPUT_ATTRS);
     }
 
     public static ValidationContext runModelOrFlow(
@@ -229,6 +281,112 @@ public class JobValidator {
         return ctx;
     }
 
+    private static ValidationContext outputAttrs(ValidationContext ctx, Descriptors.FieldDescriptor outputAttrs) {
+
+        return ctx.pushRepeated(outputAttrs)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, false)
+                .pop();
+    }
+
+    @Validator
+    public static ValidationContext importDataJob(ImportDataJob msg, ValidationContext ctx) {
+
+        ctx = ctx.push(IDJ_MODEL)
+                .apply(CommonValidators::required)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.MODEL)
+                .pop();
+
+        ctx = importOrExportJob(ctx, IDJ_PARAMETERS, IDJ_INPUTS, IDJ_OUTPUTS, IDJ_PRIOR_OUTPUTS, IDJ_STORAGE_ACCESS);
+
+        ctx = outputAttrs(ctx, IDJ_OUTPUT_ATTRS);
+
+        if (msg.getImportsCount() > 0) {
+            ctx = ctx.pushMap(IDJ_IMPORTS)
+                    .error("The imports field is not currently supported and must be empty")
+                    .pop();
+        }
+
+        if (msg.getImportAttrsCount() > 0) {
+            ctx = ctx.pushRepeated(IDJ_IMPORT_ATTRS)
+                    .error("The importAttrs field is not currently supported and must be empty")
+                    .pop();
+        }
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext exportDataJob(ExportDataJob msg, ValidationContext ctx) {
+
+        ctx = ctx.push(EDJ_MODEL)
+                .apply(CommonValidators::required)
+                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
+                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.MODEL)
+                .pop();
+
+        ctx = importOrExportJob(ctx, EDJ_PARAMETERS, EDJ_INPUTS, EDJ_OUTPUTS, EDJ_PRIOR_OUTPUTS, EDJ_STORAGE_ACCESS);
+
+        ctx = outputAttrs(ctx, EDJ_OUTPUT_ATTRS);
+
+        if (msg.getExportsCount() > 0) {
+            ctx = ctx.pushMap(EDJ_EXPORTS)
+                    .error("The exports field is not currently supported and must be empty")
+                    .pop();
+        }
+
+        return ctx;
+    }
+
+    // Duplicates runModelOrFlow's parameters/inputs/outputs/priorOutputs validation blocks
+    // (not shared with RunModelJob/RunFlowJob)
+    private static ValidationContext importOrExportJob(
+            ValidationContext ctx,
+            Descriptors.FieldDescriptor parameters,
+            Descriptors.FieldDescriptor inputs,
+            Descriptors.FieldDescriptor outputs,
+            Descriptors.FieldDescriptor priorOutputs,
+            Descriptors.FieldDescriptor storageAccess) {
+
+        ctx = ctx.pushMap(parameters)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(TypeSystemValidator::value, Value.class)
+                .pop();
+
+        ctx = ctx.pushMap(inputs)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
+                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
+                .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                .pop();
+
+        ctx = ctx.pushMap(outputs)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
+                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
+                .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                .pop();
+
+        ctx = ctx.pushMap(priorOutputs)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
+                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
+                .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(storageAccess)
+                .applyRepeated(CommonValidators::identifier)
+                .applyRepeated(CommonValidators::notTracReserved)
+                .pop();
+
+        return ctx;
+    }
+
     private static ValidationContext jobMatchesType(ValidationContext ctx) {
 
         var job = (JobDefinition) ctx.parentMsg();
@@ -255,6 +413,12 @@ public class JobValidator {
         if (msg.getJobType() == JobType.RUN_MODEL)
             ctx = ctx.apply(JobValidator::outputsMustBeEmpty, RunModelJob.class);
 
+        else if (msg.getJobType() == JobType.IMPORT_DATA)
+            ctx = ctx.apply(JobValidator::outputsMustBeEmpty, ImportDataJob.class);
+
+        else if (msg.getJobType() == JobType.EXPORT_DATA)
+            ctx = ctx.apply(JobValidator::outputsMustBeEmpty, ExportDataJob.class);
+
         return ctx.pop();
     }
 
@@ -263,6 +427,30 @@ public class JobValidator {
         if (msg.getOutputsCount() > 0) {
 
             ctx = ctx.push(RMJ_OUTPUTS)
+                    .error("Outputs must be empty, they cannot be specified explicitly when submitting a job")
+                    .pop();
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext outputsMustBeEmpty(ImportDataJob msg, ValidationContext ctx) {
+
+        if (msg.getOutputsCount() > 0) {
+
+            ctx = ctx.pushMap(IDJ_OUTPUTS)
+                    .error("Outputs must be empty, they cannot be specified explicitly when submitting a job")
+                    .pop();
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext outputsMustBeEmpty(ExportDataJob msg, ValidationContext ctx) {
+
+        if (msg.getOutputsCount() > 0) {
+
+            ctx = ctx.pushMap(EDJ_OUTPUTS)
                     .error("Outputs must be empty, they cannot be specified explicitly when submitting a job")
                     .pop();
         }

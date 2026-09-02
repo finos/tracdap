@@ -48,3 +48,12 @@ tenants:
           unit-test.property: repo-value.2
         properties:
           repoUrl: ${TRAC_LOCAL_REPO}
+
+      UNIT_TEST_EXTERNAL_STORAGE:
+        resourceType: EXTERNAL_STORAGE
+        protocol: LOCAL
+        publicProperties:
+          unit_test_property: storage_value_3
+          unit-test.property: storage-value.3
+        properties:
+          rootPath: ${TRAC_STORAGE_DIR}

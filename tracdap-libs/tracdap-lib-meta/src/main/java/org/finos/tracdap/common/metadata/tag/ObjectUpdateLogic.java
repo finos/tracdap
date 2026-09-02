@@ -302,6 +302,11 @@ public class ObjectUpdateLogic {
                     .build());
         }
 
+        modelAttrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_MODEL_TYPE)
+                .setValue(MetadataCodec.encodeValue(tracModel.getModelType().name()))
+                .build());
+
         return modelAttrs;
     }
 

@@ -97,6 +97,7 @@ public class MetadataConstants {
     public static final String TRAC_MODEL_VERSION = "trac_model_version";
     public static final String TRAC_MODEL_ENTRY_POINT = "trac_model_entry_point";
     public static final String TRAC_MODEL_PATH = "trac_model_path";
+    public static final String TRAC_MODEL_TYPE = "trac_model_type";
 
     public static final String TRAC_CONFIG_CLASS = "trac_config_class";
     public static final String TRAC_CONFIG_KEY = "trac_config_key";

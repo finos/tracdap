@@ -15,6 +15,7 @@
 
 import abc
 import copy
+import dataclasses as dc
 import io
 import pathlib
 import typing as tp
@@ -309,7 +310,7 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
 
         # Handle file data views
         if data_view.object_type == _meta.ObjectType.FILE:
-            return data_view.file_item
+            return data_view.file_item.with_attrs(data_view.attrs) if data_view.attrs else data_view.file_item
 
         # TODO: Support selecting data item described by self.node
 
@@ -318,7 +319,7 @@ class DataItemFunc(NodeFunction[_data.DataItem]):
         part = data_view.parts[part_key]
         delta = part[0]  # selects delta=0
 
-        return delta
+        return delta.with_attrs(data_view.attrs) if data_view.attrs else delta
 
 
 class _LoadSaveDataFunc(abc.ABC):
@@ -448,16 +449,21 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
             return _data.DataSpec.create_empty_spec(data_item.object_type, data_item.schema_type)
 
         if data_item.object_type == _api.ObjectType.FILE:
-            return self._save_file(data_item, data_spec, data_copy)
+            saved_spec = self._save_file(data_item, data_spec, data_copy)
 
         elif data_item.schema_type == _api.SchemaType.TABLE_SCHEMA:
-            return self._save_table(data_item, data_spec, data_copy)
+            saved_spec = self._save_table(data_item, data_spec, data_copy)
 
         elif data_item.schema_type == _api.SchemaType.STRUCT_SCHEMA:
-            return self._save_struct(data_item, data_spec, data_copy)
+            saved_spec = self._save_struct(data_item, data_spec, data_copy)
 
         else:
             raise _ex.EUnexpected()
+
+        if data_item.attrs:
+            saved_spec = dc.replace(saved_spec, attrs=[*saved_spec.attrs, *data_item.attrs])
+
+        return saved_spec
 
     def _save_file(self, data_item, data_spec, data_copy):
 
@@ -773,6 +779,9 @@ class JobResultFunc(NodeFunction[_cfg.JobResult]):
         job_result.objectIds.append(storage_id)
         job_result.objects[output_key] = output_obj
         job_result.objects[storage_key] = storage_obj
+
+        if data_spec.attrs:
+            job_result.attrs[output_key] = _cfg.JobResultAttrs(data_spec.attrs)
 
         # Currently, jobs do not ever produce external schemas
 

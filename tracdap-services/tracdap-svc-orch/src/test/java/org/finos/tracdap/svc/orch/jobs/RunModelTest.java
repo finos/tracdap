@@ -634,11 +634,13 @@ public class RunModelTest {
         var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
         var fieldCountAttr = dataTag.getAttrsOrThrow("trac_schema_field_count");
         var rowCountAttr = dataTag.getAttrsOrThrow("trac_data_row_count");
+        var jobTypeAttr = dataTag.getAttrsOrThrow("trac_job_type");
 
         Assertions.assertEquals("run_model:data_output", MetadataCodec.decodeStringValue(outputAttr));
         Assertions.assertTrue(MetadataCodec.decodeIntegerValue(fieldCountAttr) > 0);
         Assertions.assertTrue(MetadataCodec.decodeIntegerValue(rowCountAttr) > 0);
         Assertions.assertEquals(1, dataDef.getPartsCount());
+        Assertions.assertEquals(JobType.RUN_MODEL.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
 
         outputDataId = dataTag.getHeader();
     }

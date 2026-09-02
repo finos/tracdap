@@ -34,7 +34,9 @@ public class JobLogic {
             JOB_TYPES = Map.ofEntries(
                     Map.entry(JobType.IMPORT_MODEL, ImportModelJob.class.getDeclaredConstructor()),
                     Map.entry(JobType.RUN_MODEL, RunModelJob.class.getDeclaredConstructor()),
-                    Map.entry(JobType.RUN_FLOW, RunFlowJob.class.getDeclaredConstructor()));
+                    Map.entry(JobType.RUN_FLOW, RunFlowJob.class.getDeclaredConstructor()),
+                    Map.entry(JobType.IMPORT_DATA, ImportDataJob.class.getDeclaredConstructor()),
+                    Map.entry(JobType.EXPORT_DATA, ExportDataJob.class.getDeclaredConstructor()));
         }
         catch (NoSuchMethodException e) {
 

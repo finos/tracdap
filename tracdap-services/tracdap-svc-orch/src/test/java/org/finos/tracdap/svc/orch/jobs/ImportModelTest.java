@@ -104,12 +104,14 @@ public abstract class ImportModelTest {
 
         var modelDef = modelTag.getDefinition().getModel();
         var modelAttr = modelTag.getAttrsOrThrow("e2e_test_model");
+        var jobTypeAttr = modelTag.getAttrsOrThrow("trac_job_type");
 
         Assertions.assertEquals("import_model:schema_files", MetadataCodec.decodeStringValue(modelAttr));
         Assertions.assertEquals("tutorial.schema_files.PnlAggregationSchemas", modelDef.getEntryPoint());
         Assertions.assertTrue(modelDef.getParametersMap().containsKey("eur_usd_rate"));
         Assertions.assertTrue(modelDef.getInputsMap().containsKey("customer_loans"));
         Assertions.assertTrue(modelDef.getOutputsMap().containsKey("profit_by_region"));
+        Assertions.assertEquals(JobType.IMPORT_MODEL.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
     }
 
     @Test

@@ -542,6 +542,9 @@ public class JobProcessorHelpers {
                     .setAttrName(TRAC_UPDATE_JOB)
                     .setValue(MetadataCodec.encodeValue(jobState.jobKey)));
 
+            attrs.addAttrs(TagUpdate.newBuilder()
+                    .setAttrName(TRAC_JOB_TYPE_ATTR)
+                    .setValue(MetadataCodec.encodeValue(jobState.jobType.name())));
 
             if (objectId.getObjectVersion() == MetadataConstants.OBJECT_FIRST_VERSION) {
 

@@ -53,3 +53,9 @@ tenants:
           host: api.github.com
           port: 443
           tls: true
+
+      TEST_EXTERNAL_STORAGE:
+        resourceType: EXTERNAL_STORAGE
+        protocol: LOCAL
+        properties:
+          rootPath: ${TRAC_DIR}/external_storage
