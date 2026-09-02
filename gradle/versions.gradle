@@ -67,7 +67,7 @@ ext {
     // Plugins
 
     aws_sdk_version = '2.53.1'
-    gcp_sdk_version = '26.87.0'
+    gcp_sdk_version = '26.86.0'
     azure_sdk_version = '1.2.36'
 
     apache_sshd_version = "2.12.1"
