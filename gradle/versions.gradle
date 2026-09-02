@@ -30,7 +30,7 @@ ext {
     guava_version = '33.4.8-jre'
     gson_version = '2.13.1'
     proto_version = '4.31.1'
-    grpc_version = '1.79.0'   // 1.76.0
+    grpc_version = '1.84.0'   // 1.82.0 works
     gapi_version = '2.60.0'
 
     // Data technologies
