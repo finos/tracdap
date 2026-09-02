@@ -239,7 +239,7 @@ jobs:
         run: |
           python -m venv ./venv
           . ./venv/bin/activate
-          python -m pip install --upgrade pip
+          python -m pip install --quiet --upgrade pip
 
       # Filter plugin dependencies, only install for the plugin being tested
       # This prevents dependency issues in one plugin affecting all the others
@@ -252,8 +252,8 @@ jobs:
         run: |
           . ./venv/bin/activate
           cd tracdap-runtime/python
-          pip install -r requirements.txt
-          pip install -r requirements_selected.txt
+          pip install --quiet -r requirements.txt
+          pip install --quiet -r requirements_selected.txt
 
       - name: Protoc code generation
         run: |
