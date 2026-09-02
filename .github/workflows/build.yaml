@@ -136,7 +136,7 @@ jobs:
           python-version: ${{ matrix.environment.PYTHON_VERSION }}
 
       - name: PIP Upgrade
-        run: python -m pip install --upgrade pip
+        run: python -m pip install --quiet --upgrade pip
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -144,10 +144,10 @@ jobs:
       - name: Install dependencies
         run: |
           cd tracdap-runtime/python
-          pip install ${{ matrix.environment.PANDAS_DEPENDENCY }}
-          pip install ${{ matrix.environment.PYSPARK_DEPENDENCY }}
-          pip install -r requirements.txt
-          pip install -r requirements_extensions.txt
+          pip install --quiet ${{ matrix.environment.PANDAS_DEPENDENCY }}
+          pip install --quiet ${{ matrix.environment.PYSPARK_DEPENDENCY }}
+          pip install --quiet -r requirements.txt
+          pip install --quiet -r requirements_extensions.txt
 
       - name: Protoc code generation
         run: python tracdap-runtime/python/build_runtime.py --target codegen
@@ -201,7 +201,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: PIP Upgrade
-        run: python -m pip install --upgrade pip
+        run: python -m pip install --quiet --upgrade pip
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -209,7 +209,7 @@ jobs:
       - name: Install dependencies for build tools
         run: |
           cd dev/
-          pip install -r requirements.txt
+          pip install --quiet -r requirements.txt
 
       - name: Run all docgen targets
         run: |
