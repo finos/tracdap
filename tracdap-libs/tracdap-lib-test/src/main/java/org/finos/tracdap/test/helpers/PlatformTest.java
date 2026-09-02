@@ -657,7 +657,14 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 venvPb.command("python3", "-m", "venv", venvPath.toString());
 
                 var venvP = venvPb.start();
-                venvP.waitFor(60, TimeUnit.SECONDS);
+                var venvCompleted = venvP.waitFor(60, TimeUnit.SECONDS);
+
+                if (!venvCompleted || venvP.exitValue() != 0) {
+
+                    var status = venvCompleted ? "exit code = " + venvP.exitValue() : "timed out";
+                    throw new RuntimeException(String.format(
+                            "Failed to create the test venv (%s): %s", status, venvPb.command()));
+                }
 
                 log.info("Installing TRAC runtime for Python...");
 
@@ -686,8 +693,15 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
                 pipPB.environment().put(VENV_ENV_VAR, venvPath.toString());
 
                 var pipP = pipPB.start();
-                pipP.waitFor(2, TimeUnit.MINUTES);
+                var pipCompleted = pipP.waitFor(2, TimeUnit.MINUTES);
 
+                if (!pipCompleted || pipP.exitValue() != 0) {
+
+                    var status = pipCompleted ? "exit code = " + pipP.exitValue() : "timed out";
+                    throw new RuntimeException(String.format(
+                            "Failed to set up the test venv, pip install did not succeed (%s): %s",
+                            status, String.join(" ", pipInstall)));
+                }
             }
         }
     }
