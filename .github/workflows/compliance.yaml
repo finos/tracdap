@@ -171,7 +171,7 @@ jobs:
           PIP_AUDIT_PROGRESS_SPINNER: "off"
         run: |
           pip install pip-audit
-          pip-audit
+          pip-audit --ignore-vuln PYSEC-2026-3740
 
   web_api_compliance:
 

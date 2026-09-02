@@ -50,13 +50,9 @@ elif [ ${prior_version_found} = 0 ]; then
       next_patch_version=`echo "${prior_version}" | sed "s/-.*$//"`
   fi
 
-  # Next patch version exists but is not in the revision history -> release branch exists
-  if [ `git tag | grep "^v${next_patch_version}$"` ]; then
-      next_minor_version=`echo "${next_patch_version}" | awk -F. '{$2=$2+1; $3=0; print}' OFS=.`
-      version_number=${next_minor_version}-SNAPSHOT
-  else
-      version_number=${next_patch_version}-SNAPSHOT
-  fi
+  # A same-numbered tag elsewhere in the tag list proves nothing about this branch's history:
+  # if it were an ancestor, git describe would already have returned it as prior_version_tag.
+  version_number=${next_patch_version}-SNAPSHOT
 
 else
 
