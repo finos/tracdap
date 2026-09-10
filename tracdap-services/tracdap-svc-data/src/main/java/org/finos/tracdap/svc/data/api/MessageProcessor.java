@@ -18,6 +18,8 @@
 package org.finos.tracdap.svc.data.api;
 
 import org.finos.tracdap.api.internal.*;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IPlatformConfigListener;
 import org.finos.tracdap.svc.data.service.TenantStorageManager;
 
 import io.grpc.Context;
@@ -29,13 +31,14 @@ import java.util.concurrent.ExecutorService;
 public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessagingApiImplBase {
 
     private final TenantStorageManager tenantState;
-
     private final ExecutorService offloadExecutor;
+    private final PluginRegistry registry;
 
-    public MessageProcessor(TenantStorageManager tenantState, ExecutorService offloadExecutor) {
+    public MessageProcessor(TenantStorageManager tenantState, ExecutorService offloadExecutor, PluginRegistry registry) {
 
         this.tenantState = tenantState;
         this.offloadExecutor = offloadExecutor;
+        this.registry = registry;
     }
 
     @Override
@@ -61,11 +64,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     @Override
     public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        // Data service does not currently use any live platform config
+        var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
 
-        var status = ReceivedStatus.newBuilder()
-                .setCode(ReceivedCode.IGNORED)
-                .build();
+        var status = listener != null
+                ? listener.applyConfigUpdate(request)
+                : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
 
         response.onNext(status);
         response.onCompleted();

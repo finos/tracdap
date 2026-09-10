@@ -18,6 +18,8 @@
 package org.finos.tracdap.svc.orch.api;
 
 import org.finos.tracdap.api.internal.*;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IPlatformConfigListener;
 import org.finos.tracdap.common.service.TenantConfigManager;
 
 import io.grpc.stub.StreamObserver;
@@ -27,10 +29,12 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
 
     private final TenantConfigManager tenantState;
+    private final PluginRegistry registry;
 
-    public MessageProcessor(TenantConfigManager tenantState) {
+    public MessageProcessor(TenantConfigManager tenantState, PluginRegistry registry) {
 
         this.tenantState = tenantState;
+        this.registry = registry;
     }
 
     @Override
@@ -45,11 +49,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     @Override
     public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        // Orchestrator service does not currently use any live platform config
+        var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
 
-        var status = ReceivedStatus.newBuilder()
-                .setCode(ReceivedCode.IGNORED)
-                .build();
+        var status = listener != null
+                ? listener.applyConfigUpdate(request)
+                : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
 
         response.onNext(status);
         response.onCompleted();

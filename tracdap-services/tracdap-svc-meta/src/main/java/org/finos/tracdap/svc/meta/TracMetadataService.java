@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.meta;
 
 import org.finos.tracdap.api.MetadataServiceProto;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
+import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.api.internal.InternalMetadataProto;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -27,8 +28,10 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.common.validation.ValidationConcern;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
@@ -41,6 +44,8 @@ import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
 import org.finos.tracdap.svc.meta.services.PlatformConfigService;
 
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 
@@ -83,10 +88,12 @@ public class TracMetadataService extends TracServiceBase {
 
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
+    private final PluginRegistry registry;
 
     private IMetadataStore metadataStore;
     private ExecutorService executor;
     private Server server;
+    private ManagedChannel loopbackChannel;
 
     public static void main(String[] args) {
 
@@ -99,6 +106,10 @@ public class TracMetadataService extends TracServiceBase {
 
         this.pluginManager = pluginManager;
         this.configManager = configManager;
+        this.registry = new PluginRegistry();
+
+        registry.addSingleton(PluginManager.class, pluginManager);
+        registry.addSingleton(ConfigManager.class, configManager);
     }
 
     @Override
@@ -132,10 +143,22 @@ public class TracMetadataService extends TracServiceBase {
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
             var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService, platformConfigService);
-            var messageProcessor = new MessageProcessor();
 
             // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns();
+
+            // Loopback client, for extensions that need to call this service's own internal API
+            var metadataTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.METADATA_SERVICE_KEY);
+            loopbackChannel = ManagedChannelBuilder
+                    .forAddress(metadataTarget.getHost(), metadataTarget.getPort())
+                    .usePlaintext()
+                    .build();
+            var loopbackClient = commonConcerns.configureClient(InternalMetadataApiGrpc.newBlockingStub(loopbackChannel));
+
+            registry.addSingleton(GrpcConcern.class, commonConcerns);
+            registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, loopbackClient);
+
+            var messageProcessor = new MessageProcessor(registry);
 
             // Create the main server
             // This setup is thread-per-request using a thread pool executor
@@ -159,6 +182,11 @@ public class TracMetadataService extends TracServiceBase {
 
             // Good to go, let's start!
             this.server.start();
+
+            // Run extensions startup logic - the loopback client above needs the server listening,
+            // so this must run after start(), not before
+            for (var extension : pluginManager.getExtensions())
+                extension.runStartupLogic(registry);
 
         }
         catch (IOException e) {
@@ -192,7 +220,13 @@ public class TracMetadataService extends TracServiceBase {
             return executor.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && executorDown)
+        var loopbackDown = shutdownResource("Loopback client channel", deadline, remaining -> {
+
+            loopbackChannel.shutdown();
+            return loopbackChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
+        if (serverDown && executorDown && loopbackDown)
             return 0;
 
         if (!server.isTerminated())
