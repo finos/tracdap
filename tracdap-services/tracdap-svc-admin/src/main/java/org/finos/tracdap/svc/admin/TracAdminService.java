@@ -41,6 +41,7 @@ import io.grpc.ServerBuilder;
 
 import org.finos.tracdap.svc.admin.services.ConfigService;
 import org.finos.tracdap.svc.admin.services.NotifierService;
+import org.finos.tracdap.svc.admin.services.PlatformConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,8 +96,9 @@ public class TracAdminService extends TracServiceBase {
             var secretService = configManager.getSecrets();
             var notifierService = new NotifierService(platformConfig, commonConcerns);
             var configService = new ConfigService(metadataClient, commonConcerns, secretService, notifierService);
+            var platformConfigService = new PlatformConfigService(metadataClient, commonConcerns, notifierService);
 
-            var adminApi = new TracAdminApi(configService);
+            var adminApi = new TracAdminApi(configService, platformConfigService);
 
             var serverBuilder = ServerBuilder
                     .forPort(servicePort)

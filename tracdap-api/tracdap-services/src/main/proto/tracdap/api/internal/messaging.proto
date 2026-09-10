@@ -33,6 +33,8 @@ import "tracdap/metadata/config.proto";
 service InternalMessagingApi {
 
   rpc configUpdate(ConfigUpdate) returns (ReceivedStatus);
+
+  rpc platformConfigUpdate(PlatformConfigUpdate) returns (ReceivedStatus);
 }
 
 message ReceivedStatus {
@@ -63,4 +65,11 @@ enum ConfigUpdateType {
   CREATE = 1;
   UPDATE = 2;
   DELETE = 3;
+}
+
+message PlatformConfigUpdate {
+
+  ConfigUpdateType updateType = 1;
+
+  metadata.PlatformConfigEntry configEntry = 2;
 }

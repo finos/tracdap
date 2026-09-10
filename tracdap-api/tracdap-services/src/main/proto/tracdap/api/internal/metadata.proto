@@ -178,4 +178,25 @@ service InternalMetadataApi {
 
   /// List available config entries, with optional filter criteria
   rpc listConfigEntries (ConfigListRequest) returns (ConfigListResponse);
+
+  // Platform config API - no tenant dimension, stored separately from the generic object store
+  // Admin service makes these internal calls directly to update platform config metadata
+
+  /// Create a new platform config entry and store the associated object definition
+  rpc createPlatformConfigObject(PlatformConfigWriteRequest) returns (PlatformConfigWriteResponse);
+
+  /// Update an existing platform config entry and store the associated object definition
+  rpc updatePlatformConfigObject(PlatformConfigWriteRequest) returns (PlatformConfigWriteResponse);
+
+  /// Delete an existing platform config entry
+  rpc deletePlatformConfigObject(PlatformConfigWriteRequest) returns (PlatformConfigWriteResponse);
+
+  /// Read an individual platform config entry
+  rpc readPlatformConfigEntry (PlatformConfigReadRequest) returns (PlatformConfigReadResponse);
+
+  /// Read a batch of platform config entries
+  rpc readPlatformConfigBatch (PlatformConfigReadBatchRequest) returns (PlatformConfigReadBatchResponse);
+
+  /// List available platform config entries, with optional filter criteria
+  rpc listPlatformConfigEntries (PlatformConfigListRequest) returns (PlatformConfigListResponse);
 };

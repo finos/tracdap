@@ -98,3 +98,29 @@ message ConfigDefinition {
   /// The map of config properties (only available for PROPERTIES config entries)
   map<string,string> properties = 2;
 }
+
+
+/**
+ * Represents a single platform-wide config entry, keyed by class and key.
+ *
+ * Unlike ConfigEntry, platform config has no tenant dimension and no separate versioned
+ * metadata object - the store only ever holds the current version of each entry, so there
+ * is no isLatestConfig flag.
+ */
+message PlatformConfigEntry {
+
+  /// Config class for this config entry.
+  string configClass = 1;
+
+  /// Config key for this config entry.
+  string configKey = 2;
+
+  /// Version of the config entry.
+  int32 configVersion = 3;
+
+  /// Timestamp for when this version of the config entry was created.
+  DatetimeValue configTimestamp = 4;
+
+  /// Flag indicating whether this config entry has been deleted.
+  bool configDeleted = 5;
+}

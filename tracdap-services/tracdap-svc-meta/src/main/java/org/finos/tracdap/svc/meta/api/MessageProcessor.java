@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.meta.api;
 import io.grpc.stub.StreamObserver;
 import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
+import org.finos.tracdap.api.internal.PlatformConfigUpdate;
 import org.finos.tracdap.api.internal.ReceivedCode;
 import org.finos.tracdap.api.internal.ReceivedStatus;
 
@@ -32,6 +33,19 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     public void configUpdate(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
         // Metadata service does not currently use any dynamic config
+
+        var status = ReceivedStatus.newBuilder()
+                .setCode(ReceivedCode.IGNORED)
+                .build();
+
+        response.onNext(status);
+        response.onCompleted();
+    }
+
+    @Override
+    public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
+
+        // Metadata service does not currently use any live platform config
 
         var status = ReceivedStatus.newBuilder()
                 .setCode(ReceivedCode.IGNORED)

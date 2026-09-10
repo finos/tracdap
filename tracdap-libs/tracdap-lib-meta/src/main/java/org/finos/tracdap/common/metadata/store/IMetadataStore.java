@@ -19,6 +19,7 @@ package org.finos.tracdap.common.metadata.store;
 
 import org.finos.tracdap.metadata.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -80,6 +81,26 @@ public interface IMetadataStore {
     ConfigEntry loadConfigEntry(String tenant, ConfigEntry configKey, boolean includeDeleted);
 
     List<ConfigEntry> listConfigEntries(String tenant, String configClass, boolean includeDeleted);
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // PLATFORM CONFIG (no tenant dimension)
+    // -----------------------------------------------------------------------------------------------------------------
+
+    // Platform config is a separate, much simpler store to tenant config - a single flat table with
+    // no tenant dimension, no version history and no separate generic object store to join to
+    // The store itself resolves the next version number, so create/update/delete are atomic
+
+    PlatformConfigEntry createPlatformConfigEntry(String configClass, String configKey, Instant timestamp, byte[] value);
+
+    PlatformConfigEntry updatePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, byte[] value);
+
+    PlatformConfigEntry deletePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp);
+
+    PlatformConfigRecord loadPlatformConfigEntry(String configClass, String configKey, boolean includeDeleted);
+
+    List<PlatformConfigRecord> loadPlatformConfigEntries(List<PlatformConfigEntry> configKeys, boolean includeDeleted);
+
+    List<PlatformConfigEntry> listPlatformConfigEntries(String configClass, boolean includeDeleted);
 
     // -----------------------------------------------------------------------------------------------------------------
     // LEGACY LOAD API

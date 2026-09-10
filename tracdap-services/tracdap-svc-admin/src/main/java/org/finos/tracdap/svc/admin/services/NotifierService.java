@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.admin.services;
 import io.grpc.ManagedChannel;
 import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
+import org.finos.tracdap.api.internal.PlatformConfigUpdate;
 import org.finos.tracdap.api.internal.ReceivedStatus;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -165,6 +166,49 @@ public class NotifierService {
 
             log.error("NOTIFY CONFIG UPDATE: tenant = {} class = {}, key = {}, service = {}, error = {}",
                     update.getTenant(),
+                    update.getConfigEntry().getConfigClass(),
+                    update.getConfigEntry().getConfigKey(),
+                    serviceKey, error.getMessage(),
+                    error);
+        }
+    }
+
+    public void platformConfigUpdate(PlatformConfigUpdate update) {
+
+        // Offload notifications to run as a separate event, fire and forget
+        // Same rationale as configUpdate() above
+
+        var callCtx = Context.current().fork();
+        var clientState = commonConcerns.prepareClientCall(callCtx);
+
+        for (var serviceEntry : services.entrySet()) {
+
+            var serviceKey = serviceEntry.getKey();
+            var service = serviceEntry.getValue();
+
+            callCtx.run(() -> {
+
+                var client = clientState.configureClient(service);
+                var result = client.platformConfigUpdate(update);
+
+                result.addListener(() -> platformConfigUpdateResult(serviceKey, update, result), callCtx::run);
+            });
+        }
+    }
+
+    private void platformConfigUpdateResult(String serviceKey, PlatformConfigUpdate update, ListenableFuture<ReceivedStatus> result) {
+
+        try  {
+            var status = result.get();
+
+            log.info("NOTIFY PLATFORM CONFIG UPDATE: class = {}, key = {}, service = {}, result = {}",
+                    update.getConfigEntry().getConfigClass(),
+                    update.getConfigEntry().getConfigKey(),
+                    serviceKey, status.getCode().name());
+        }
+        catch (Exception error) {
+
+            log.error("NOTIFY PLATFORM CONFIG UPDATE: class = {}, key = {}, service = {}, error = {}",
                     update.getConfigEntry().getConfigClass(),
                     update.getConfigEntry().getConfigKey(),
                     serviceKey, error.getMessage(),

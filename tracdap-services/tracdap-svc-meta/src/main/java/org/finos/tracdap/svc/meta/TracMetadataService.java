@@ -39,6 +39,7 @@ import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
+import org.finos.tracdap.svc.meta.services.PlatformConfigService;
 
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -127,9 +128,10 @@ public class TracMetadataService extends TracServiceBase {
             var writeService = new MetadataWriteService(metadataStore);
             var searchService = new MetadataSearchService(metadataStore);
             var configService = new ConfigService(metadataStore);
+            var platformConfigService = new PlatformConfigService(metadataStore);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);
-            var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService);
+            var internalApi = new InternalMetadataApi(readService, writeService, searchService, configService, platformConfigService);
             var messageProcessor = new MessageProcessor();
 
             // Common framework for cross-cutting concerns

@@ -27,6 +27,7 @@ import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
+import org.finos.tracdap.common.metadata.store.PlatformConfigRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +53,7 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
     private final JdbcReadBatchImpl readBatch;
     private final JdbcWriteBatchImpl writeBatch;
     private final JdbcSearchImpl search;
+    private final JdbcPlatformConfigImpl platformConfig;
 
 
     public JdbcMetadataStore(JdbcDialect dialect, DataSource dataSource) {
@@ -65,6 +67,7 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
         readBatch = new JdbcReadBatchImpl(this.dialect);
         writeBatch = new JdbcWriteBatchImpl(this.dialect, readBatch);
         search = new JdbcSearchImpl();
+        platformConfig = new JdbcPlatformConfigImpl();
     }
 
     @Override
@@ -595,6 +598,59 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
 
             throw MetadataErrors.catchAll(error, dialect);
         }
+    }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // PLATFORM CONFIG (no tenant dimension)
+    // -----------------------------------------------------------------------------------------------------------------
+
+    @Override
+    public PlatformConfigEntry createPlatformConfigEntry(String configClass, String configKey, Instant timestamp, byte[] value) {
+
+        return wrapTransaction(conn -> {
+            return platformConfig.createPlatformConfigEntry(conn, configClass, configKey, timestamp, value);
+        });
+    }
+
+    @Override
+    public PlatformConfigEntry updatePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, byte[] value) {
+
+        return wrapTransaction(conn -> {
+            return platformConfig.updatePlatformConfigEntry(conn, priorEntry, timestamp, value);
+        });
+    }
+
+    @Override
+    public PlatformConfigEntry deletePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp) {
+
+        return wrapTransaction(conn -> {
+            return platformConfig.deletePlatformConfigEntry(conn, priorEntry, timestamp);
+        });
+    }
+
+    @Override
+    public PlatformConfigRecord loadPlatformConfigEntry(String configClass, String configKey, boolean includeDeleted) {
+
+        return wrapTransaction(conn -> {
+            return platformConfig.loadPlatformConfigEntry(conn, configClass, configKey, includeDeleted);
+        });
+    }
+
+    @Override
+    public List<PlatformConfigRecord> loadPlatformConfigEntries(List<PlatformConfigEntry> configKeys, boolean includeDeleted) {
+
+        return wrapTransaction(conn -> {
+            return platformConfig.loadPlatformConfigEntries(conn, configKeys, includeDeleted);
+        });
+    }
+
+    @Override
+    public List<PlatformConfigEntry> listPlatformConfigEntries(String configClass, boolean includeDeleted) {
+
+        return wrapTransaction(conn -> {
+            return platformConfig.listPlatformConfigEntries(conn, configClass, includeDeleted);
+        });
     }
 
 

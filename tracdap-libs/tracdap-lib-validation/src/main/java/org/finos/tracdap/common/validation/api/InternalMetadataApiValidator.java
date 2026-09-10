@@ -123,4 +123,36 @@ public class InternalMetadataApiValidator {
     public static ValidationContext listConfigEntries(ConfigListRequest msg, ValidationContext ctx) {
         return AdminApiValidator.listConfigEntries(msg, ctx);
     }
+
+    // Internal platform config API is a mirror of the platform config API on admin service
+
+    @Validator(method = "createPlatformConfigObject")
+    public static ValidationContext createPlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.createPlatformConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "updatePlatformConfigObject")
+    public static ValidationContext updatePlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.updatePlatformConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "deletePlatformConfigObject")
+    public static ValidationContext deletePlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.deletePlatformConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "readPlatformConfigEntry")
+    public static ValidationContext readPlatformConfigEntry(PlatformConfigReadRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.readPlatformConfigObject(msg, ctx);
+    }
+
+    @Validator(method = "readPlatformConfigBatch")
+    public static ValidationContext readPlatformConfigBatch(PlatformConfigReadBatchRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.readPlatformConfigBatch(msg, ctx);
+    }
+
+    @Validator(method = "listPlatformConfigEntries")
+    public static ValidationContext listPlatformConfigEntries(PlatformConfigListRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.listPlatformConfigEntries(msg, ctx);
+    }
 }
