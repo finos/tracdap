@@ -55,6 +55,16 @@ public class PluginRegistry {
         return pluginClass.cast(instance);
     }
 
+    public <T> T trySingleton(Class<T> pluginClass) {
+        var key = new Key(pluginClass, null);
+        var instance = registry.get(key);
+        if (instance == null)
+            return null;
+        if (!pluginClass.isInstance(instance))
+            throw new EUnexpected();
+        return pluginClass.cast(instance);
+    }
+
     public <T> T getNamedInstance(Class<T> pluginClass, String namedKey) {
         var key = new Key(pluginClass, namedKey);
         var instance = registry.get(key);
