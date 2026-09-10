@@ -38,7 +38,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Tenant-less equivalent of {@link TenantStateManager}: holds a live, in-memory view of a
  * single platform config class, keyed by configKey, updated on receipt of platformConfigUpdate.
  */
-public class PlatformStateManager {
+public class PlatformStateManager implements IPlatformConfigListener {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -96,6 +96,7 @@ public class PlatformStateManager {
         return liveConfig.get(configKey);
     }
 
+    @Override
     public ReceivedStatus applyConfigUpdate(PlatformConfigUpdate update) {
 
         var entry = update.getConfigEntry();

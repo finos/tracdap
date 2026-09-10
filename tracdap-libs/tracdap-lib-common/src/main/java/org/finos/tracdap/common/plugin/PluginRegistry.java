@@ -69,6 +69,16 @@ public class PluginRegistry {
         return pluginClass.cast(instance);
     }
 
+    public <T> T tryGetNamedInstance(Class<T> pluginClass, String namedKey) {
+        var key = new Key(pluginClass, namedKey);
+        var instance = registry.get(key);
+        if (instance == null)
+            return null;
+        if (!pluginClass.isInstance(instance))
+            throw new EUnexpected();
+        return pluginClass.cast(instance);
+    }
+
     private static class Key {
 
         private final Class<?> pluginClass;

@@ -23,11 +23,17 @@ import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
 import org.finos.tracdap.api.internal.PlatformConfigUpdate;
 import org.finos.tracdap.api.internal.ReceivedCode;
 import org.finos.tracdap.api.internal.ReceivedStatus;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IPlatformConfigListener;
 
 
 public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessagingApiImplBase {
 
-    public MessageProcessor() {}
+    private final PluginRegistry registry;
+
+    public MessageProcessor(PluginRegistry registry) {
+        this.registry = registry;
+    }
 
     @Override
     public void configUpdate(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
@@ -45,11 +51,11 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     @Override
     public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        // Metadata service does not currently use any live platform config
+        var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
 
-        var status = ReceivedStatus.newBuilder()
-                .setCode(ReceivedCode.IGNORED)
-                .build();
+        var status = listener != null
+                ? listener.applyConfigUpdate(request)
+                : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
 
         response.onNext(status);
         response.onCompleted();

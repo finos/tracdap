@@ -32,6 +32,7 @@ import org.finos.tracdap.common.codec.CodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
@@ -71,6 +72,7 @@ public class TracDataService extends TracServiceBase {
 
     private final PluginManager pluginManager;
     private final ConfigManager configManager;
+    private final PluginRegistry registry;
 
     private EventLoopGroup bossGroup;
     private EventLoopGroup serviceGroup;
@@ -88,6 +90,10 @@ public class TracDataService extends TracServiceBase {
     public TracDataService(PluginManager plugins, ConfigManager config) {
         this.pluginManager = plugins;
         this.configManager = config;
+        this.registry = new PluginRegistry();
+
+        registry.addSingleton(PluginManager.class, pluginManager);
+        registry.addSingleton(ConfigManager.class, configManager);
     }
 
     @Override
@@ -192,7 +198,15 @@ public class TracDataService extends TracServiceBase {
 
             var dataApi = new TracDataApi(dataService, fileService, formats, eventLoopResolver, arrowAllocator, commonConcerns);
             var storageApi = new TracStorageApi(storageService, eventLoopResolver, arrowAllocator);
-            var messageProcessor = new MessageProcessor(storageManager, offloadExecutor);
+
+            registry.addSingleton(GrpcConcern.class, commonConcerns);
+            registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClientBlocking);
+
+            // Run extensions startup logic
+            for (var extension : pluginManager.getExtensions())
+                extension.runStartupLogic(registry);
+
+            var messageProcessor = new MessageProcessor(storageManager, offloadExecutor, registry);
 
             var serverBuilder = NettyServerBuilder
                     .forPort(serviceConfig.getPort())
