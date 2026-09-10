@@ -50,6 +50,13 @@ public class ConfigValidator {
     private static final Descriptors.FieldDescriptor CDEF_CONFIG_TYPE;
     private static final Descriptors.FieldDescriptor CDEF_PROPERTIES;
 
+    private static final Descriptors.Descriptor PLATFORM_CONFIG_ENTRY;
+    private static final Descriptors.FieldDescriptor PCE_CONFIG_CLASS;
+    private static final Descriptors.FieldDescriptor PCE_CONFIG_KEY;
+    private static final Descriptors.FieldDescriptor PCE_CONFIG_VERSION;
+    private static final Descriptors.FieldDescriptor PCE_CONFIG_TIMESTAMP;
+    private static final Descriptors.FieldDescriptor PCE_CONFIG_DELETED;
+
     static {
         CONFIG_ENTRY = ConfigEntry.getDescriptor();
         CE_CONFIG_CLASS = field(CONFIG_ENTRY, ConfigEntry.CONFIGCLASS_FIELD_NUMBER);
@@ -69,6 +76,13 @@ public class ConfigValidator {
         CONFIG_DEFINITION = ConfigDefinition.getDescriptor();
         CDEF_CONFIG_TYPE = field(CONFIG_DEFINITION, ConfigDefinition.CONFIGTYPE_FIELD_NUMBER);
         CDEF_PROPERTIES = field(CONFIG_DEFINITION, ConfigDefinition.PROPERTIES_FIELD_NUMBER);
+
+        PLATFORM_CONFIG_ENTRY = PlatformConfigEntry.getDescriptor();
+        PCE_CONFIG_CLASS = field(PLATFORM_CONFIG_ENTRY, PlatformConfigEntry.CONFIGCLASS_FIELD_NUMBER);
+        PCE_CONFIG_KEY = field(PLATFORM_CONFIG_ENTRY, PlatformConfigEntry.CONFIGKEY_FIELD_NUMBER);
+        PCE_CONFIG_VERSION = field(PLATFORM_CONFIG_ENTRY, PlatformConfigEntry.CONFIGVERSION_FIELD_NUMBER);
+        PCE_CONFIG_TIMESTAMP = field(PLATFORM_CONFIG_ENTRY, PlatformConfigEntry.CONFIGTIMESTAMP_FIELD_NUMBER);
+        PCE_CONFIG_DELETED = field(PLATFORM_CONFIG_ENTRY, PlatformConfigEntry.CONFIGDELETED_FIELD_NUMBER);
     }
 
     @Validator
@@ -105,6 +119,36 @@ public class ConfigValidator {
         ctx = ctx.push(CE_DETAILS)
                 .apply(CommonValidators::optional)
                 .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator
+    public static ValidationContext platformConfigEntry(PlatformConfigEntry msg, ValidationContext ctx) {
+
+        ctx = ctx.push(PCE_CONFIG_CLASS)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::configKey)
+                .pop();
+
+        ctx = ctx.push(PCE_CONFIG_KEY)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::configKey)
+                .pop();
+
+        ctx = ctx.push(PCE_CONFIG_VERSION)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::positive, Integer.class)
+                .pop();
+
+        ctx = ctx.push(PCE_CONFIG_TIMESTAMP)
+                .apply(CommonValidators::optional)
+                .applyRegistered()
+                .pop();
+
+        ctx = ctx.push(PCE_CONFIG_DELETED)
+                .apply(CommonValidators::optional)
                 .pop();
 
         return ctx;

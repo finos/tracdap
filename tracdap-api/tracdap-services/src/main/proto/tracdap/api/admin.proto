@@ -87,4 +87,52 @@ service TracAdminApi {
             body: "*"
         };
     }
+
+    /// Create a new platform config entry and store the associated object definition (no tenant dimension)
+    rpc createPlatformConfigObject(PlatformConfigWriteRequest) returns (PlatformConfigWriteResponse) {
+        option (google.api.http) = {
+            post: "/platform/create-config-object"
+            body: "*"
+        };
+    }
+
+    /// Update an existing platform config entry and store the associated object definition
+    rpc updatePlatformConfigObject(PlatformConfigWriteRequest) returns (PlatformConfigWriteResponse) {
+        option (google.api.http) = {
+            post: "/platform/update-config-object"
+            body: "*"
+        };
+    }
+
+    /// Delete an existing platform config entry
+    rpc deletePlatformConfigObject(PlatformConfigWriteRequest) returns (PlatformConfigWriteResponse) {
+        option (google.api.http) = {
+            post: "/platform/delete-config-object"
+            body: "*"
+        };
+    }
+
+    /// Read an individual platform config entry
+    rpc readPlatformConfigObject(PlatformConfigReadRequest) returns (PlatformConfigReadResponse) {
+        option (google.api.http) = {
+            post: "/platform/read-config-object"
+            body: "*"
+        };
+    }
+
+    /// Read a batch of platform config entries
+    rpc readPlatformConfigBatch(PlatformConfigReadBatchRequest) returns (PlatformConfigReadBatchResponse) {
+        option (google.api.http) = {
+            post: "/platform/read-config-batch"
+            body: "*"
+        };
+    }
+
+    /// List available platform config entries, with optional filter criteria
+    rpc listPlatformConfigEntries(PlatformConfigListRequest) returns (PlatformConfigListResponse) {
+        option (google.api.http) = {
+            post: "/platform/list-config-entries"
+            body: "*"
+        };
+    }
 }

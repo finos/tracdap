@@ -29,14 +29,17 @@ import io.grpc.stub.StreamObserver;
 public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadataApiImplBase {
 
     private final MetadataApiImpl apiImpl;
+    private final PlatformConfigService platformConfigService;
 
     public InternalMetadataApi(
             MetadataReadService readService,
             MetadataWriteService writeService,
             MetadataSearchService searchService,
-            ConfigService configService) {
+            ConfigService configService,
+            PlatformConfigService platformConfigService) {
 
         apiImpl = new MetadataApiImpl(readService, writeService, searchService, configService, MetadataApiImpl.INTERNAL_API);
+        this.platformConfigService = platformConfigService;
     }
 
     @Override
@@ -139,5 +142,83 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
     public void listConfigEntries(ConfigListRequest request, StreamObserver<ConfigListResponse> response) {
 
         apiImpl.listConfigEntries(request, response);
+    }
+
+    @Override
+    public void createPlatformConfigObject(PlatformConfigWriteRequest request, StreamObserver<PlatformConfigWriteResponse> response) {
+
+        try {
+            var result = platformConfigService.createPlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void updatePlatformConfigObject(PlatformConfigWriteRequest request, StreamObserver<PlatformConfigWriteResponse> response) {
+
+        try {
+            var result = platformConfigService.updatePlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void deletePlatformConfigObject(PlatformConfigWriteRequest request, StreamObserver<PlatformConfigWriteResponse> response) {
+
+        try {
+            var result = platformConfigService.deletePlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void readPlatformConfigEntry(PlatformConfigReadRequest request, StreamObserver<PlatformConfigReadResponse> response) {
+
+        try {
+            var result = platformConfigService.readPlatformConfigEntry(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void readPlatformConfigBatch(PlatformConfigReadBatchRequest request, StreamObserver<PlatformConfigReadBatchResponse> response) {
+
+        try {
+            var result = platformConfigService.readPlatformConfigBatch(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void listPlatformConfigEntries(PlatformConfigListRequest request, StreamObserver<PlatformConfigListResponse> response) {
+
+        try {
+            var result = platformConfigService.listPlatformConfigEntries(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
     }
 }

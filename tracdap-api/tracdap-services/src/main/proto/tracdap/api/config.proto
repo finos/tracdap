@@ -154,3 +154,107 @@ message ConfigListResponse{
   /// The list of available config entries matching the filter criteria.
   repeated metadata.ConfigEntry entries = 1;
 }
+
+
+/**
+ * Request to create or update a platform config entry (no tenant dimension).
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigWriteRequest {
+
+  /// The config class associated with this config entry.
+  string configClass = 1;
+
+  /// The config key associated with this config entry.
+  string configKey = 2;
+
+  /// For update and delete operations, the prior config entry that is being modified.
+  optional metadata.PlatformConfigEntry priorEntry = 3;
+
+  /// For create and update operations, the config object definition to store.
+  optional metadata.ObjectDefinition definition = 4;
+};
+
+/**
+ * Result of creating or updating a platform config entry.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigWriteResponse {
+
+  /// The config entry that was created or modified by the write operation.
+  metadata.PlatformConfigEntry entry = 1;
+}
+
+/**
+ * Request to read a platform config entry.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigReadRequest {
+
+  /// The config entry that is being requested (configClass / configKey act as the lookup key).
+  metadata.PlatformConfigEntry entry = 1;
+}
+
+/**
+ * Result of reading a platform config entry.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigReadResponse {
+
+  /// The config entry, including its current version and timestamp.
+  metadata.PlatformConfigEntry entry = 1;
+
+  /// Definition of the config entry.
+  metadata.ObjectDefinition definition = 2;
+}
+
+/**
+ * Request to read a batch of platform config entries.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigReadBatchRequest {
+
+  /// A list of config entries to request (cannot be empty).
+  repeated metadata.PlatformConfigEntry entries = 1;
+}
+
+/**
+ * Result of reading a batch of platform config entries.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigReadBatchResponse {
+
+  /// The config entries, in the same order they were requested.
+  repeated PlatformConfigReadResponse entries = 1;
+}
+
+/**
+ * List platform config entries available in the platform config store.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigListRequest {
+
+  /// Config class to list entries for.
+  string configClass = 1;
+
+  /// Whether to include deleted entries in the response.
+  bool includeDeleted = 2;
+}
+
+/**
+ * Result of listing platform config entries.
+ *
+ * @see TracAdminApi
+ */
+message PlatformConfigListResponse {
+
+  /// The list of available config entries matching the filter criteria.
+  repeated metadata.PlatformConfigEntry entries = 1;
+}

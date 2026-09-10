@@ -57,4 +57,17 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
         response.onNext(status);
         response.onCompleted();
     }
+
+    @Override
+    public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
+
+        // Data service does not currently use any live platform config
+
+        var status = ReceivedStatus.newBuilder()
+                .setCode(ReceivedCode.IGNORED)
+                .build();
+
+        response.onNext(status);
+        response.onCompleted();
+    }
 }
