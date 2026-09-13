@@ -22,9 +22,9 @@ import tracdap.rt.config as config
 
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
-import tracdap.rt._impl.static_api as api_hook  # noqa
 import tracdap.rt._impl.core.repos as repos  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
+import tracdap.rt._impl.static_api as api_hook  # noqa
 
 
 class PyPIExtensionTest(unittest.TestCase):

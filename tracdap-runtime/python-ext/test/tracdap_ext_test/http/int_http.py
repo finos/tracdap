@@ -26,7 +26,7 @@ import tracdap.rt.metadata as meta
 
 import tracdap.rt._impl.core.logging as _log  # noqa
 import tracdap.rt._impl.core.plugins as _plugins  # noqa
-import tracdap.rt._impl.core.config_parser as _cfg  # noqa
+import tracdap.rt._impl.core.config as _cfg  # noqa
 
 
 class HttpExtensionModel(trac.TracModel):
