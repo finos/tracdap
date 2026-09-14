@@ -96,7 +96,7 @@ public class TracAdminService extends TracServiceBase {
             var secretService = configManager.getSecrets();
             var notifierService = new NotifierService(platformConfig, commonConcerns);
             var configService = new ConfigService(metadataClient, commonConcerns, secretService, notifierService);
-            var platformConfigService = new PlatformConfigService(metadataClient, commonConcerns, notifierService);
+            var platformConfigService = new PlatformConfigService(metadataClient, commonConcerns, secretService, notifierService);
 
             var adminApi = new TracAdminApi(configService, platformConfigService);
 

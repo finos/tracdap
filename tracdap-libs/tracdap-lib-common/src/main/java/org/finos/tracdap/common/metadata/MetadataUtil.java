@@ -160,6 +160,17 @@ public class MetadataUtil {
             return object.toBuilder().setResource(resource).build();
         }
 
+        if (object.getObjectType() == ObjectType.CREDENTIAL) {
+
+            var credential = object.getCredential().toBuilder();
+
+            for (var secret : credential.getSecretsMap().keySet()) {
+                credential.putSecrets(secret, "");
+            }
+
+            return object.toBuilder().setCredential(credential).build();
+        }
+
         return object;
     }
 }

@@ -42,6 +42,7 @@ enum ObjectType {
   RESULT = 9;
   CONFIG = 10;
   RESOURCE = 11;
+  CREDENTIAL = 12;
 }
 
 

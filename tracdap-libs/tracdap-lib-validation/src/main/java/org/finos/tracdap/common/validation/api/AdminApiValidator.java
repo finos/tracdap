@@ -276,7 +276,7 @@ public class AdminApiValidator {
 
         ctx = ctx.push(PCWR_DEFINITION)
                 .apply(CommonValidators::required)
-                .apply(AdminApiValidator::configObjectType, ObjectDefinition.class)
+                .apply(AdminApiValidator::platformConfigObjectType, ObjectDefinition.class)
                 .applyRegistered()
                 .pop();
 
@@ -297,7 +297,7 @@ public class AdminApiValidator {
         ctx = ctx.push(PCWR_DEFINITION)
                 .apply(CommonValidators::required)
                 .applyRegistered()
-                .apply(AdminApiValidator::configObjectType, ObjectDefinition.class)
+                .apply(AdminApiValidator::platformConfigObjectType, ObjectDefinition.class)
                 .pop();
 
         return ctx;
@@ -401,6 +401,16 @@ public class AdminApiValidator {
 
         if (!ValidationConstants.CONFIG_OBJECT_TYPES.contains(definition.getObjectType())) {
             var err = String.format("Object type [%s] is not a config object", definition.getObjectType().name());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext platformConfigObjectType(ObjectDefinition definition, ValidationContext ctx) {
+
+        if (!ValidationConstants.PLATFORM_CONFIG_OBJECT_TYPES.contains(definition.getObjectType())) {
+            var err = String.format("Object type [%s] is not a platform config object", definition.getObjectType().name());
             return ctx.error(err);
         }
 

@@ -72,4 +72,6 @@ message PlatformConfigUpdate {
   ConfigUpdateType updateType = 1;
 
   metadata.PlatformConfigEntry configEntry = 2;
+
+  bool secretsUpdated = 3;
 }
