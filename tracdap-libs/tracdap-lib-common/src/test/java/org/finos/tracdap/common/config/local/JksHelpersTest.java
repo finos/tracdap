@@ -21,6 +21,8 @@ import org.finos.tracdap.common.exception.EConfigLoad;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.SecureRandom;
@@ -38,6 +40,49 @@ public class JksHelpersTest {
 
         JksHelpers.writeTextEntry(keystore, secretKey, "my_secret", payload);
         var rtPayload = JksHelpers.readTextEntry(keystore, secretKey, "my_secret");
+
+        Assertions.assertEquals(payload, rtPayload);
+    }
+
+    // A real PEM-formatted key/cert is multi-line - roundTrip_password above never exercised this,
+    // since a short single-line payload doesn't hit the PBE password's ASCII/control-character
+    // restriction that a multi-line value does
+    @Test
+    void roundTrip_multilineText() throws Exception {
+
+        var secretKey = "qdierj-ejcuw-ejcude";
+        var keystore = KeyStore.getInstance("PKCS12");
+        keystore.load(null, secretKey.toCharArray());
+
+        var payload = "-----BEGIN RSA PRIVATE KEY-----\n" +
+                "A".repeat(64) + "\n" +
+                "A".repeat(64) + "\n" +
+                "-----END RSA PRIVATE KEY-----\n";
+
+        JksHelpers.writeTextEntry(keystore, secretKey, "multiline_secret", payload);
+        var rtPayload = JksHelpers.readTextEntry(keystore, secretKey, "multiline_secret");
+
+        Assertions.assertEquals(payload, rtPayload);
+    }
+
+    // Entries written before writeTextEntry() moved off the PBE-password route must stay readable
+    @Test
+    void readTextEntry_legacyPbeFormat_stillReadable() throws Exception {
+
+        var secretKey = "qdierj-ejcuw-ejcude";
+        var keystore = KeyStore.getInstance("PKCS12");
+        keystore.load(null, secretKey.toCharArray());
+
+        var payload = "a legacy single-line secret";
+
+        // Mirrors writeTextEntry()'s old implementation, before this fix
+        var protection = new KeyStore.PasswordProtection(secretKey.toCharArray());
+        var factory = SecretKeyFactory.getInstance("PBE");
+        var spec = new PBEKeySpec(payload.toCharArray());
+        var legacySecret = factory.generateSecret(spec);
+        keystore.setEntry("legacy_secret", new KeyStore.SecretKeyEntry(legacySecret), protection);
+
+        var rtPayload = JksHelpers.readTextEntry(keystore, secretKey, "legacy_secret");
 
         Assertions.assertEquals(payload, rtPayload);
     }
