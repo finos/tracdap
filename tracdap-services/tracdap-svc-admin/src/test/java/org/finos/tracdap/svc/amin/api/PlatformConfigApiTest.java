@@ -112,6 +112,104 @@ abstract class PlatformConfigApiTest {
     }
 
     @Test
+    void createAndReadMaskedCredential() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CREDENTIAL);
+
+        var writeRequest = PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("createAndReadMaskedCredential")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build();
+
+        var writeResponse = adminApi.createPlatformConfigObject(writeRequest);
+        var configEntry = writeResponse.getEntry();
+
+        var readRequest = PlatformConfigReadRequest.newBuilder()
+                .setEntry(configEntry)
+                .build();
+
+        var rtConfig = adminApi.readPlatformConfigObject(readRequest);
+
+        // Expect the platform config API to mask secrets on round trip, same as tenant-scoped config
+        var maskedCredential = configObj.getCredential().toBuilder();
+        for (var secret : configObj.getCredential().getSecretsMap().keySet())
+            maskedCredential.putSecrets(secret, "");
+        var maskedCredentialObj = configObj.toBuilder().setCredential(maskedCredential).build();
+
+        assertEquals(maskedCredentialObj, rtConfig.getDefinition());
+
+        // The raw secret value should be resolvable via the secret service, proving it was really aliased
+        // Reload first: the running service writes via its own ConfigManager/keystore instance
+        var rootSecrets = platform.configManager().getSecrets();
+        rootSecrets.reload();
+        var secrets = rootSecrets.scope("createAndReadMaskedCredential").scope("entry1");
+
+        assertEquals("secret_alias", secrets.loadPassword("clientSecret"));
+    }
+
+    @Test
+    void updateCredentialCarriesOverBlankSecret() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CREDENTIAL);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("updateCredentialCarriesOverBlankSecret")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var configEntry = writeResponse.getEntry();
+
+        // Submit an update with clientId changed but clientSecret left blank
+        var updatedCredential = configObj.getCredential().toBuilder()
+                .putProperties("clientId", "updated_client_id")
+                .putSecrets("clientSecret", "");
+
+        var updatedObj = configObj.toBuilder().setCredential(updatedCredential).build();
+
+        adminApi.updatePlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("updateCredentialCarriesOverBlankSecret")
+                .setConfigKey("entry1")
+                .setPriorEntry(configEntry)
+                .setDefinition(updatedObj)
+                .build());
+
+        // The original secret value should be carried over unchanged, not deleted or blanked out
+        var rootSecrets = platform.configManager().getSecrets();
+        rootSecrets.reload();
+        var secrets = rootSecrets.scope("updateCredentialCarriesOverBlankSecret").scope("entry1");
+
+        assertEquals("secret_alias", secrets.loadPassword("clientSecret"));
+    }
+
+    @Test
+    void deleteCredentialCleansUpSecret() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CREDENTIAL);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("deleteCredentialCleansUpSecret")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var configEntry = writeResponse.getEntry();
+
+        adminApi.deletePlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("deleteCredentialCleansUpSecret")
+                .setConfigKey("entry1")
+                .setPriorEntry(configEntry)
+                .build());
+
+        var rootSecrets = platform.configManager().getSecrets();
+        rootSecrets.reload();
+        var secrets = rootSecrets.scope("deleteCredentialCleansUpSecret").scope("entry1");
+
+        assertFalse(secrets.hasSecret("clientSecret"));
+    }
+
+    @Test
     void createDuplicateFails() {
 
         var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);

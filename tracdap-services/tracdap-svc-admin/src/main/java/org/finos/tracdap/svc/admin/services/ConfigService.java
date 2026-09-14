@@ -22,7 +22,6 @@ import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.ConfigUpdateType;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
-import org.finos.tracdap.common.exception.EConfigParse;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 
@@ -30,15 +29,11 @@ import io.grpc.Context;
 import org.finos.tracdap.common.config.ISecretService;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.ResourceDefinition;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.stream.Collectors;
 
 
 public class ConfigService {
-
-    private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metadataClient;
     private final GrpcConcern commonConcerns;
@@ -235,79 +230,43 @@ public class ConfigService {
                 ? request.getDefinition().getObjectType()
                 : request.getPriorEntry().getDetails().getObjectType();
 
-        if (objectType == ObjectType.RESOURCE) {
-
-            var secureResource = processResourceSecrets(
-                    request.getDefinition().getResource(),
-                    prior.getDefinition().getResource(),
-                    secrets, secretsUpdated);
-
-            var secureObject = request.getDefinition().toBuilder().setResource(secureResource);
-
-            return request.toBuilder().setDefinition(secureObject).build();
-        }
-        else {
+        if (objectType != ObjectType.RESOURCE) {
 
             // Other object types are not processed for secrets
             secretsUpdated.setResult(false);
 
             return request;
         }
+
+        var newResource = request.hasDefinition()
+                ? request.getDefinition().getResource()
+                : ResourceDefinition.getDefaultInstance();
+
+        var secureResource = processResourceSecrets(
+                newResource, prior.getDefinition().getResource(),
+                secrets, secretsUpdated);
+
+        // Delete requests carry no definition, and it must stay omitted for validation to pass
+        // The secret store cleanup above still applies as a side effect
+        if (!request.hasDefinition())
+            return request;
+
+        var secureObject = request.getDefinition().toBuilder().setResource(secureResource);
+
+        return request.toBuilder().setDefinition(secureObject).build();
     }
 
     private ResourceDefinition processResourceSecrets(
             ResourceDefinition newResource, ResourceDefinition oldResource,
             ISecretService secrets, SimpleResult<Boolean> secretsUpdated) {
 
-        var secureResource = newResource.toBuilder();
+        var secureSecrets = SecretMapProcessor.processSecrets(
+                newResource.getSecretsMap(), oldResource.getSecretsMap(),
+                secrets, secretsUpdated);
 
-        for (var secret : newResource.getSecretsMap().entrySet()) {
-
-            var secretKey = secret.getKey();
-            var secretValue = secret.getValue();
-
-            if (secretValue != null && !secretValue.isEmpty()) {
-
-                // Secret value is supplied - update the secret store
-                var secretAlias = secrets.storePassword(secretKey, secretValue);
-                secureResource.putSecrets(secretKey, secretAlias);
-
-                if (!secretsUpdated.isDone())
-                    secretsUpdated.setResult(true);
-            }
-            else if (oldResource.containsSecrets(secretKey)) {
-
-                // If secret value is blank and a previous version exists, carry the secret over
-                var secretAlias = oldResource.getSecretsOrThrow(secretKey);
-                secureResource.putSecrets(secretKey, secretAlias);
-            }
-            else {
-
-                // Do not allow setting blank secrets
-                var message = String.format("No value supplied for config secret [%s]", secretKey);
-                log.error(message);
-                throw new EConfigParse(message);
-            }
-        }
-
-        for (var secretKey : oldResource.getSecretsMap().keySet()) {
-            if (!newResource.containsSecrets(secretKey)) {
-
-                // Delete any secrets that have been removed since the prior version
-                var secretAlias = oldResource.getSecretsOrThrow(secretKey);
-                secrets.deleteSecret(secretAlias);
-
-                if (!secretsUpdated.isDone())
-                    secretsUpdated.setResult(true);
-            }
-        }
-
-        if (secretsUpdated.isDone())
-            secrets.commit();
-        else
-            secretsUpdated.setResult(false);
-
-        return secureResource.build();
+        return newResource.toBuilder()
+                .putAllSecrets(secureSecrets)
+                .build();
     }
 
     private ISecretService secretScope(ConfigWriteRequest request) {
@@ -316,33 +275,5 @@ public class ConfigService {
                 .namedScope(ConfigKeys.TENANT_SCOPE, request.getTenant())
                 .scope(request.getConfigClass())
                 .scope(request.getConfigKey());
-    }
-
-    private static class SimpleResult<T> {
-
-        private T result;
-        private boolean done;
-
-        public SimpleResult() {
-            this.result = null;
-            this.done = false;
-        }
-
-        public void setResult(T result) {
-            if (done)
-                throw new IllegalStateException("Result has already been set");
-            this.result = result;
-            this.done = true;
-        }
-
-        public T getResult() {
-            if (!done)
-                throw new IllegalStateException("Result has not been set");
-            return result;
-        }
-
-        public boolean isDone() {
-            return done;
-        }
     }
 }

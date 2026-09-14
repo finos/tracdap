@@ -77,6 +77,7 @@ public class SampleMetadata {
             case RESULT: return dummyResultDef();
             case CONFIG: return dummyConfigDef();
             case RESOURCE: return dummyResourceDef();
+            case CREDENTIAL: return dummyCredentialDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -106,6 +107,7 @@ public class SampleMetadata {
             case FILE: return nextFileDef(definition);
             case CONFIG: return nextConfigDef(definition);
             case RESOURCE: return nextResourceDef(definition);
+            case CREDENTIAL: return nextCredentialDef(definition);
 
             case FLOW:
             case JOB:
@@ -139,6 +141,7 @@ public class SampleMetadata {
 
             case FLOW:
             case JOB:
+            case CREDENTIAL:
 
                 return definition;
 
@@ -557,6 +560,25 @@ public class SampleMetadata {
                 .setProtocol("S3")
                 .putPublicProperties("friendlyName", "Now this resource is an S3 bucket")
                 .putProperties("bucketName", "expecting-a-model-repo"))
+                .build();
+    }
+
+    public static ObjectDefinition dummyCredentialDef() {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.CREDENTIAL)
+                .setCredential(CredentialDefinition.newBuilder()
+                .putProperties("clientId", "sample_client_id")
+                .putSecrets("clientSecret", "secret_alias"))
+                .build();
+    }
+
+    public static ObjectDefinition nextCredentialDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setCredential(origDef.getCredential().toBuilder()
+                .putProperties("clientId", "updated_client_id")
+                .putSecrets("clientSecret", "updated_secret_alias"))
                 .build();
     }
 
