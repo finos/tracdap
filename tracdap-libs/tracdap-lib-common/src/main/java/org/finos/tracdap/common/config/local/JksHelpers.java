@@ -24,6 +24,8 @@ import org.slf4j.event.Level;
 
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -34,6 +36,16 @@ import java.util.List;
 
 public class JksHelpers {
 
+    // PKCS12's PBE-password route (PBEKeySpec + a bare "PBE" SecretKeyFactory) rejects any text
+    // containing control characters (e.g. the newlines in a multi-line PEM key) with
+    // "Password is not ASCII", and separately depends on the JVM's ambient default protection
+    // algorithm for encoding the entry - both are implicit JVM behaviour that can (and did) change
+    // across JDK patch releases. Text entries are stored as raw UTF-8 bytes under a fixed, always-
+    // registered algorithm name instead, with the protection algorithm named explicitly, so neither
+    // the content nor the JVM's own defaults can affect whether a write succeeds.
+    private static final String TEXT_ENTRY_ALGORITHM = "HmacSHA256";
+    private static final String KEY_PROTECTION_ALGORITHM = "PBEWithHmacSHA256AndAES_256";
+
     public static void writeTextEntry(
             KeyStore keystore, String secretKey,
             String alias, String text)
@@ -41,11 +53,11 @@ public class JksHelpers {
 
         try {
 
-            var protection = new KeyStore.PasswordProtection(secretKey.toCharArray());
-            var factory = SecretKeyFactory.getInstance("PBE");
+            var protection = new KeyStore.PasswordProtection(
+                    secretKey.toCharArray(), KEY_PROTECTION_ALGORITHM, null);
 
-            var spec = new PBEKeySpec(text.toCharArray());
-            var secret = factory.generateSecret(spec);
+            var keyBytes = text.getBytes(StandardCharsets.UTF_8);
+            var secret = new SecretKeySpec(keyBytes, TEXT_ENTRY_ALGORITHM);
             var entry = new KeyStore.SecretKeyEntry(secret);
 
             keystore.setEntry(alias, entry, protection);
@@ -107,9 +119,15 @@ public class JksHelpers {
 
             var secret = (KeyStore.SecretKeyEntry) entry;
             var algorithm = secret.getSecretKey().getAlgorithm();
-            var factory = SecretKeyFactory.getInstance(algorithm);
 
-            // Decode using password based encryption
+            // Entries written by the current writeTextEntry() - raw UTF-8 bytes, not a PBE password
+            if (TEXT_ENTRY_ALGORITHM.equals(algorithm)) {
+                return new String(secret.getSecretKey().getEncoded(), StandardCharsets.UTF_8);
+            }
+
+            // Older entries, written before writeTextEntry() moved off the PBE-password route -
+            // still readable via the algorithm recorded against the entry itself
+            var factory = SecretKeyFactory.getInstance(algorithm);
             var keySpecType = PBEKeySpec.class;
             var keySpec = (PBEKeySpec) factory.getKeySpec(secret.getSecretKey(), keySpecType);
 
