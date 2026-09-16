@@ -16,14 +16,23 @@
 
 create table platform_config (
 
+    config_pk bigserial,
+
     config_class varchar (256) not null,
     config_key varchar (256) not null,
 
     config_version int not null,
     config_timestamp timestamp (6) not null,
+    config_superseded timestamp (6) null,
+    config_is_latest boolean not null,
     config_deleted boolean not null,
+
+    meta_format int not null,
+    meta_version int not null,
 
     config_value bytea not null,
 
-    constraint pk_platform_config primary key (config_class, config_key)
+    constraint pk_platform_config primary key (config_pk)
 );
+
+create unique index idx_platform_config_unq on platform_config (config_class, config_key, config_version);

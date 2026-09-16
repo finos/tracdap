@@ -106,6 +106,8 @@ public class PlatformStateManager implements IPlatformConfigListener {
             return ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
         }
 
+        // PlatformStateManager does not currently reload secrets on update
+
         switch (update.getUpdateType()) {
 
             case DELETE:

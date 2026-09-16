@@ -21,6 +21,8 @@ import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.store.PlatformConfigRecord;
+import org.finos.tracdap.metadata.MetadataFormat;
+import org.finos.tracdap.metadata.MetadataVersion;
 import org.finos.tracdap.metadata.PlatformConfigEntry;
 
 import org.slf4j.Logger;
@@ -57,10 +59,10 @@ class JdbcPlatformConfigImpl {
         var newVersion = current == null ? 1 : current.version + 1;
         var newEntry = buildEntry(configClass, configKey, newVersion, timestamp, false);
 
-        if (current == null)
-            insertRow(conn, newEntry, timestamp, value);
-        else
-            updateRow(conn, newEntry, timestamp, value);
+        if (current != null)
+            closeCurrentRow(conn, configClass, configKey, timestamp);
+
+        insertRow(conn, newEntry, timestamp, value);
 
         return newEntry;
     }
@@ -74,7 +76,8 @@ class JdbcPlatformConfigImpl {
         var newVersion = current.version + 1;
         var newEntry = buildEntry(priorEntry.getConfigClass(), priorEntry.getConfigKey(), newVersion, timestamp, false);
 
-        updateRow(conn, newEntry, timestamp, value);
+        closeCurrentRow(conn, priorEntry.getConfigClass(), priorEntry.getConfigKey(), timestamp);
+        insertRow(conn, newEntry, timestamp, value);
 
         return newEntry;
     }
@@ -87,7 +90,8 @@ class JdbcPlatformConfigImpl {
         var newVersion = current.version + 1;
         var newEntry = buildEntry(priorEntry.getConfigClass(), priorEntry.getConfigKey(), newVersion, timestamp, true);
 
-        updateRow(conn, newEntry, timestamp, current.value);
+        closeCurrentRow(conn, priorEntry.getConfigClass(), priorEntry.getConfigKey(), timestamp);
+        insertRow(conn, newEntry, timestamp, current.value);
 
         return newEntry;
     }
@@ -125,9 +129,9 @@ class JdbcPlatformConfigImpl {
 
         var query = includeDeleted
                 ? "select config_key, config_version, config_timestamp, config_deleted \n" +
-                  "from platform_config where config_class = ? order by config_key"
+                  "from platform_config where config_class = ? and config_is_latest = ? order by config_key"
                 : "select config_key, config_version, config_timestamp, config_deleted \n" +
-                  "from platform_config where config_class = ? and config_deleted = ? order by config_key";
+                  "from platform_config where config_class = ? and config_is_latest = ? and config_deleted = ? order by config_key";
 
         if (log.isDebugEnabled())
             log.debug("QUERY listPlatformConfigEntries: \n{}", query);
@@ -137,9 +141,10 @@ class JdbcPlatformConfigImpl {
         try (var stmt = conn.prepareStatement(query)) {
 
             stmt.setString(1, configClass);
+            stmt.setBoolean(2, true);
 
             if (!includeDeleted)
-                stmt.setBoolean(2, false);
+                stmt.setBoolean(3, false);
 
             try (var rs = stmt.executeQuery()) {
 
@@ -182,9 +187,12 @@ class JdbcPlatformConfigImpl {
 
     private CurrentRow selectCurrentRow(Connection conn, String configClass, String configKey) throws SQLException {
 
+        // Platform config reads always fetch the latest entry
+        // There is currently no support for reading a specific prior version or an as-of timestamp
+
         var query =
                 "select config_version, config_timestamp, config_deleted, config_value \n" +
-                "from platform_config where config_class = ? and config_key = ?";
+                "from platform_config where config_class = ? and config_key = ? and config_is_latest = ?";
 
         if (log.isDebugEnabled())
             log.debug("QUERY selectCurrentRow (platform_config): \n{}", query);
@@ -193,6 +201,7 @@ class JdbcPlatformConfigImpl {
 
             stmt.setString(1, configClass);
             stmt.setString(2, configKey);
+            stmt.setBoolean(3, true);
 
             try (var rs = stmt.executeQuery()) {
 
@@ -213,9 +222,10 @@ class JdbcPlatformConfigImpl {
 
         var query =
                 "insert into platform_config (\n" +
-                "  config_class, config_key, config_version, config_timestamp, config_deleted, config_value\n" +
+                "  config_class, config_key, config_version, config_timestamp, config_is_latest, config_deleted,\n" +
+                "  meta_format, meta_version, config_value\n" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         if (log.isDebugEnabled())
             log.debug("QUERY insertRow (platform_config): \n{}", query);
@@ -226,34 +236,34 @@ class JdbcPlatformConfigImpl {
             stmt.setString(2, entry.getConfigKey());
             stmt.setInt(3, entry.getConfigVersion());
             stmt.setTimestamp(4, Timestamp.from(timestamp));
-            stmt.setBoolean(5, entry.getConfigDeleted());
-            stmt.setBytes(6, value);
+            stmt.setBoolean(5, true);
+            stmt.setBoolean(6, entry.getConfigDeleted());
+            stmt.setInt(7, MetadataFormat.PROTO.getNumber());
+            stmt.setInt(8, MetadataVersion.CURRENT.getNumber());
+            stmt.setBytes(9, value);
 
             stmt.executeUpdate();
         }
     }
 
-    private void updateRow(Connection conn, PlatformConfigEntry entry, Instant timestamp, byte[] value) throws SQLException {
+    private void closeCurrentRow(Connection conn, String configClass, String configKey, Instant timestamp) throws SQLException {
 
         var query =
                 "update platform_config set\n" +
-                "  config_version = ?,\n" +
-                "  config_timestamp = ?,\n" +
-                "  config_deleted = ?,\n" +
-                "  config_value = ?\n" +
-                "where config_class = ? and config_key = ?";
+                "  config_superseded = ?,\n" +
+                "  config_is_latest = ?\n" +
+                "where config_class = ? and config_key = ? and config_is_latest = ?";
 
         if (log.isDebugEnabled())
-            log.debug("QUERY updateRow (platform_config): \n{}", query);
+            log.debug("QUERY closeCurrentRow (platform_config): \n{}", query);
 
         try (var stmt = conn.prepareStatement(query)) {
 
-            stmt.setInt(1, entry.getConfigVersion());
-            stmt.setTimestamp(2, Timestamp.from(timestamp));
-            stmt.setBoolean(3, entry.getConfigDeleted());
-            stmt.setBytes(4, value);
-            stmt.setString(5, entry.getConfigClass());
-            stmt.setString(6, entry.getConfigKey());
+            stmt.setTimestamp(1, Timestamp.from(timestamp));
+            stmt.setBoolean(2, false);
+            stmt.setString(3, configClass);
+            stmt.setString(4, configKey);
+            stmt.setBoolean(5, true);
 
             stmt.executeUpdate();
         }

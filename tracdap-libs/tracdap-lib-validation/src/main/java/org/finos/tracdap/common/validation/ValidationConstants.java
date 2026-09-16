@@ -87,7 +87,7 @@ public class ValidationConstants {
 
     // List of object types that can be used with the platform (tenant-less) config objects API
     public static final List<ObjectType> PLATFORM_CONFIG_OBJECT_TYPES = List.of(
-            ObjectType.CONFIG, ObjectType.RESOURCE, ObjectType.CREDENTIAL);
+            ObjectType.CONFIG, ObjectType.CREDENTIAL);
 
     // Limit config keys to valid identifiers for now
     public static final Pattern CONFIG_KEY = MetadataConstants.VALID_IDENTIFIER;
