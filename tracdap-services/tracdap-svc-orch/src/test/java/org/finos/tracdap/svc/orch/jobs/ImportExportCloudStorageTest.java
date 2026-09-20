@@ -49,24 +49,28 @@ import java.util.stream.Collectors;
 
 /**
  * Proves {@code JobProcessorHelpers.translateResourceSecrets} against real cloud storage, for all
- * three cloud storage plugins (S3, Azure Blob, GCS). {@code SimpleCsvExport}/{@code SimpleCsvImport}
- * ({@code tutorial.data_export}/{@code tutorial.data_import}) are a genuine matched round-trip pair -
- * same schema ({@code profit_by_region.csv}), same CSV format on both sides - unlike
+ * three cloud storage plugins (S3, Azure Blob, GCS), using {@code default} credentials.
+ * {@code SimpleCsvExport}/{@code SimpleCsvImport} ({@code tutorial.data_export}/
+ * {@code tutorial.data_import}) are a genuine matched round-trip pair - same schema
+ * ({@code profit_by_region.csv}), same CSV format on both sides - unlike
  * {@code DataExportExample}/{@code SimpleDataImport}, which share neither.
  * <p>
- * Two scenarios per cloud: a full export/import round trip using {@code default} credentials, and
- * (S3/Azure only - GCS has no credential-mode property, see {@code GcsObjectStorage}) an export
- * using a deliberately incorrect {@code static}/{@code account_key} secret, asserting the job fails.
- * The second scenario is an interim proof that secret aliasing and presentation to the runtime work
- * correctly without depending on a real static credential existing anywhere; a real-secret pass is
- * left to manual UAT.
+ * Deliberately does not attempt a {@code static}/{@code account_key} scenario with a made-up
+ * secret: PyArrow's native S3/Azure filesystems always raise a plain {@code OSError} for an auth
+ * rejection (confirmed directly against both real endpoints), never Python's {@code PermissionError}
+ * subclass, so the runtime's own error mapping can't distinguish "wrong secret" from any other
+ * storage-layer failure - a fake-secret job failing proves nothing about *why* it failed. Proving
+ * secret resolution itself (the alias reaching the runtime as plaintext) doesn't need a real cloud
+ * call at all; proving a real static credential authenticates needs one that doesn't exist yet.
+ * Both are left for a follow-up once either exists, rather than landing a test whose pass/fail
+ * doesn't mean what it looks like it means.
  * <p>
  * Requires real cloud credentials via environment variables; each cloud's tests are skipped if its
  * variables aren't set (see {@code Assumptions.assumeTrue} below for the exact variable names).
  * <p>
  * Tagged {@code all-platforms} (not a single {@code aws-platform}/{@code azure-platform}/
  * {@code gcp-platform}) because one class covers all three clouds - each CI matrix row
- * (aws/azure/gcp) runs the whole class once, and only that row's own scenarios execute for real;
+ * (aws/azure/gcp) runs the whole class once, and only that row's own scenario executes for real;
  * the other clouds' {@code Assumptions.assumeTrue} calls skip, since only one cloud is
  * authenticated per job.
  */
@@ -88,21 +92,8 @@ public class ImportExportCloudStorageTest {
             new String[] {"munster", "1000.50"},
             new String[] {"leinster", "2000.75"});
 
-    private static final List<JobStatusCode> COMPLETED_JOB_STATES = List.of(
-            JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
-
     private static final int RESOURCE_PROPAGATION_RETRIES = 10;
     private static final long RESOURCE_PROPAGATION_RETRY_DELAY_MS = 200;
-
-    // Not real - used only to prove the secret-alias/auth-failure path. Deliberately not shaped
-    // like a real AWS access key (which always has a recognised 4-letter prefix, e.g. AKIA/ASIA,
-    // followed by 16 more characters), and the Azure key is computed rather than a literal -
-    // GitHub's push protection flags both an AKIA-prefixed string and a bare base64 blob of this
-    // length as likely-leaked credentials regardless of whether they're genuine.
-    private static final String FAKE_AWS_ACCESS_KEY_ID = "NOTAREALACCESSKEYID0";
-    private static final String FAKE_AWS_SECRET_ACCESS_KEY = "fakeFAKEfakeFAKEfakeFAKEfakeFAKEfakeFAKE";
-    private static final String FAKE_AZURE_ACCOUNT_KEY = java.util.Base64.getEncoder().encodeToString(
-            "not-a-real-azure-account-key-value".getBytes(StandardCharsets.UTF_8));
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
@@ -226,30 +217,6 @@ public class ImportExportCloudStorageTest {
         roundTrip("AWS_DEFAULT", resource, "aws_default");
     }
 
-    @Test @Order(202)
-    void awsStaticFakeSecret() {
-
-        var region = System.getenv("TRAC_AWS_REGION");
-        var bucket = System.getenv("TRAC_AWS_BUCKET");
-
-        Assumptions.assumeTrue(
-                targetMatches("aws") && region != null && bucket != null,
-                "TRAC_AWS_REGION / TRAC_AWS_BUCKET are not set, or TRAC_CLOUD_TARGET is a different cloud");
-
-        var resource = ResourceDefinition.newBuilder()
-                .setResourceType(ResourceType.EXTERNAL_STORAGE)
-                .setProtocol("S3")
-                .putProperties("bucket", bucket)
-                .putProperties("region", region)
-                .putProperties("prefix", "int_cloud_storage_" + TRAC_TEST_ID + "/")
-                .putProperties("credentials", "static")
-                .putSecrets("accessKeyId", FAKE_AWS_ACCESS_KEY_ID)
-                .putSecrets("secretAccessKey", FAKE_AWS_SECRET_ACCESS_KEY)
-                .build();
-
-        expectAuthFailure("AWS_STATIC_FAKE", resource, "aws_static_fake");
-    }
-
     // --- Azure -----------------------------------------------------------------------------
 
     @Test @Order(301)
@@ -274,32 +241,8 @@ public class ImportExportCloudStorageTest {
         roundTrip("AZURE_DEFAULT", resource, "azure_default");
     }
 
-    @Test @Order(302)
-    void azureStaticFakeSecret() {
-
-        var storageAccount = System.getenv("TRAC_AZURE_STORAGE_ACCOUNT");
-        var container = System.getenv("TRAC_AZURE_CONTAINER");
-
-        Assumptions.assumeTrue(
-                targetMatches("azure") && storageAccount != null && container != null,
-                "TRAC_AZURE_STORAGE_ACCOUNT / TRAC_AZURE_CONTAINER are not set, or TRAC_CLOUD_TARGET is a different cloud");
-
-        var resource = ResourceDefinition.newBuilder()
-                .setResourceType(ResourceType.EXTERNAL_STORAGE)
-                .setProtocol("BLOB")
-                .putProperties("storageAccount", storageAccount)
-                .putProperties("container", container)
-                .putProperties("prefix", "int_cloud_storage_" + TRAC_TEST_ID + "/")
-                .putProperties("credentials", "account_key")
-                .putSecrets("accountKey", FAKE_AZURE_ACCOUNT_KEY)
-                .build();
-
-        expectAuthFailure("AZURE_STATIC_FAKE", resource, "azure_static_fake");
-    }
-
     // --- GCP ---------------------------------------------------------------------------------
-    // Default only - the GCS plugin has no credentials property at all (GcsObjectStorage only
-    // takes region/project/bucket/prefix), so there is no static-credential scenario to run.
+    // Default only - no static-credential scenario for any cloud here (see class doc comment).
 
     @Test @Order(401)
     void gcpDefaultRoundTrip() {
@@ -346,26 +289,6 @@ public class ImportExportCloudStorageTest {
 
         var outputDataId = findOutputDataset(importJobId);
         assertDatasetMatchesInput(outputDataId);
-    }
-
-    private void expectAuthFailure(String storageKey, ResourceDefinition resource, String label) {
-
-        registerStorageResource(storageKey, resource);
-
-        var exportFile = label + "/profit_by_region.csv";
-        var exportJobId = submitExportJob(storageKey, exportFile, "import_export_cloud_storage:" + label + "_export");
-
-        var jobStatus = pollJobStatus(exportJobId);
-
-        Assertions.assertEquals(JobStatusCode.FAILED, jobStatus.getStatusCode());
-
-        // Assert on the failure being an auth rejection specifically (EStorageAccess, raised from
-        // CommonFileStorage's generic PermissionError handler), not just any failure - a config
-        // typo would also produce JobStatusCode.FAILED, and would not prove secret resolution works.
-        var statusMessage = jobStatus.getStatusMessage().toLowerCase();
-        Assertions.assertTrue(
-                statusMessage.contains("access denied") || statusMessage.contains("permission"),
-                () -> "Expected an access-denied failure, got: " + jobStatus.getStatusMessage());
     }
 
     private void registerStorageResource(String storageKey, ResourceDefinition resource) {
@@ -464,24 +387,6 @@ public class ImportExportCloudStorageTest {
                 .build();
 
         return Helpers.startJob(orchClient, jobRequest).getJobId();
-    }
-
-    private JobStatus pollJobStatus(TagHeader jobId) {
-
-        var orchClient = platform.orchClientBlocking();
-        var statusRequest = JobStatusRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(jobId))
-                .build();
-
-        var jobStatus = orchClient.checkJob(statusRequest);
-
-        while (!COMPLETED_JOB_STATES.contains(jobStatus.getStatusCode())) {
-            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
-            jobStatus = orchClient.checkJob(statusRequest);
-        }
-
-        return jobStatus;
     }
 
     private TagHeader findOutputDataset(TagHeader jobId) {
