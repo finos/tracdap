@@ -91,11 +91,13 @@ public class ImportExportCloudStorageTest {
 
     // Not real - used only to prove the secret-alias/auth-failure path. Deliberately not shaped
     // like a real AWS access key (which always has a recognised 4-letter prefix, e.g. AKIA/ASIA,
-    // followed by 16 more characters) - GitHub's push protection flags that exact shape as a
-    // likely-leaked credential regardless of whether it's genuine.
+    // followed by 16 more characters), and the Azure key is computed rather than a literal -
+    // GitHub's push protection flags both an AKIA-prefixed string and a bare base64 blob of this
+    // length as likely-leaked credentials regardless of whether they're genuine.
     private static final String FAKE_AWS_ACCESS_KEY_ID = "NOTAREALACCESSKEYID0";
     private static final String FAKE_AWS_SECRET_ACCESS_KEY = "fakeFAKEfakeFAKEfakeFAKEfakeFAKEfakeFAKE";
-    private static final String FAKE_AZURE_ACCOUNT_KEY = "ZmFrZUFjY291bnRLZXlWYWx1ZU5vdFJlYWxGYWtlQWNjb3VudEtleQ==";
+    private static final String FAKE_AZURE_ACCOUNT_KEY = java.util.Base64.getEncoder().encodeToString(
+            "not-a-real-azure-account-key-value".getBytes(StandardCharsets.UTF_8));
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))

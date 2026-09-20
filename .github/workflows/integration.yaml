@@ -222,6 +222,113 @@ jobs:
           retention-days: 7
 
 
+  # Runs the int-cloud-storage tag only, never int-e2e - a separate job so a cloud auth or
+  # connectivity failure here cannot affect the end-to-end job's five unrelated test classes.
+  # Runs on the bare runner rather than int-cloud-storage's minimal container, since it needs
+  # the same git + Python runtime build that end-to-end already sets up for itself.
+  end-to-end-cloud:
+
+    name: end-to-end-cloud-${{ matrix.storage.TARGET }}
+
+    strategy:
+
+      fail-fast: false
+
+      matrix:
+
+        storage:
+
+          - { TARGET: aws, ENABLE_IF: TRAC_AWS_BUCKET }
+          - { TARGET: gcp, ENABLE_IF: TRAC_GCP_BUCKET }
+          - { TARGET: azure, ENABLE_IF: TRAC_AZURE_CONTAINER }
+
+    # Dependabot branches are in the main repo but it does not have permissions for CI storage
+    if: ${{ vars[ matrix.storage.ENABLE_IF ] != '' && github.actor != 'dependabot[bot]' }}
+
+    runs-on: ubuntu-latest
+    environment: integration
+    timeout-minutes: 20
+
+    # Permissions required to use IdP to connect to cloud platforms
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+
+      # fetch-depth = 0 is needed to get tags for version info
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Using IdP for AWS, set the repo secret AWS_CI_ROLE to use
+      - name: Authenticate to AWS
+        if: ${{ matrix.storage.TARGET == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_CI_ROLE }}
+          role-session-name: tracdap-ci-session
+          aws-region: ${{ vars.TRAC_AWS_REGION }}
+
+      # Using IdP for GCP
+      - name: Authenticate to GCP
+        if: ${{ matrix.storage.TARGET == 'gcp' }}
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/158849182108/locations/global/workloadIdentityPools/github/providers/github
+          service_account: ${{ secrets.GCP_CI_USER }}
+
+      # Using IdP for Azure
+      - name: Authenticate to Azure
+        if: ${{ matrix.storage.TARGET == 'azure' }}
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CI_CLIENT }}
+          tenant-id: ${{ secrets.AZURE_CI_TENANT }}
+          subscription-id: ${{ secrets.AZURE_CI_SUBSCRIPTION }}
+
+      - name: Java - Setup
+        uses: actions/setup-java@v4
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Java - Build platform
+        run: ./gradlew testClasses --parallel
+
+      - name: Python - setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Python - PIP
+        run: python -m pip install --quiet --upgrade pip
+
+      - name: Python - Install build dependencies
+        run: |
+          pip install --quiet -r tracdap-runtime/python/requirements.txt
+
+      - name: Python - Build runtime package
+        env:
+          TRAC_PYTHON_BUILD_ISOLATION: false
+        run: python tracdap-runtime/python/build_runtime.py --target dist ext
+
+      - name: Run cloud storage end to end tests
+        env: ${{ vars }}
+        run: ./gradlew integration -DintegrationTags="int-cloud-storage & ( ${{ matrix.storage.TARGET }}-platform | all-platforms )"
+
+      # If the tests fail, make the output available for download
+      - name: Store failed test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: junit-test-results
+          path: build/modules/*/reports/**
+          retention-days: 7
+
+
   int-sql:
 
     strategy:
@@ -303,7 +410,7 @@ jobs:
               TRAC_TENANTS_FILE: '.github/config/int-storage-s3-tenants.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_aws*.py,
-              JAVA_TESTS: "( int-storage | int-cloud-storage )" }
+              JAVA_TESTS: int-storage }
 
           - { SERVICE: storage,
               TARGET: gcp,
@@ -316,7 +423,7 @@ jobs:
               TRAC_TENANTS_FILE: '.github/config/int-storage-gcs-tenants.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py,
-              JAVA_TESTS: "( int-storage | int-cloud-storage )" }
+              JAVA_TESTS: int-storage }
 
           - { SERVICE: storage,
               TARGET: azure,
@@ -329,7 +436,7 @@ jobs:
               TRAC_TENANTS_FILE: ".github/config/int-storage-azure-tenants.yaml",
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_azure*.py,
-              JAVA_TESTS: "( int-storage | int-cloud-storage )" }
+              JAVA_TESTS: int-storage }
 
     uses: ./.github/workflows/integration-cloud.yaml
 
