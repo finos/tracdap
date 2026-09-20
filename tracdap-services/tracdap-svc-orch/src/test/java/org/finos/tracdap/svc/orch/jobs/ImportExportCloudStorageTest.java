@@ -32,6 +32,8 @@ import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
@@ -88,6 +90,9 @@ public class ImportExportCloudStorageTest {
 
     private static final List<JobStatusCode> COMPLETED_JOB_STATES = List.of(
             JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
+
+    private static final int RESOURCE_PROPAGATION_RETRIES = 10;
+    private static final long RESOURCE_PROPAGATION_RETRY_DELAY_MS = 200;
 
     // Not real - used only to prove the secret-alias/auth-failure path. Deliberately not shaped
     // like a real AWS access key (which always has a recognised 4-letter prefix, e.g. AKIA/ASIA,
@@ -402,7 +407,36 @@ public class ImportExportCloudStorageTest {
                         .setValue(MetadataCodec.encodeValue(jobAttrValue)))
                 .build();
 
-        return Helpers.startJob(orchClient, jobRequest).getJobId();
+        return submitJobAwaitingResource(orchClient, jobRequest, storageKey);
+    }
+
+    // registerStorageResource() always precedes this call, but NotifierService.configUpdate()
+    // (tracdap-svc-admin) pushes the new resource to the orchestrator asynchronously, fire-and-
+    // forget - retry briefly on FAILED_PRECONDITION for the resource just registered, rather than
+    // assume it's already visible.
+    private TagHeader submitJobAwaitingResource(
+            TracOrchestratorApiGrpc.TracOrchestratorApiBlockingStub orchClient,
+            JobRequest jobRequest, String storageKey) {
+
+        var notYetVisible = "Required resource [" + storageKey + "] not available";
+
+        for (var attempt = 1; ; attempt++) {
+
+            try {
+                return Helpers.startJob(orchClient, jobRequest).getJobId();
+            }
+            catch (StatusRuntimeException e) {
+
+                var description = e.getStatus().getDescription();
+                var isResourcePropagationDelay = e.getStatus().getCode() == Status.Code.FAILED_PRECONDITION
+                        && description != null && description.contains(notYetVisible);
+
+                if (!isResourcePropagationDelay || attempt >= RESOURCE_PROPAGATION_RETRIES)
+                    throw e;
+
+                LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(RESOURCE_PROPAGATION_RETRY_DELAY_MS));
+            }
+        }
     }
 
     private TagHeader submitImportJob(String storageKey, String sourceFile, String jobAttrValue) {
