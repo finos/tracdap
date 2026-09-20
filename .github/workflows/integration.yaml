@@ -329,7 +329,13 @@ jobs:
       - name: Run cloud storage end to end tests
         if: ${{ steps.gate.outputs.enabled == 'true' }}
         env: ${{ vars }}
-        run: ./gradlew integration -DintegrationTags="int-cloud-storage & ( ${{ matrix.storage.TARGET }}-platform | all-platforms )"
+        # env: ${{ vars }} injects every repo variable into every job regardless of matrix target,
+        # so TRAC_CLOUD_TARGET tells the test class which single cloud this job actually
+        # authenticated to - without it every job would attempt all three clouds' tests, including
+        # ones it has no real credentials for.
+        run: |
+          export TRAC_CLOUD_TARGET=${{ matrix.storage.TARGET }}
+          ./gradlew integration -DintegrationTags="int-cloud-storage & ( ${{ matrix.storage.TARGET }}-platform | all-platforms )"
 
       # If the tests fail, make the output available for download
       - name: Store failed test results

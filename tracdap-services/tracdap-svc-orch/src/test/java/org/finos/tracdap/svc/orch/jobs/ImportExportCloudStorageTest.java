@@ -211,8 +211,8 @@ public class ImportExportCloudStorageTest {
         var bucket = System.getenv("TRAC_AWS_BUCKET");
 
         Assumptions.assumeTrue(
-                region != null && bucket != null,
-                "TRAC_AWS_REGION / TRAC_AWS_BUCKET are not set");
+                targetMatches("aws") && region != null && bucket != null,
+                "TRAC_AWS_REGION / TRAC_AWS_BUCKET are not set, or TRAC_CLOUD_TARGET is a different cloud");
 
         var resource = ResourceDefinition.newBuilder()
                 .setResourceType(ResourceType.EXTERNAL_STORAGE)
@@ -233,8 +233,8 @@ public class ImportExportCloudStorageTest {
         var bucket = System.getenv("TRAC_AWS_BUCKET");
 
         Assumptions.assumeTrue(
-                region != null && bucket != null,
-                "TRAC_AWS_REGION / TRAC_AWS_BUCKET are not set");
+                targetMatches("aws") && region != null && bucket != null,
+                "TRAC_AWS_REGION / TRAC_AWS_BUCKET are not set, or TRAC_CLOUD_TARGET is a different cloud");
 
         var resource = ResourceDefinition.newBuilder()
                 .setResourceType(ResourceType.EXTERNAL_STORAGE)
@@ -259,8 +259,8 @@ public class ImportExportCloudStorageTest {
         var container = System.getenv("TRAC_AZURE_CONTAINER");
 
         Assumptions.assumeTrue(
-                storageAccount != null && container != null,
-                "TRAC_AZURE_STORAGE_ACCOUNT / TRAC_AZURE_CONTAINER are not set");
+                targetMatches("azure") && storageAccount != null && container != null,
+                "TRAC_AZURE_STORAGE_ACCOUNT / TRAC_AZURE_CONTAINER are not set, or TRAC_CLOUD_TARGET is a different cloud");
 
         var resource = ResourceDefinition.newBuilder()
                 .setResourceType(ResourceType.EXTERNAL_STORAGE)
@@ -281,8 +281,8 @@ public class ImportExportCloudStorageTest {
         var container = System.getenv("TRAC_AZURE_CONTAINER");
 
         Assumptions.assumeTrue(
-                storageAccount != null && container != null,
-                "TRAC_AZURE_STORAGE_ACCOUNT / TRAC_AZURE_CONTAINER are not set");
+                targetMatches("azure") && storageAccount != null && container != null,
+                "TRAC_AZURE_STORAGE_ACCOUNT / TRAC_AZURE_CONTAINER are not set, or TRAC_CLOUD_TARGET is a different cloud");
 
         var resource = ResourceDefinition.newBuilder()
                 .setResourceType(ResourceType.EXTERNAL_STORAGE)
@@ -312,8 +312,8 @@ public class ImportExportCloudStorageTest {
         var bucket = System.getenv("TRAC_GCP_BUCKET");
 
         Assumptions.assumeTrue(
-                project != null && bucket != null,
-                "TRAC_GCP_PROJECT / TRAC_GCP_BUCKET are not set");
+                targetMatches("gcp") && project != null && bucket != null,
+                "TRAC_GCP_PROJECT / TRAC_GCP_BUCKET are not set, or TRAC_CLOUD_TARGET is a different cloud");
 
         var resourceBuilder = ResourceDefinition.newBuilder()
                 .setResourceType(ResourceType.EXTERNAL_STORAGE)
@@ -524,7 +524,13 @@ public class ImportExportCloudStorageTest {
 
         for (var i = 0; i < INPUT_ROWS.size(); i++) {
             Assertions.assertEquals(INPUT_ROWS.get(i)[0], rows.get(i)[0]);
-            Assertions.assertEquals(new BigDecimal(INPUT_ROWS.get(i)[1]), new BigDecimal(rows.get(i)[1]));
+
+            // Value equality, not BigDecimal.equals() - DECIMAL fields round-trip through Arrow's
+            // decimal128(38, 12) (DataMapping.DEFAULT_DECIMAL_SCALE), so 1000.50 legitimately comes
+            // back as 1000.500000000000: same number, different scale.
+            var expected = new BigDecimal(INPUT_ROWS.get(i)[1]);
+            var actual = new BigDecimal(rows.get(i)[1]);
+            Assertions.assertEquals(0, expected.compareTo(actual), () -> "Expected " + expected + " but was " + actual);
         }
     }
 
@@ -536,5 +542,15 @@ public class ImportExportCloudStorageTest {
                 .skip(1)  // header row
                 .map(line -> line.split(","))
                 .collect(Collectors.toList());
+    }
+
+    // CI sets TRAC_CLOUD_TARGET so each end-to-end-cloud-* job only attempts its own cloud - the
+    // bucket/region env vars alone are not enough to tell, since env: ${{ vars }} exposes every
+    // repo variable to every job regardless of matrix target. Unset locally, so a developer can
+    // still run a single cloud's tests just by setting that cloud's own env vars.
+    private static boolean targetMatches(String target) {
+
+        var configuredTarget = System.getenv("TRAC_CLOUD_TARGET");
+        return configuredTarget == null || configuredTarget.equals(target);
     }
 }
