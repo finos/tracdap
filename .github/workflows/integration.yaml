@@ -303,7 +303,7 @@ jobs:
               TRAC_TENANTS_FILE: '.github/config/int-storage-s3-tenants.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_aws*.py,
-              JAVA_TESTS: int-storage }
+              JAVA_TESTS: "( int-storage | int-cloud-storage )" }
 
           - { SERVICE: storage,
               TARGET: gcp,
@@ -316,7 +316,7 @@ jobs:
               TRAC_TENANTS_FILE: '.github/config/int-storage-gcs-tenants.yaml',
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_gcp*.py,
-              JAVA_TESTS: int-storage }
+              JAVA_TESTS: "( int-storage | int-cloud-storage )" }
 
           - { SERVICE: storage,
               TARGET: azure,
@@ -329,7 +329,7 @@ jobs:
               TRAC_TENANTS_FILE: ".github/config/int-storage-azure-tenants.yaml",
               TRAC_SECRET_KEY: short-lived-secret,
               PYTHON_TESTS: int_storage_azure*.py,
-              JAVA_TESTS: int-storage }
+              JAVA_TESTS: "( int-storage | int-cloud-storage )" }
 
     uses: ./.github/workflows/integration-cloud.yaml
 

@@ -183,6 +183,35 @@ class SimpleDataImport(trac.TracDataImport):
         ctx.set_source_metadata("customer_loans", storage_key, file_stat)
 
 
+class SimpleCsvImport(trac.TracDataImport):
+
+    def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
+
+        return trac.define_parameters(
+            trac.P("storage_key", trac.STRING, "TRAC external storage key"),
+            trac.P("source_file", trac.STRING, "Path of the source CSV file, relative to the storage location"))
+
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
+
+        dataset_schema = trac.load_schema(schemas, "profit_by_region.csv")
+
+        return {"dataset": trac.ModelOutputSchema(dataset_schema)}
+
+    def run_model(self, ctx: trac.TracDataContext):
+
+        storage_key = ctx.get_parameter("storage_key")
+        storage = ctx.get_file_storage(storage_key)
+
+        source_file = ctx.get_parameter("source_file")
+        file_stat = storage.stat(source_file)
+
+        with storage.read_byte_stream(source_file) as file_stream:
+            dataset = pd.read_csv(file_stream)
+            ctx.put_pandas_table("dataset", dataset)
+
+        ctx.set_source_metadata("dataset", storage_key, file_stat)
+
+
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
     launch.launch_model(BulkDataImport, "config/data_import.yaml", "config/sys_config.yaml")
