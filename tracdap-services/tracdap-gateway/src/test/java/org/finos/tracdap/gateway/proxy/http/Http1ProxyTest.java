@@ -198,9 +198,7 @@ public class Http1ProxyTest {
         Assertions.assertEquals(404, response.statusCode());
     }
 
-    // Disabled 2026-09-23 - started to throw java.io.IOException instead of returning 503
-    // when Netty bumped from 4.1.137 -> 4.1.138.
-    @Test @Disabled
+    @Test
     void http1SimpleProxy_serverDown() throws Exception {
 
         var request = java.net.http.HttpRequest.newBuilder()
