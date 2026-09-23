@@ -38,6 +38,8 @@ allprojects {
 
     group = 'org.finos.tracdap'
     version = versionNumber
+
+    task printAllDependencies(type: DependencyReportTask) {}
 }
 
 subprojects {
