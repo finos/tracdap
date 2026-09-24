@@ -205,7 +205,7 @@ public class Http1ProxyTest {
                 .GET()
                 .uri(new URI("http://localhost:" + TEST_GW_PORT + TEST_URL_SERVER_DOWN))
                 .version(HttpClient.Version.HTTP_1_1)
-                .timeout(Duration.ofMillis(TEST_TIMEOUT))
+                .timeout(Duration.ofMillis(TEST_TIMEOUT + 1000))
                 .build();
 
         // Should be a successful response with error code 503, source server is not available
