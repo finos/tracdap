@@ -56,10 +56,10 @@ dependencies {
     implementation group: 'com.fasterxml.jackson.datatype', name: 'jackson-datatype-jsr310', version: "$jackson_databind_version"
 
     constraints {
-        // reactor-netty-core, used by Azure SDK, has a CVE.  Force update of the transitive
-        // dependency to 1.2.18, the last release in the 1.2.x line - the same line Azure's
-        // SDK itself is built against, even in its latest release. Jumping to 1.3.x instead
-        // caused Azure BLOB storage round trips to hang on multi-chunk uploads.
+        // reactor-netty-core, used by Azure SDK, has CVE-2026-47874. No 1.2.x release fixes it,
+        // but 1.2.18 (the last 1.2.x release) is the version Azure's own SDK is built against -
+        // jumping to 1.3.x (where the fix landed) broke Azure BLOB storage round trips on
+        // multi-chunk uploads. CVE is suppressed for this package, see dev/compliance/owasp-false-positives.xml.
         api 'io.projectreactor.netty:reactor-netty-core:1.2.18'
         api 'io.projectreactor.netty:reactor-netty-http:1.2.18'
     }

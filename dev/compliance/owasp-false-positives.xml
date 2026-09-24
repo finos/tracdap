@@ -254,12 +254,14 @@
         <vulnerabilityName>CVE-2023-4586</vulnerabilityName>
     </suppress>
 
-    <!-- Netty is pulled in by Apache Arrow, for which we are stuck on an ancient version. -->
-    <!-- Gradle appears to ignore attempts to force a newer transitive dependency.  -->
-    <!-- Revisit this and upgrade Arrow when time allows -->
+    <!-- reactor-netty-core / reactor-netty-http are pulled in by the Azure SDK (azure-core-http-netty),
+         which pins its own build to exactly reactor-netty 1.2.18 (enforced via a Maven banned-dependency
+         rule in azure-core-http-netty's own pom). No release in the 1.2.x line fixes CVE-2026-47874, and
+         forcing a newer line (1.3.x, where the fix landed) broke Azure BLOB storage round trips on
+         multi-chunk uploads - see tracdap-libs/tracdap-lib-common and tracdap-lib-data build.gradle.
+         Revisit once Azure SDK moves to a reactor-netty line that includes the fix. -->
     <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@.*$</packageUrl>
-        <vulnerabilityName>CVE-2026-89044</vulnerabilityName>
+        <packageUrl regex="true">^pkg:maven/io\.projectreactor\.netty/reactor\-netty\-.*@.*$</packageUrl>
         <vulnerabilityName>CVE-2026-47874</vulnerabilityName>
     </suppress>
 
