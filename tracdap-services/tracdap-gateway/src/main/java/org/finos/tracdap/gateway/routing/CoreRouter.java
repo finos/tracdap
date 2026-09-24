@@ -293,6 +293,20 @@ abstract class CoreRouter extends ChannelDuplexHandler {
         // TODO: Handle pipelining
         // TODO: Is it possible to retain messages and reconnect in any cases?
 
+        // If the channel never successfully connected and activated, proxyChannelOpen /
+        // proxyChannelActive have already reported an error to the client and decided for
+        // themselves whether to close the client connection - this channel closing is an
+        // expected consequence of that, not a new, unexpected event. Read the outcome directly
+        // off the futures rather than relying on those listeners having already run: Netty
+        // does not guarantee this listener fires after theirs, only that a channel cannot be
+        // closed while its own connect/activate outcome is still undecided.
+        var channelWasActive = target.channelOpenFuture.isSuccess() && target.channelActiveFuture.isSuccess();
+
+        if (!channelWasActive) {
+            targets.remove(target.routeIndex);
+            return;
+        }
+
         var targetConfig = routes.get(target.routeIndex).getConfig().getTarget();
         var lostMsg = !target.outboundQueue.isEmpty();
 
