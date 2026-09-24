@@ -268,7 +268,7 @@ public class PlatformTest implements BeforeAllCallback, AfterAllCallback {
     }
 
     public TracAdminApiGrpc.TracAdminApiBlockingStub adminClientBlocking() {
-        var channel = serviceChannels.get(ConfigKeys.METADATA_SERVICE_KEY);
+        var channel = serviceChannels.get(ConfigKeys.ADMIN_SERVICE_KEY);
         var client = TracAdminApiGrpc.newBlockingStub(channel);
         return clientConcerns.configureClient(client);
     }
