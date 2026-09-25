@@ -210,6 +210,41 @@ jobs:
           TRAC_PYTHON_BUILD_ISOLATION: false
         run: python tracdap-runtime/python/build_runtime.py --target dist ext
 
+      # Each extension plugin under python-ext/plugins/*/requirements.txt pins an exact
+      # tracdap-runtime == X.Y.* range by hand - it is not derived from dev/version.sh, so it
+      # can silently go stale across a minor release and make the plugin uninstallable
+      # alongside the runtime it's meant to extend (pip reports a ResolutionImpossible
+      # dependency conflict). See RELEASING.md and #754.
+      - name: Check extension plugin runtime pins
+        run: |
+          full_version=$(dev/version.sh)
+          minor_version=$(echo "${full_version}" | grep -oE '^[0-9]+\.[0-9]+')
+
+          if [ -z "${minor_version}" ]; then
+            echo "Could not determine a X.Y version from dev/version.sh output: '${full_version}' - skipping pin check"
+            exit 0
+          fi
+
+          fail=0
+
+          for req in tracdap-runtime/python-ext/plugins/*/requirements.txt; do
+
+            pin=$(grep -oE 'tracdap-runtime == [0-9]+\.[0-9]+' "${req}" | grep -oE '[0-9]+\.[0-9]+$')
+
+            if [ -z "${pin}" ]; then
+              echo "::error file=${req}::Could not find a 'tracdap-runtime == X.Y.*' pin"
+              fail=1
+            elif [ "${pin}" != "${minor_version}" ]; then
+              echo "::error file=${req}::tracdap-runtime pin is ${pin}.*, but this build is version ${full_version} (${minor_version}.*)"
+              fail=1
+            fi
+          done
+
+          if [ "${fail}" -ne 0 ]; then
+            echo "One or more extension plugins have a stale tracdap-runtime pin - see RELEASING.md"
+            exit 1
+          fi
+
       - name: Save artifacts
         uses: actions/upload-artifact@v4
         with:
