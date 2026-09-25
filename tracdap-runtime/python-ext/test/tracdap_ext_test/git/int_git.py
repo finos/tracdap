@@ -20,7 +20,7 @@ import subprocess as sp
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.exceptions as ex
-import tracdap.rt._impl.core.config_parser as config  # noqa
+import tracdap.rt._impl.core.config as config  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa

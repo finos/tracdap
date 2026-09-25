@@ -37,7 +37,7 @@ try:
 except ModuleNotFoundError:
     _hx = None
 
-import tracdap.rt._impl.core.config_parser as _cfg
+import tracdap.rt._impl.core.config as _cfg
 import tracdap.rt._impl.core.guard_rails as _guard
 import tracdap.rt._impl.core.logging as _log
 import tracdap.rt._impl.core.util as _util

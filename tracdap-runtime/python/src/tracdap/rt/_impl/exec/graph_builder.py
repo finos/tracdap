@@ -16,13 +16,12 @@
 import itertools as _itr
 import typing as _tp
 
-import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
-import tracdap.rt._impl.core.type_system as _type_system
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt.api as _api
 
@@ -1099,7 +1098,7 @@ class GraphBuilder:
         tag = _util.get_job_metadata_tag(selector, self._job_config, optional=True)
 
         attributes = dict() if tag is None else dict(
-            (attr_name, _type_system.MetadataCodec.decode_value(attr_value))
+            (attr_name, _meta.MetadataCodec.decode_value(attr_value))
             for attr_name, attr_value in tag.attrs.items())
 
         metadata = _api.RuntimeMetadata(objectId=item_id, attributes=attributes)

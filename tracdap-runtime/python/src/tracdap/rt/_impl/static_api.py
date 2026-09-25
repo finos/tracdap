@@ -17,14 +17,13 @@ import typing as _tp
 import types as _ts
 
 import tracdap.rt.api.experimental as _api
-import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.core.config_parser as _config
+import tracdap.rt._impl.core.config as _cfg
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.schemas as _schemas
 import tracdap.rt._impl.core.shim as _shim
 import tracdap.rt._impl.core.struct as _struct
-import tracdap.rt._impl.core.type_system as _type_system
+import tracdap.rt._impl.core.metadata as _meta
 import tracdap.rt._impl.core.util as _util
 import tracdap.rt._impl.core.validation as _val
 
@@ -44,7 +43,7 @@ class StaticApiImpl(_StaticApiHook):
             _StaticApiHook._register(StaticApiImpl())
 
     @classmethod
-    def supply_config(cls, sys_config: _config.RuntimeConfig):
+    def supply_config(cls, sys_config: _cfg.RuntimeConfig):
         impl: StaticApiImpl = _StaticApiHook.get_instance()  # noqa
         impl.__sys_config = sys_config
 
@@ -54,7 +53,7 @@ class StaticApiImpl(_StaticApiHook):
         impl.__rct.close_all(silent = silent)
 
     def __init__(self):
-        self.__sys_config = _config.RuntimeConfig()
+        self.__sys_config = _cfg.RuntimeConfig()
         self.__rct = _util.RuntimeContextTracking()
 
     def array_type(self, item_type: _meta.BasicType) -> _meta.TypeDescriptor:
@@ -90,13 +89,13 @@ class StaticApiImpl(_StaticApiHook):
             raise _ex.EModelValidation("Categorical flag is only allowed for STRING attributes")
 
         if attr_type is None:
-            trac_value = _type_system.MetadataCodec.encode_value(attr_value)
+            trac_value = _meta.MetadataCodec.encode_value(attr_value)
         elif isinstance(attr_value, list):
             type_desc = _meta.TypeDescriptor(_meta.BasicType.ARRAY, arrayType=_meta.TypeDescriptor(attr_type))
-            trac_value = _type_system.MetadataCodec.convert_value(attr_value, type_desc)
+            trac_value = _meta.MetadataCodec.convert_value(attr_value, type_desc)
         else:
             type_desc = _meta.TypeDescriptor(attr_type)
-            trac_value = _type_system.MetadataCodec.convert_value(attr_value, type_desc)
+            trac_value = _meta.MetadataCodec.convert_value(attr_value, type_desc)
 
         return _Named(attr_name, trac_value)
 
@@ -126,7 +125,7 @@ class StaticApiImpl(_StaticApiHook):
 
         if default_value is not None and not isinstance(default_value, _meta.Value):
             try:
-                default_value = _type_system.MetadataCodec.convert_value(default_value, param_type_descriptor)
+                default_value = _meta.MetadataCodec.convert_value(default_value, param_type_descriptor)
             except _ex.ETrac as e:
                 msg = f"Default value for parameter [{param_name}] does not match the declared type"
                 raise _ex.EModelValidation(msg) from e
@@ -332,8 +331,8 @@ class StaticApiImpl(_StaticApiHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
-            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         return _shim.ShimLoader.load_resource(package, resource_file, resource_size_limit)
@@ -346,8 +345,8 @@ class StaticApiImpl(_StaticApiHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
-            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         stream = _shim.ShimLoader.open_resource(package, resource_file, resource_size_limit)
@@ -362,8 +361,8 @@ class StaticApiImpl(_StaticApiHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
-            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         return _shim.ShimLoader.load_text_resource(package, resource_file, encoding, resource_size_limit)
@@ -377,8 +376,8 @@ class StaticApiImpl(_StaticApiHook):
 
         resource_size_limit = _util.read_property(
             self.__sys_config.properties,
-            _config.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
-            _config.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKeys.RUNTIME_LIMIT_RESOURCE_SIZE,
+            _cfg.ConfigKDefaults.RUNTIME_LIMIT_RESOURCE_SIZE,
             int)
 
         stream = _shim.ShimLoader.open_text_resource(package, resource_file, encoding, resource_size_limit)
@@ -398,7 +397,7 @@ class StaticApiImpl(_StaticApiHook):
                     if isinstance(raw_value, _meta.Value):
                         encoded_props[key] = raw_value
                     else:
-                        encoded_props[key] = _type_system.MetadataCodec.encode_value(raw_value)
+                        encoded_props[key] = _meta.MetadataCodec.encode_value(raw_value)
                 except _ex.ETracInternal as e:
                     error_suffix = f" [{socket_name}]" if socket_name is not None else ""
                     error = f"Illegal value for prop [{key}] on model {socket_type}{error_suffix}: {str(e)}"

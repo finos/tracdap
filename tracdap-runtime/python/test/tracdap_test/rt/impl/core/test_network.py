@@ -23,7 +23,7 @@ import tempfile
 import threading
 import time
 
-import tracdap.rt._impl.core.config_parser as _cfg  # noqa
+import tracdap.rt._impl.core.config as _cfg  # noqa
 import tracdap.rt._impl.core.util as _util  # noqa
 import tracdap.rt._impl.core.network as _net  # noqa
 
