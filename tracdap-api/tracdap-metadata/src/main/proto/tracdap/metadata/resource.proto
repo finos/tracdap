@@ -74,3 +74,26 @@ message ResourceDefinition {
    */
   map<string, string> secrets = 6;
 }
+
+/**
+ * Definition of a platform-level credential set
+ *
+ * Unlike ResourceDefinition, a credential entry is not a connection to anything in its own
+ * right - it is an input consumed by other resources' auth logic, so it carries no protocol,
+ * sub-protocol or resource type of its own.
+ */
+message CredentialDefinition {
+
+  /// Configuration properties for this credential set, not visible to client applications
+  map<string, string> properties = 1;
+
+  /**
+   * Configuration properties that are stored as secrets using TRAC's secret handling mechanism
+   *
+   * Only the secret alias is stored in metadata, handling of secret storage is delegated to the
+   * configured secrets plugin. Secret values may be sent by clients when credential definitions are
+   * created / updated, in which case they will be written to the configured secret store and
+   * metadata values will be replaced with an alias.
+   */
+  map<string, string> secrets = 2;
+}

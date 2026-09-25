@@ -19,6 +19,7 @@ package org.finos.tracdap.svc.admin.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.svc.admin.services.ConfigService;
+import org.finos.tracdap.svc.admin.services.PlatformConfigService;
 
 import io.grpc.stub.StreamObserver;
 
@@ -26,9 +27,11 @@ import io.grpc.stub.StreamObserver;
 public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
 
     private final ConfigService configService;
+    private final PlatformConfigService platformConfigService;
 
-    public TracAdminApi(ConfigService configService) {
+    public TracAdminApi(ConfigService configService, PlatformConfigService platformConfigService) {
         this.configService = configService;
+        this.platformConfigService = platformConfigService;
     }
 
     @Override
@@ -101,6 +104,84 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
 
         try {
             var result = configService.listConfigEntries(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void createPlatformConfigObject(PlatformConfigWriteRequest request, StreamObserver<PlatformConfigWriteResponse> response) {
+
+        try {
+            var result = platformConfigService.createPlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void updatePlatformConfigObject(PlatformConfigWriteRequest request, StreamObserver<PlatformConfigWriteResponse> response) {
+
+        try {
+            var result = platformConfigService.updatePlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void deletePlatformConfigObject(PlatformConfigWriteRequest request, StreamObserver<PlatformConfigWriteResponse> response) {
+
+        try {
+            var result = platformConfigService.deletePlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void readPlatformConfigObject(PlatformConfigReadRequest request, StreamObserver<PlatformConfigReadResponse> response) {
+
+        try {
+            var result = platformConfigService.readPlatformConfigObject(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void readPlatformConfigBatch(PlatformConfigReadBatchRequest request, StreamObserver<PlatformConfigReadBatchResponse> response) {
+
+        try {
+            var result = platformConfigService.readPlatformConfigBatch(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void listPlatformConfigEntries(PlatformConfigListRequest request, StreamObserver<PlatformConfigListResponse> response) {
+
+        try {
+            var result = platformConfigService.listPlatformConfigEntries(request);
             response.onNext(result);
             response.onCompleted();
         }

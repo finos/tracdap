@@ -56,6 +56,22 @@ public class AdminApiValidator {
     private static final Descriptors.FieldDescriptor CLR_CONFIG_TYPE;
     private static final Descriptors.FieldDescriptor CLR_RESOURCE_TYPE;
 
+    private static final Descriptors.Descriptor PLATFORM_CONFIG_WRITE_REQUEST;
+    private static final Descriptors.FieldDescriptor PCWR_CONFIG_CLASS;
+    private static final Descriptors.FieldDescriptor PCWR_CONFIG_KEY;
+    private static final Descriptors.FieldDescriptor PCWR_PRIOR_ENTRY;
+    private static final Descriptors.FieldDescriptor PCWR_DEFINITION;
+
+    private static final Descriptors.Descriptor PLATFORM_CONFIG_READ_REQUEST;
+    private static final Descriptors.FieldDescriptor PCRR_ENTRY;
+
+    private static final Descriptors.Descriptor PLATFORM_CONFIG_READ_BATCH_REQUEST;
+    private static final Descriptors.FieldDescriptor PCRB_ENTRIES;
+
+    private static final Descriptors.Descriptor PLATFORM_CONFIG_LIST_REQUEST;
+    private static final Descriptors.FieldDescriptor PCLR_CONFIG_CLASS;
+    private static final Descriptors.FieldDescriptor PCLR_INCLUDE_DELETED;
+
     static {
 
         CONFIG_WRITE_REQUEST = ConfigWriteRequest.getDescriptor();
@@ -79,6 +95,22 @@ public class AdminApiValidator {
         CLR_INCLUDE_DELETED = field(CONFIG_LIST_REQUEST, ConfigListRequest.INCLUDEDELETED_FIELD_NUMBER);
         CLR_CONFIG_TYPE = field(CONFIG_LIST_REQUEST, ConfigListRequest.CONFIGTYPE_FIELD_NUMBER);
         CLR_RESOURCE_TYPE = field(CONFIG_LIST_REQUEST, ConfigListRequest.RESOURCETYPE_FIELD_NUMBER);
+
+        PLATFORM_CONFIG_WRITE_REQUEST = PlatformConfigWriteRequest.getDescriptor();
+        PCWR_CONFIG_CLASS = field(PLATFORM_CONFIG_WRITE_REQUEST, PlatformConfigWriteRequest.CONFIGCLASS_FIELD_NUMBER);
+        PCWR_CONFIG_KEY = field(PLATFORM_CONFIG_WRITE_REQUEST, PlatformConfigWriteRequest.CONFIGKEY_FIELD_NUMBER);
+        PCWR_PRIOR_ENTRY = field(PLATFORM_CONFIG_WRITE_REQUEST, PlatformConfigWriteRequest.PRIORENTRY_FIELD_NUMBER);
+        PCWR_DEFINITION = field(PLATFORM_CONFIG_WRITE_REQUEST, PlatformConfigWriteRequest.DEFINITION_FIELD_NUMBER);
+
+        PLATFORM_CONFIG_READ_REQUEST = PlatformConfigReadRequest.getDescriptor();
+        PCRR_ENTRY = field(PLATFORM_CONFIG_READ_REQUEST, PlatformConfigReadRequest.ENTRY_FIELD_NUMBER);
+
+        PLATFORM_CONFIG_READ_BATCH_REQUEST = PlatformConfigReadBatchRequest.getDescriptor();
+        PCRB_ENTRIES = field(PLATFORM_CONFIG_READ_BATCH_REQUEST, PlatformConfigReadBatchRequest.ENTRIES_FIELD_NUMBER);
+
+        PLATFORM_CONFIG_LIST_REQUEST = PlatformConfigListRequest.getDescriptor();
+        PCLR_CONFIG_CLASS = field(PLATFORM_CONFIG_LIST_REQUEST, PlatformConfigListRequest.CONFIGCLASS_FIELD_NUMBER);
+        PCLR_INCLUDE_DELETED = field(PLATFORM_CONFIG_LIST_REQUEST, PlatformConfigListRequest.INCLUDEDELETED_FIELD_NUMBER);
     }
 
     @Validator(method = "createConfigObject")
@@ -232,10 +264,153 @@ public class AdminApiValidator {
         return ctx;
     }
 
+    @Validator(method = "createPlatformConfigObject")
+    public static ValidationContext createPlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
+
+        ctx = commonPlatformWriteRequest(ctx);
+
+        // No prior version for create calls
+        ctx = ctx.push(PCWR_PRIOR_ENTRY)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(PCWR_DEFINITION)
+                .apply(CommonValidators::required)
+                .apply(AdminApiValidator::platformConfigObjectType, ObjectDefinition.class)
+                .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "updatePlatformConfigObject")
+    public static ValidationContext updatePlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
+
+        ctx = commonPlatformWriteRequest(ctx);
+
+        ctx = ctx.push(PCWR_PRIOR_ENTRY)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .apply(AdminApiValidator::sameClassAndKey, PlatformConfigEntry.class, msg)
+                .pop();
+
+        ctx = ctx.push(PCWR_DEFINITION)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .apply(AdminApiValidator::platformConfigObjectType, ObjectDefinition.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "deletePlatformConfigObject")
+    public static ValidationContext deletePlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
+
+        ctx = commonPlatformWriteRequest(ctx);
+
+        ctx = ctx.push(PCWR_PRIOR_ENTRY)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .apply(AdminApiValidator::sameClassAndKey, PlatformConfigEntry.class, msg)
+                .pop();
+
+        // Details must be blank for a delete request
+        ctx = ctx.push(PCWR_DEFINITION)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext commonPlatformWriteRequest(ValidationContext ctx) {
+
+        ctx = ctx.push(PCWR_CONFIG_CLASS)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::configKey)
+                .pop();
+
+        ctx = ctx.push(PCWR_CONFIG_KEY)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::configKey)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "readPlatformConfigObject")
+    public static ValidationContext readPlatformConfigObject(PlatformConfigReadRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(PCRR_ENTRY)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "readPlatformConfigBatch")
+    public static ValidationContext readPlatformConfigBatch(PlatformConfigReadBatchRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.pushRepeated(PCRB_ENTRIES)
+                .apply(CommonValidators::required)
+                .applyRepeated(ConfigValidator::platformConfigEntry, PlatformConfigEntry.class)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "listPlatformConfigEntries")
+    public static ValidationContext listPlatformConfigEntries(PlatformConfigListRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(PCLR_CONFIG_CLASS)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::configKey)
+                .pop();
+
+        ctx = ctx.push(PCLR_INCLUDE_DELETED)
+                .apply(CommonValidators::optional)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext sameClassAndKey(PlatformConfigEntry priorEntry, PlatformConfigWriteRequest writeRequest, ValidationContext ctx) {
+
+        if (!priorEntry.getConfigClass().equals(writeRequest.getConfigClass())) {
+
+            var error = String.format(
+                    "Prior config class [%s] does not match supplied config class [%s]",
+                    priorEntry.getConfigClass(), writeRequest.getConfigClass());
+
+            ctx = ctx.error(error);
+        }
+
+        if (!priorEntry.getConfigKey().equals(writeRequest.getConfigKey())) {
+
+            var error = String.format(
+                    "Prior config key [%s] does not match supplied config key [%s]",
+                    priorEntry.getConfigKey(), writeRequest.getConfigKey());
+
+            ctx = ctx.error(error);
+        }
+
+        return ctx;
+    }
+
     private static ValidationContext configObjectType(ObjectDefinition definition, ValidationContext ctx) {
 
         if (!ValidationConstants.CONFIG_OBJECT_TYPES.contains(definition.getObjectType())) {
             var err = String.format("Object type [%s] is not a config object", definition.getObjectType().name());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext platformConfigObjectType(ObjectDefinition definition, ValidationContext ctx) {
+
+        if (!ValidationConstants.PLATFORM_CONFIG_OBJECT_TYPES.contains(definition.getObjectType())) {
+            var err = String.format("Object type [%s] is not a platform config object", definition.getObjectType().name());
             return ctx.error(err);
         }
 

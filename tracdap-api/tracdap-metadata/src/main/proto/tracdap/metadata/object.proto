@@ -82,6 +82,7 @@ message ObjectDefinition {
         ResultDefinition result = 10;
         ConfigDefinition config = 11;
         ResourceDefinition resource = 12;
+        CredentialDefinition credential = 13;
     }
 
     map<string, Value> objectProps = 100;

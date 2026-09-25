@@ -37,7 +37,7 @@ public class JksSecretLoader implements ISecretLoader {
     protected final String keystoreType;
     protected final String keystoreUrl;
     protected final String keystoreKey;
-    protected final KeyStore keystore;
+    protected volatile KeyStore keystore;
 
     protected ConfigManager configManager;
     protected boolean ready;
@@ -96,12 +96,19 @@ public class JksSecretLoader implements ISecretLoader {
         try {
 
             var keystoreBytes = configManager.loadBinaryConfig(keystoreUrl);
+            var freshKeystore = KeyStore.getInstance(keystoreType);
 
             try (var stream = new ByteArrayInputStream(keystoreBytes)) {
 
-                keystore.load(stream, keystoreKey.toCharArray());
+                freshKeystore.load(stream, keystoreKey.toCharArray());
+                keystore = freshKeystore;
                 ready = true;
             }
+        }
+        catch (KeyStoreException e) {
+            var message = String.format("Keystore type is not supported: [%s]", keystoreType);
+            StartupLog.log(this, Level.ERROR, message);
+            throw new EStartup(message);
         }
         catch (IOException e) {
             // Inner error is more meaningful if keystore cannot be read

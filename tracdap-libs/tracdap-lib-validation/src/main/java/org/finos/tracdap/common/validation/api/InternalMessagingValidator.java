@@ -21,6 +21,7 @@ import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.ConfigUpdateType;
 import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
+import org.finos.tracdap.api.internal.PlatformConfigUpdate;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -39,6 +40,10 @@ public class InternalMessagingValidator {
     private static final Descriptors.FieldDescriptor CU_UPDATE_TYPE;
     private static final Descriptors.FieldDescriptor CU_CONFIG_ENTRY;
 
+    private static final Descriptors.Descriptor PLATFORM_CONFIG_UPDATE;
+    private static final Descriptors.FieldDescriptor PCU_UPDATE_TYPE;
+    private static final Descriptors.FieldDescriptor PCU_CONFIG_ENTRY;
+
     static {
 
         CONFIG_UPDATE = ConfigUpdate.getDescriptor();
@@ -46,6 +51,9 @@ public class InternalMessagingValidator {
         CU_UPDATE_TYPE = field(CONFIG_UPDATE, ConfigUpdate.UPDATETYPE_FIELD_NUMBER);
         CU_CONFIG_ENTRY = field(CONFIG_UPDATE, ConfigUpdate.CONFIGENTRY_FIELD_NUMBER);
 
+        PLATFORM_CONFIG_UPDATE = PlatformConfigUpdate.getDescriptor();
+        PCU_UPDATE_TYPE = field(PLATFORM_CONFIG_UPDATE, PlatformConfigUpdate.UPDATETYPE_FIELD_NUMBER);
+        PCU_CONFIG_ENTRY = field(PLATFORM_CONFIG_UPDATE, PlatformConfigUpdate.CONFIGENTRY_FIELD_NUMBER);
     }
 
     @Validator(method = "configUpdate")
@@ -62,6 +70,22 @@ public class InternalMessagingValidator {
                 .pop();
 
         ctx = ctx.push(CU_CONFIG_ENTRY)
+                .apply(CommonValidators::required)
+                .applyRegistered()
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "platformConfigUpdate")
+    public static ValidationContext platformConfigUpdate(PlatformConfigUpdate msg, ValidationContext ctx) {
+
+        ctx = ctx.push(PCU_UPDATE_TYPE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ConfigUpdateType.class)
+                .pop();
+
+        ctx = ctx.push(PCU_CONFIG_ENTRY)
                 .apply(CommonValidators::required)
                 .applyRegistered()
                 .pop();
