@@ -19,14 +19,32 @@ package org.finos.tracdap.common.metadata.store;
 
 import org.finos.tracdap.metadata.PlatformConfigEntry;
 
+import java.time.Instant;
+
 public class PlatformConfigRecord {
 
     private final PlatformConfigEntry entry;
     private final byte[] value;
 
-    public PlatformConfigRecord(PlatformConfigEntry entry, byte[] value) {
+    // Null for rows written before provenance was recorded
+    private final Instant createTime;
+    private final String createUserId;
+    private final String createUserName;
+    private final String updateUserId;
+    private final String updateUserName;
+
+    public PlatformConfigRecord(
+            PlatformConfigEntry entry, byte[] value,
+            Instant createTime, String createUserId, String createUserName,
+            String updateUserId, String updateUserName) {
+
         this.entry = entry;
         this.value = value;
+        this.createTime = createTime;
+        this.createUserId = createUserId;
+        this.createUserName = createUserName;
+        this.updateUserId = updateUserId;
+        this.updateUserName = updateUserName;
     }
 
     public PlatformConfigEntry entry() {
@@ -35,5 +53,25 @@ public class PlatformConfigRecord {
 
     public byte[] value() {
         return value;
+    }
+
+    public Instant createTime() {
+        return createTime;
+    }
+
+    public String createUserId() {
+        return createUserId;
+    }
+
+    public String createUserName() {
+        return createUserName;
+    }
+
+    public String updateUserId() {
+        return updateUserId;
+    }
+
+    public String updateUserName() {
+        return updateUserName;
     }
 }
