@@ -78,6 +78,7 @@ public class SampleMetadata {
             case CONFIG: return dummyConfigDef();
             case RESOURCE: return dummyResourceDef();
             case CREDENTIAL: return dummyCredentialDef();
+            case IDENTITY: return dummyIdentityDef();
 
             default:
                 throw new RuntimeException("No dummy data available for object type " + objectType.name());
@@ -108,6 +109,7 @@ public class SampleMetadata {
             case CONFIG: return nextConfigDef(definition);
             case RESOURCE: return nextResourceDef(definition);
             case CREDENTIAL: return nextCredentialDef(definition);
+            case IDENTITY: return nextIdentityDef(definition);
 
             case FLOW:
             case JOB:
@@ -142,6 +144,7 @@ public class SampleMetadata {
             case FLOW:
             case JOB:
             case CREDENTIAL:
+            case IDENTITY:
 
                 return definition;
 
@@ -579,6 +582,25 @@ public class SampleMetadata {
                 .setCredential(origDef.getCredential().toBuilder()
                 .putProperties("clientId", "updated_client_id")
                 .putSecrets("clientSecret", "updated_secret_alias"))
+                .build();
+    }
+
+    public static ObjectDefinition dummyIdentityDef() {
+
+        return ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.IDENTITY)
+                .setIdentity(IdentityDefinition.newBuilder()
+                .putProperties("email", "sample.user@example.com")
+                .putSecrets("password", "sample_password_hash"))
+                .build();
+    }
+
+    public static ObjectDefinition nextIdentityDef(ObjectDefinition origDef) {
+
+        return origDef.toBuilder()
+                .setIdentity(origDef.getIdentity().toBuilder()
+                .putProperties("email", "updated.user@example.com")
+                .putSecrets("password", "updated_password_hash"))
                 .build();
     }
 

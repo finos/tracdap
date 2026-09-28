@@ -18,6 +18,9 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.ConfigUpdateType;
+import org.finos.tracdap.common.exception.EMetadataDuplicate;
+import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
@@ -25,12 +28,20 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.PlatformConfigRecord;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.ConfigWrite;
+import org.finos.tracdap.common.service.IConfigReader;
+import org.finos.tracdap.common.service.IConfigWriteHook;
+import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.metadata.ObjectDefinition;
+import org.finos.tracdap.metadata.PlatformConfigEntry;
 import org.finos.tracdap.metadata.Value;
 
 import io.grpc.Context;
 import com.google.protobuf.InvalidProtocolBufferException;
 
+import java.text.MessageFormat;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;
@@ -40,11 +51,26 @@ import java.util.stream.Collectors;
 
 public class PlatformConfigService {
 
+    private static final String PRIOR_ENTRY_SUPERSEDED = "Prior platform config entry [{0}] [{1}] has been superseded (expected version {2}, found version {3})";
+
     private final IMetadataStore metadataStore;
+    private final PluginRegistry registry;
+    private final IConfigReader configReader;
+    private final ConfigKeyGenerator keyGenerator;
     private final Validator validator;
 
-    public PlatformConfigService(IMetadataStore metadataStore) {
+    public PlatformConfigService(IMetadataStore metadataStore, PluginRegistry registry, IConfigReader configReader) {
+        this(metadataStore, registry, configReader, new ConfigKeyGenerator());
+    }
+
+    PlatformConfigService(
+            IMetadataStore metadataStore, PluginRegistry registry,
+            IConfigReader configReader, ConfigKeyGenerator keyGenerator) {
+
         this.metadataStore = metadataStore;
+        this.registry = registry;
+        this.configReader = configReader;
+        this.keyGenerator = keyGenerator;
         this.validator = new Validator();
     }
 
@@ -52,10 +78,28 @@ public class PlatformConfigService {
 
         var timestamp = RequestMetadata.get(Context.current()).requestTimestamp().toInstant();
         var user = UserMetadata.get(Context.current());
-        var value = request.getDefinition().toByteArray();
+
+        var configClass = request.getConfigClass();
+        var definition = request.getDefinition();
+
+        var configKey = ValidationConstants.GENERATED_KEY_OBJECT_TYPES.contains(definition.getObjectType())
+                ? keyGenerator.generateKey(key -> isKeyFree(configClass, key))
+                : request.getConfigKey();
+
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+
+        if (hook != null) {
+
+            var write = ConfigWrite.forPlatform(
+                    ConfigUpdateType.CREATE, configClass, configKey,
+                    null, null, definition, user, configReader);
+
+            definition = hook.transform(write);
+            hook.validate(write, definition);
+        }
 
         var entry = metadataStore.createPlatformConfigEntry(
-                request.getConfigClass(), request.getConfigKey(), timestamp, user, value);
+                configClass, configKey, timestamp, user, definition.toByteArray());
 
         return PlatformConfigWriteResponse.newBuilder().setEntry(entry).build();
     }
@@ -64,11 +108,30 @@ public class PlatformConfigService {
 
         var timestamp = RequestMetadata.get(Context.current()).requestTimestamp().toInstant();
         var user = UserMetadata.get(Context.current());
-        var value = request.getDefinition().toByteArray();
 
-        validateDefinitionUpdate(request);
+        var priorEntry = request.getPriorEntry();
+        var prior = loadPrior(priorEntry);
+        var priorDefinition = parseDefinition(prior.value());
+        var definition = request.getDefinition();
 
-        var entry = metadataStore.updatePlatformConfigEntry(request.getPriorEntry(), timestamp, user, value);
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+        ConfigWrite write = null;
+
+        if (hook != null) {
+
+            write = ConfigWrite.forPlatform(
+                    ConfigUpdateType.UPDATE, priorEntry.getConfigClass(), priorEntry.getConfigKey(),
+                    prior.entry(), priorDefinition, definition, user, configReader);
+
+            definition = hook.transform(write);
+        }
+
+        validator.validateVersion(definition, priorDefinition);
+
+        if (hook != null)
+            hook.validate(write, definition);
+
+        var entry = metadataStore.updatePlatformConfigEntry(priorEntry, timestamp, user, definition.toByteArray());
 
         return PlatformConfigWriteResponse.newBuilder().setEntry(entry).build();
     }
@@ -78,7 +141,21 @@ public class PlatformConfigService {
         var timestamp = RequestMetadata.get(Context.current()).requestTimestamp().toInstant();
         var user = UserMetadata.get(Context.current());
 
-        var entry = metadataStore.deletePlatformConfigEntry(request.getPriorEntry(), timestamp, user);
+        var priorEntry = request.getPriorEntry();
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+
+        if (hook != null) {
+
+            var prior = loadPrior(priorEntry);
+
+            var write = ConfigWrite.forPlatform(
+                    ConfigUpdateType.DELETE, priorEntry.getConfigClass(), priorEntry.getConfigKey(),
+                    prior.entry(), parseDefinition(prior.value()), null, user, configReader);
+
+            hook.validate(write, null);
+        }
+
+        var entry = metadataStore.deletePlatformConfigEntry(priorEntry, timestamp, user);
 
         return PlatformConfigWriteResponse.newBuilder().setEntry(entry).build();
     }
@@ -99,7 +176,7 @@ public class PlatformConfigService {
                 request.getEntriesList(), /* includeDeleted = */ false);
 
         var entries = records.stream()
-                .map(this::buildReadResponse)
+                .map(PlatformConfigService::buildReadResponse)
                 .collect(Collectors.toList());
 
         return PlatformConfigReadBatchResponse.newBuilder().addAllEntries(entries).build();
@@ -113,21 +190,35 @@ public class PlatformConfigService {
         return PlatformConfigListResponse.newBuilder().addAllEntries(entries).build();
     }
 
-    private void validateDefinitionUpdate(PlatformConfigWriteRequest request) {
-
-        var priorEntry = request.getPriorEntry();
+    private PlatformConfigRecord loadPrior(PlatformConfigEntry priorEntry) {
 
         var prior = metadataStore.loadPlatformConfigEntry(
                 priorEntry.getConfigClass(), priorEntry.getConfigKey(), /* includeDeleted = */ false);
 
-        // A superseded prior entry is rejected by the store when the update is saved
-        if (prior.entry().getConfigVersion() != priorEntry.getConfigVersion())
-            return;
+        if (prior.entry().getConfigVersion() != priorEntry.getConfigVersion()) {
 
-        validator.validateVersion(request.getDefinition(), parseDefinition(prior.value()));
+            var message = MessageFormat.format(
+                    PRIOR_ENTRY_SUPERSEDED, priorEntry.getConfigClass(), priorEntry.getConfigKey(),
+                    priorEntry.getConfigVersion(), prior.entry().getConfigVersion());
+
+            throw new EMetadataDuplicate(message);
+        }
+
+        return prior;
     }
 
-    private PlatformConfigReadResponse buildReadResponse(PlatformConfigRecord record) {
+    private boolean isKeyFree(String configClass, String configKey) {
+
+        try {
+            metadataStore.loadPlatformConfigEntry(configClass, configKey, /* includeDeleted = */ true);
+            return false;
+        }
+        catch (EMetadataNotFound e) {
+            return true;
+        }
+    }
+
+    static PlatformConfigReadResponse buildReadResponse(PlatformConfigRecord record) {
 
         return PlatformConfigReadResponse.newBuilder()
                 .setEntry(record.entry())
@@ -136,7 +227,7 @@ public class PlatformConfigService {
                 .build();
     }
 
-    private Map<String, Value> buildAttrs(PlatformConfigRecord record) {
+    private static Map<String, Value> buildAttrs(PlatformConfigRecord record) {
 
         var entry = record.entry();
         var attrs = new HashMap<String, Value>();
@@ -161,10 +252,10 @@ public class PlatformConfigService {
         return attrs;
     }
 
-    private org.finos.tracdap.metadata.ObjectDefinition parseDefinition(byte[] value) {
+    private static ObjectDefinition parseDefinition(byte[] value) {
 
         try {
-            return org.finos.tracdap.metadata.ObjectDefinition.parseFrom(value);
+            return ObjectDefinition.parseFrom(value);
         }
         catch (InvalidProtocolBufferException e) {
 

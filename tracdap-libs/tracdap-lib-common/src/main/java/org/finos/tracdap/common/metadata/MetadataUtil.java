@@ -171,6 +171,18 @@ public class MetadataUtil {
             return object.toBuilder().setCredential(credential).build();
         }
 
+        // Identity secrets are stored values, not aliases, so masking is required
+        if (object.getObjectType() == ObjectType.IDENTITY) {
+
+            var identity = object.getIdentity().toBuilder();
+
+            for (var secret : identity.getSecretsMap().keySet()) {
+                identity.putSecrets(secret, "");
+            }
+
+            return object.toBuilder().setIdentity(identity).build();
+        }
+
         return object;
     }
 }
