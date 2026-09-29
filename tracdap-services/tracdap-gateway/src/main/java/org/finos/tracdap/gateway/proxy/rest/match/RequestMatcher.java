@@ -19,15 +19,13 @@ package org.finos.tracdap.gateway.proxy.rest.match;
 
 import org.finos.tracdap.gateway.proxy.rest.RestApiRequest;
 
-import java.util.List;
-
 
 public class RequestMatcher implements Matcher<RestApiRequest> {
 
     private final Matcher<String> methodMatcher;
-    private final Matcher<List<String>> pathMatcher;
+    private final PathMatcher pathMatcher;
 
-    public RequestMatcher(Matcher<String> methodMatcher, Matcher<List<String>> pathMatcher) {
+    public RequestMatcher(Matcher<String> methodMatcher, PathMatcher pathMatcher) {
         this.methodMatcher = methodMatcher;
         this.pathMatcher = pathMatcher;
     }
@@ -37,5 +35,9 @@ public class RequestMatcher implements Matcher<RestApiRequest> {
 
         return methodMatcher.matches(request.httpMethod()) &&
                 pathMatcher.matches(request.pathSegments());
+    }
+
+    public int compareSpecificity(RequestMatcher other) {
+        return pathMatcher.compareSpecificity(other.pathMatcher);
     }
 }

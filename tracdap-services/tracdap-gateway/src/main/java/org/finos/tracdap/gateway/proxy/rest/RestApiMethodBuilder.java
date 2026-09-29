@@ -77,6 +77,9 @@ public class RestApiMethodBuilder {
             }
         }
 
+        // Requests are dispatched to the first matching method, so literal segments must win over variables
+        methodList.sort((a, b) -> a.requestMatcher.compareSpecificity(b.requestMatcher));
+
         return methodList;
     }
 
