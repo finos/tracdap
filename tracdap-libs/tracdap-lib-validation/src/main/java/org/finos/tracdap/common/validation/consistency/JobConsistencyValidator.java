@@ -65,6 +65,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RFJ_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
+    private static final Descriptors.FieldDescriptor RFJ_EXPORT_STORAGE_ACCESS;
 
     private static final Descriptors.Descriptor IMPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor IDJ_MODEL;
@@ -105,6 +106,7 @@ public class JobConsistencyValidator {
         RFJ_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTS_FIELD_NUMBER);
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
         RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
+        RFJ_EXPORT_STORAGE_ACCESS = field(RUN_FLOW_JOB, RunFlowJob.EXPORTSTORAGEACCESS_FIELD_NUMBER);
 
         IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
         IDJ_MODEL = field(IMPORT_DATA_JOB, ImportDataJob.MODEL_FIELD_NUMBER);
@@ -231,7 +233,26 @@ public class JobConsistencyValidator {
                 .apply(JobConsistencyValidator::runFlowOutputs, Map.class, graph)
                 .pop();
 
+        ctx = runFlowExportStorage(job, graph, ctx);
+
         return ctx;
+    }
+
+    private static ValidationContext runFlowExportStorage(RunFlowJob job, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        var hasExportModelNode = graph.nodes().values().stream()
+                .anyMatch(node -> isExportModelNode(node.payload().flowNode()));
+
+        ctx = ctx.pushRepeated(RFJ_EXPORT_STORAGE_ACCESS);
+
+        if (hasExportModelNode && job.getExportStorageAccessCount() == 0)
+            ctx = ctx.error("Export storage access is required for a flow with an export model node");
+
+        if (!hasExportModelNode && job.getExportStorageAccessCount() > 0)
+            ctx = ctx.error("Export storage access is only allowed for a flow with an export model node");
+
+        return ctx.applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
+                .pop();
     }
 
     @Validator
@@ -1015,6 +1036,12 @@ public class JobConsistencyValidator {
         var modelDef = modelObj.getModel();
         var nodeMetadata = node.payload();
 
+        if (modelDef.getModelType() != nodeMetadata.flowNode().getModelType()) {
+            return ctx.error(String.format(
+                    "Model type does not match the flow node (expected %s, got %s)",
+                    nodeMetadata.flowNode().getModelType(), modelDef.getModelType()));
+        }
+
         // Check the model keys for params / inputs / outputs match the structure of the flow node
         // Parameters should have been autowired if they were not declared explicitly
 
@@ -1054,6 +1081,11 @@ public class JobConsistencyValidator {
             ctx = JobConsistencyValidator.modelResource(node, graph, resource.getKey(), resource.getValue(), ctx);
 
         return ctx;
+    }
+
+    private static boolean isExportModelNode(FlowNode flowNode) {
+
+        return flowNode.getNodeType() == FlowNodeType.MODEL_NODE && flowNode.getModelType() == ModelType.DATA_EXPORT_MODEL;
     }
 
     private static void modelNodeKeyErrors(String prefix, List<String> keys, List<String> details) {
@@ -1103,8 +1135,14 @@ public class JobConsistencyValidator {
 
         var sourceSocket = node.dependencies().get(inputName);
 
-        if (sourceSocket == null)
+        if (sourceSocket == null) {
+
+            // Optional inputs of export model nodes can be left unconnected
+            if (modelInput.getOptional() && isExportModelNode(node.payload().flowNode()))
+                return ctx;
+
             return ctx.error(String.format("Input [%s] is not connected in the flow", inputName));
+        }
 
         var sourceNode = graph.nodes().get(sourceSocket.nodeId());
         var sourceMetadata = sourceNode.payload();

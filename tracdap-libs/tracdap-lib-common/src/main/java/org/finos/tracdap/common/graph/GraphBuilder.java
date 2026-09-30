@@ -276,8 +276,11 @@ public class GraphBuilder {
             if (!dependencies.containsKey(param))
                 missing.add(param);
 
+        // Inputs of export model nodes can be left unconnected
+        var inputsRequired = !(flowNode.getNodeType() == FlowNodeType.MODEL_NODE && flowNode.getModelType() == ModelType.DATA_EXPORT_MODEL);
+
         for (var input : flowNode.getInputsList())
-            if (!dependencies.containsKey(input))
+            if (inputsRequired && !dependencies.containsKey(input))
                 missing.add(input);
 
         for (var resource : flowNode.getResourcesList())

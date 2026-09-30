@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.orch.api;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.ProtoUtils;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -40,8 +41,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 public class JobValidationTest {
@@ -1640,5 +1643,277 @@ public class JobValidationTest {
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
         Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    private static FlowEdge.Builder flowEdge(String sourceNode, String sourceSocket, String targetNode, String targetSocket) {
+
+        var source = FlowSocket.newBuilder().setNode(sourceNode);
+        var target = FlowSocket.newBuilder().setNode(targetNode);
+
+        if (sourceSocket != null) source.setSocket(sourceSocket);
+        if (targetSocket != null) target.setSocket(targetSocket);
+
+        return FlowEdge.newBuilder().setSource(source).setTarget(target);
+    }
+
+    private TagSelector createExportFlow() {
+
+        // Export model node is terminal, has no outputs and leaves dataset_2 unconnected
+
+        var flow = FlowDefinition.newBuilder()
+                .putNodes("basic_data_input", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("basic_data_input")
+                        .addOutputs("enriched_basic_data")
+                        .build())
+                .putNodes("enriched_basic_data", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .putNodes("export_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .setModelType(ModelType.DATA_EXPORT_MODEL)
+                        .addInputs("dataset_1").addInputs("dataset_2")
+                        .build())
+                .addEdges(flowEdge("basic_data_input", null, "model_1", "basic_data_input"))
+                .addEdges(flowEdge("model_1", "enriched_basic_data", "enriched_basic_data", null))
+                .addEdges(flowEdge("model_1", "enriched_basic_data", "export_1", "dataset_1"));
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(flow))
+                .build();
+
+        var flowId = metaClient.createObject(createFlowRequest);
+
+        return MetadataUtil.selectorFor(flowId);
+    }
+
+    private TagSelector createFlowExportModel(boolean dataset2Optional) {
+
+        var modelDef = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository("UNIT_TEST_REPO")
+                .setVersion("v1.0.0")
+                .setPath("src/")
+                .setEntryPoint("acme.models.test_model.FlowDataExportModel")
+                .setModelType(ModelType.DATA_EXPORT_MODEL)
+                .putInputs("dataset_1", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSchema(SampleData.BASIC_TABLE_SCHEMA_V2)
+                        .setOptional(true)
+                        .build())
+                .putInputs("dataset_2", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSchema(SampleData.BASIC_TABLE_SCHEMA_V2)
+                        .setOptional(dataset2Optional)
+                        .build());
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .setModel(modelDef))
+                .build();
+
+        var modelId = metaClient.createObject(writeRequest);
+
+        return MetadataUtil.selectorFor(modelId);
+    }
+
+    private RunFlowJob.Builder exportFlowJob() {
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        return RunFlowJob.newBuilder()
+                .setFlow(createExportFlow())
+                .putModels("model_1", model1)
+                .putModels("export_1", createFlowExportModel(true))
+                .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                .putInputs("basic_data_input", basicDataSelector)
+                .addExportStorageAccess("UNIT_TEST_EXTERNAL_STORAGE");
+    }
+
+    private JobStatus validateRunFlow(RunFlowJob.Builder runFlow) {
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(runFlow);
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        return orchClient.validateJob(request);
+    }
+
+    private static final io.grpc.Metadata.Key<TracErrorDetails> TRAC_ERROR_DETAILS_KEY = io.grpc.Metadata.Key.of(
+            "trac-error-details-bin", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
+
+    private void expectRunFlowInvalid(RunFlowJob.Builder runFlow, Status.Code expectedCode, String expectedMessage) {
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validateRunFlow(runFlow));
+        Assertions.assertEquals(expectedCode, e.getStatus().getCode());
+
+        var trailers = e.getTrailers();
+        var errorDetails = trailers != null ? trailers.get(TRAC_ERROR_DETAILS_KEY) : null;
+
+        var errorMessages = errorDetails != null
+                ? errorDetails.getItemsList().stream().map(TracErrorItem::getDetail).collect(Collectors.toList())
+                : new ArrayList<String>();
+
+        errorMessages.add(e.getStatus().getDescription());
+
+        Assertions.assertTrue(
+                errorMessages.stream().anyMatch(msg -> msg != null && msg.contains(expectedMessage)),
+                "Expected error [" + expectedMessage + "], got " + errorMessages);
+    }
+
+    @Test
+    public void runFlow_exportNode_validateOk() {
+
+        var jobStatus = validateRunFlow(exportFlowJob());
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void runFlow_exportNode_requiredInputUnconnected() {
+
+        var runFlow = exportFlowJob()
+                .putModels("export_1", createFlowExportModel(false));
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Input [dataset_2] is not connected");
+    }
+
+    @Test
+    public void runFlow_exportNode_modelTypeMismatch() {
+
+        // An export model bound to a standard model node, with the same parameters, inputs and outputs as the node
+
+        var modelDef = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository("UNIT_TEST_REPO")
+                .setVersion("v1.0.0")
+                .setPath("src/")
+                .setEntryPoint("acme.models.test_model.Model1Export")
+                .setModelType(ModelType.DATA_EXPORT_MODEL)
+                .putParameters("param_1", ModelParameter.newBuilder()
+                        .setParamType(TypeSystem.descriptor(BasicType.FLOAT))
+                        .build())
+                .putInputs("basic_data_input", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSchema(SampleData.BASIC_TABLE_SCHEMA)
+                        .build())
+                .putOutputs("enriched_basic_data", ModelOutputSchema.newBuilder()
+                        .setObjectType(ObjectType.DATA)
+                        .setSchema(SampleData.BASIC_TABLE_SCHEMA_V2)
+                        .build());
+
+        var modelId = metaClient.createObject(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .setModel(modelDef))
+                .build());
+
+        var runFlow = exportFlowJob()
+                .putModels("model_1", MetadataUtil.selectorFor(modelId));
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Model type does not match the flow node");
+    }
+
+    @Test
+    public void runFlow_exportNode_missingExportStorage() {
+
+        var runFlow = exportFlowJob()
+                .clearExportStorageAccess();
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Export storage access is required");
+    }
+
+    @Test
+    public void runFlow_exportNode_wrongStorageType() {
+
+        var runFlow = exportFlowJob()
+                .clearExportStorageAccess()
+                .addExportStorageAccess("UNIT_TEST_STORAGE");  // INTERNAL_STORAGE, not EXTERNAL_STORAGE
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "wrong type");
+    }
+
+    @Test
+    public void runFlow_exportNode_storageNotConfigured() {
+
+        var runFlow = exportFlowJob()
+                .clearExportStorageAccess()
+                .addExportStorageAccess("STORAGE_THAT_IS_NOT_CONFIGURED");
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "STORAGE_THAT_IS_NOT_CONFIGURED");
+    }
+
+    @Test
+    public void runFlow_exportStorage_invalidIdentifier() {
+
+        var runFlow = exportFlowJob()
+                .clearExportStorageAccess()
+                .addExportStorageAccess("not a valid identifier");
+
+        expectRunFlowInvalid(runFlow, Status.Code.INVALID_ARGUMENT, "identifier");
+    }
+
+    @Test
+    public void runFlow_exportStorageWithoutExportNode() {
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .build();
+
+        var flowSelector = MetadataUtil.selectorFor(metaClient.createObject(createFlowRequest));
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var model2 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_2", BasicType.STRING),
+                Map.of("alt_data_input", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                List.of());
+
+        var model3 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(flowSelector)
+                .putModels("model_1", model1)
+                .putModels("model_2", model2)
+                .putModels("model_3", model3)
+                .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
+                .putInputs("basic_data_input", basicDataSelector)
+                .putInputs("alt_data_input", altDataSelector)
+                .addExportStorageAccess("UNIT_TEST_EXTERNAL_STORAGE");
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Export storage access is only allowed");
     }
 }

@@ -72,6 +72,7 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
     private static final Descriptors.FieldDescriptor RFJ_OUTPUT_ATTRS;
+    private static final Descriptors.FieldDescriptor RFJ_EXPORT_STORAGE_ACCESS;
 
     private static final Descriptors.Descriptor IMPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor IDJ_MODEL;
@@ -126,6 +127,7 @@ public class JobValidator {
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
         RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
         RFJ_OUTPUT_ATTRS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTATTRS_FIELD_NUMBER);
+        RFJ_EXPORT_STORAGE_ACCESS = field(RUN_FLOW_JOB, RunFlowJob.EXPORTSTORAGEACCESS_FIELD_NUMBER);
 
         IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
         IDJ_MODEL = field(IMPORT_DATA_JOB, ImportDataJob.MODEL_FIELD_NUMBER);
@@ -229,6 +231,11 @@ public class JobValidator {
                 .pop();
 
         ctx = runModelOrFlow(ctx, RFJ_PARAMETERS, RFJ_INPUTS, RFJ_OUTPUTS, RFJ_PRIOR_OUTPUTS, RFJ_RESOURCES);
+
+        ctx = ctx.pushRepeated(RFJ_EXPORT_STORAGE_ACCESS)
+                .applyRepeated(CommonValidators::identifier)
+                .applyRepeated(CommonValidators::notTracReserved)
+                .pop();
 
         return outputAttrs(ctx, RFJ_OUTPUT_ATTRS);
     }
