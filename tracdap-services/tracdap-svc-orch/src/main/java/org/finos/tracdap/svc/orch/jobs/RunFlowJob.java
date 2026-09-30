@@ -68,6 +68,9 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
         // Add all target resources selected for the job
         resources.addAll(job.getRunFlow().getResourcesMap().values());
 
+        // Add external storage available to export model nodes
+        resources.addAll(job.getRunFlow().getExportStorageAccessList());
+
         return new ArrayList<>(resources);
     }
 

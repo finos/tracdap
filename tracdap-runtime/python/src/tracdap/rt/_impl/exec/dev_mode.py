@@ -537,7 +537,7 @@ class DevModeTranslator:
                 socket = _meta.FlowSocket(param)
                 add_source(param, socket)
 
-        def add_edge(target: _meta.FlowSocket):
+        def add_edge(target: _meta.FlowSocket, allow_unconnected: bool = False):
             target_key = socket_key(target)
             if target_key in edges:
                 return
@@ -547,8 +547,15 @@ class DevModeTranslator:
             elif target_name in duplicates:
                 sources_info = ', '.join(map(socket_key, duplicates[target_name]))
                 errors[target_key] = f"Flow target {target_name} is provided by multiple nodes: [{sources_info}]"
-            else:
+            elif not allow_unconnected:
                 errors[target_key] = f"Flow target {target_name} is not provided by any node"
+
+        def optional_export_inputs(model_node_name: str, model_node: _meta.FlowNode):
+            # Optional inputs of export models can be left unconnected
+            if model_node.modelType != _meta.ModelType.DATA_EXPORT_MODEL or model_node_name not in job.models:
+                return []
+            export_model = _util.get_job_metadata(job.models[model_node_name], job_config).model
+            return [name for name, schema in export_model.inputs.items() if schema.optional]
 
         for node_name, node in flow.nodes.items():
             if node.nodeType in [_meta.FlowNodeType.INPUT_NODE, _meta.FlowNodeType.PARAMETER_NODE, _meta.FlowNodeType.RESOURCE_NODE]:
@@ -570,8 +577,9 @@ class DevModeTranslator:
             if node.nodeType == _meta.FlowNodeType.OUTPUT_NODE:
                 add_edge(_meta.FlowSocket(node_name))
             if node.nodeType == _meta.FlowNodeType.MODEL_NODE:
+                optional_inputs = optional_export_inputs(node_name, node)
                 for model_input in node.inputs:
-                    add_edge(_meta.FlowSocket(node_name, model_input))
+                    add_edge(_meta.FlowSocket(node_name, model_input), model_input in optional_inputs)
                 for model_param in node.parameters:
                     add_edge(_meta.FlowSocket(node_name, model_param))
                 for model_resource in node.resources:

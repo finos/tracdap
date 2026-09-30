@@ -771,4 +771,165 @@ public class FlowValidatorTest extends BaseValidatorTest {
 
         expectInvalid(flow);
     }
+
+    private static FlowEdge.Builder edge(String sourceNode, String sourceSocket, String targetNode, String targetSocket) {
+
+        var source = FlowSocket.newBuilder().setNode(sourceNode);
+        var target = FlowSocket.newBuilder().setNode(targetNode);
+
+        if (sourceSocket != null) source.setSocket(sourceSocket);
+        if (targetSocket != null) target.setSocket(targetSocket);
+
+        return FlowEdge.newBuilder().setSource(source).setTarget(target);
+    }
+
+    private static FlowDefinition.Builder exportFlow() {
+
+        // Export model node is terminal, has no outputs and only one of its inputs is connected
+
+        return FlowDefinition.newBuilder()
+
+                // Nodes
+                .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("input_1")
+                        .addOutputs("output_1")
+                        .build())
+                .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .putNodes("export_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .setModelType(ModelType.DATA_EXPORT_MODEL)
+                        .addInputs("dataset_1").addInputs("dataset_2").addInputs("dataset_3")
+                        .build())
+
+                // Edges
+                .addEdges(edge("input_1", null, "model_1", "input_1"))
+                .addEdges(edge("model_1", "output_1", "output_1", null))
+                .addEdges(edge("model_1", "output_1", "export_1", "dataset_2"));
+    }
+
+    @Test
+    void exportModelNode_ok() {
+
+        expectValid(exportFlow().build());
+    }
+
+    @Test
+    void exportModelNode_allInputsConnected() {
+
+        var flow = exportFlow()
+                .addEdges(edge("model_1", "output_1", "export_1", "dataset_1"))
+                .addEdges(edge("input_1", null, "export_1", "dataset_3"))
+                .build();
+
+        expectValid(flow);
+    }
+
+    @Test
+    void exportModelNode_noInputsConnected() {
+
+        var flow = exportFlow()
+                .removeEdges(2)
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    @Test
+    void exportModelNode_inputSuppliedTwice() {
+
+        var flow = exportFlow()
+                .addEdges(edge("input_1", null, "export_1", "dataset_2"))
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    @Test
+    void exportModelNode_twoExportNodes() {
+
+        var flow = exportFlow()
+                .putNodes("export_2", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .setModelType(ModelType.DATA_EXPORT_MODEL)
+                        .addInputs("dataset_1")
+                        .build())
+                .addEdges(edge("model_1", "output_1", "export_2", "dataset_1"))
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    private static FlowDefinition.Builder exportFlowWithModel2(ModelType model2Type) {
+
+        // Adds a fully connected model node, so only its model type can make the flow invalid
+
+        return exportFlow()
+                .putNodes("model_2", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .setModelType(model2Type)
+                        .addInputs("input_1")
+                        .addOutputs("output_2")
+                        .build())
+                .putNodes("output_2", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(edge("input_1", null, "model_2", "input_1"))
+                .addEdges(edge("model_2", "output_2", "output_2", null));
+    }
+
+    @Test
+    void modelType_standardModel() {
+
+        expectValid(exportFlowWithModel2(ModelType.STANDARD_MODEL).build());
+    }
+
+    @Test
+    void modelType_importModel() {
+
+        expectInvalid(exportFlowWithModel2(ModelType.DATA_IMPORT_MODEL).build());
+    }
+
+    @Test
+    void exportModelNode_modelTypeOnOutputNode() {
+
+        var outputNode = exportFlow().getNodesOrThrow("output_1").toBuilder()
+                .setModelType(ModelType.DATA_EXPORT_MODEL);
+
+        var flow = exportFlow()
+                .putNodes("output_1", outputNode.build())
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    @Test
+    void standardModelNode_noOutputs() {
+
+        // The same node as a standard model node, with all inputs connected, is still rejected (no outputs, not used)
+
+        var standardNode = exportFlow().getNodesOrThrow("export_1").toBuilder()
+                .clearModelType();
+
+        var flow = exportFlow()
+                .putNodes("export_1", standardNode.build())
+                .addEdges(edge("model_1", "output_1", "export_1", "dataset_1"))
+                .addEdges(edge("input_1", null, "export_1", "dataset_3"))
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    @Test
+    void standardModelNode_unconnectedInput() {
+
+        // A standard model node with outputs used, but an input left unconnected, is still rejected
+
+        var flow = exportFlow()
+                .putNodes("model_2", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("input_1").addInputs("input_2")
+                        .addOutputs("output_2")
+                        .build())
+                .putNodes("output_2", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(edge("input_1", null, "model_2", "input_1"))
+                .addEdges(edge("model_2", "output_2", "output_2", null))
+                .build();
+
+        expectInvalid(flow);
+    }
 }

@@ -718,7 +718,9 @@ class GraphBuilder:
             explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
             -> GraphSection:
 
-        self.check_model_type(model_def, job_def)
+        # Models in a flow are checked against the model type of their flow node
+        if job_def.jobType != _meta.JobType.RUN_FLOW:
+            self.check_model_type(model_def, job_def)
 
         def resource_id(resource_name):
             return NodeId(resource_name, namespace, _resources.Resource)
@@ -735,11 +737,13 @@ class GraphBuilder:
         input_ids = set(map(data_id, model_def.inputs))
         output_ids = set(map(data_id, model_def.outputs))
 
-        # Set up storage access for import / export data jobs
+        # Set up storage access for import / export data jobs, and export models in flows
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
             storage_access = job_def.importData.storageAccess
         elif job_def.jobType == _meta.JobType.EXPORT_DATA:
             storage_access = job_def.exportData.storageAccess
+        elif job_def.jobType == _meta.JobType.RUN_FLOW and model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL:
+            storage_access = job_def.runFlow.exportStorageAccess
         else:
             storage_access = None
 
@@ -826,7 +830,11 @@ class GraphBuilder:
 
             if node.nodeType != _meta.FlowNodeType.OUTPUT_NODE:
 
-                source_edges = remaining_edges_by_source.pop(node_name)
+                # Export model nodes can be terminal nodes, with no outgoing edges
+                if self.is_export_model_node(node):
+                    source_edges = remaining_edges_by_source.pop(node_name, [])
+                else:
+                    source_edges = remaining_edges_by_source.pop(node_name)
 
                 for edge in source_edges:
 
@@ -887,11 +895,15 @@ class GraphBuilder:
 
             resource_mapping = {socket: edge_mapping(node_name, socket, _resources.Resource) for socket in node.resources}
             param_mapping = {socket: edge_mapping(node_name, socket, _meta.Value) for socket in node.parameters}
-            input_mapping = {socket: edge_mapping(node_name, socket, _data.DataView) for socket in node.inputs}
             output_mapping = {socket: socket_id(node_name, socket, _data.DataView) for socket in node.outputs}
 
-            push_mapping = {**resource_mapping, **input_mapping, **param_mapping}
-            pop_mapping = output_mapping
+            # Export model nodes can leave inputs unconnected, these are resolved once the model is known
+            if self.is_export_model_node(node):
+                connected_inputs = [s for s in node.inputs if socket_key(_meta.FlowSocket(node_name, s)) in target_edges]
+            else:
+                connected_inputs = node.inputs
+
+            input_mapping = {socket: edge_mapping(node_name, socket, _data.DataView) for socket in connected_inputs}
 
             model_selector = job_def.runFlow.models.get(node_name)
             model_obj = _util.get_job_metadata(model_selector, self._job_config)
@@ -902,13 +914,29 @@ class GraphBuilder:
 
             # Explicit check for model compatibility - report an error now, do not try build_model()
             self.check_model_compatibility(model_obj.model, node_name, node)
-            self.check_model_type(model_obj.model, job_def)
+            self.check_flow_node_model_type(model_obj.model, node_name, node)
 
-            return self.build_model_or_flow_with_context(
+            unconnected_inputs = [s for s in node.inputs if s not in input_mapping]
+
+            unconnected_mapping, unconnected_section = self.build_unconnected_inputs(
+                namespace, node_name, model_obj.model, unconnected_inputs,
+                explicit_deps)
+
+            input_mapping.update(unconnected_mapping)
+
+            push_mapping = {**resource_mapping, **input_mapping, **param_mapping}
+            pop_mapping = output_mapping
+
+            model_section = self.build_model_or_flow_with_context(
                 namespace, node_name,
                 job_def, model_obj,
                 push_mapping, pop_mapping,
                 explicit_deps)
+
+            if not any(unconnected_inputs):
+                return model_section
+
+            return self._join_sections(unconnected_section, model_section, allow_partial_inputs=True)
 
         self._error(_ex.EJobValidation(f"Flow node [{node_name}] has invalid node type [{node.nodeType}]"))
 
@@ -949,6 +977,50 @@ class GraphBuilder:
             model_type = model_def.modelType.name
             model_name = self.model_friendly_name(model_def)
             self._error(_ex.EJobValidation(f"Job type [{job_type}] cannot use model type [{model_type}] for [{model_name}]"))
+
+    def check_flow_node_model_type(self, model_def: _meta.ModelDefinition, node_name: str, node: _meta.FlowNode):
+
+        allowed_node_types = [_meta.ModelType.STANDARD_MODEL, _meta.ModelType.DATA_EXPORT_MODEL]
+
+        if node.modelType not in allowed_node_types:
+            self._error(_ex.EJobValidation(f"Flow node [{node_name}] has unsupported model type [{node.modelType.name}]"))
+
+        elif model_def.modelType != node.modelType:
+            node_type = node.modelType.name
+            model_type = model_def.modelType.name
+            model_name = self.model_friendly_name(model_def)
+            self._error(_ex.EJobValidation(f"Flow node [{node_name}] requires model type [{node_type}], got [{model_type}] for [{model_name}]"))
+
+    @staticmethod
+    def is_export_model_node(node: _meta.FlowNode):
+
+        return node.nodeType == _meta.FlowNodeType.MODEL_NODE and node.modelType == _meta.ModelType.DATA_EXPORT_MODEL
+
+    def build_unconnected_inputs(
+            self, namespace: NodeNamespace, node_name: str,
+            model_def: _meta.ModelDefinition, unconnected_inputs: _tp.List[str],
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            -> _tp.Tuple[_tp.Dict[str, NodeId], GraphSection]:
+
+        # Unconnected optional inputs receive an empty view, as for optional inputs not supplied to a job
+
+        mapping = dict()
+        nodes = dict()
+
+        for socket in unconnected_inputs:
+
+            input_schema = model_def.inputs.get(socket)
+
+            if input_schema is None or not input_schema.optional:
+                self._error(_ex.EJobValidation(f"Inconsistent flow: Socket [{node_name}.{socket}] is not connected"))
+                continue
+
+            data_view_id = NodeId(f"{node_name}.{socket}:EMPTY", namespace, _data.DataView)
+            data_view = _data.DataView.create_empty(input_schema.objectType)
+            nodes[data_view_id] = StaticValueNode(data_view_id, data_view, explicit_deps=explicit_deps)
+            mapping[socket] = data_view_id
+
+        return mapping, GraphSection(nodes, outputs=set(nodes.keys()))
 
     @staticmethod
     def model_friendly_name(model_def: _meta.ModelDefinition):

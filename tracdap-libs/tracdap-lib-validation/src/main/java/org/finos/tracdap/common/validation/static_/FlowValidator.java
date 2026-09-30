@@ -52,10 +52,14 @@ public class FlowValidator {
     private static final Descriptors.FieldDescriptor FN_INPUTS;
     private static final Descriptors.FieldDescriptor FN_OUTPUTS;
     private static final Descriptors.FieldDescriptor FN_RESOURCES;
+    private static final Descriptors.FieldDescriptor FN_MODEL_TYPE;
     private static final Descriptors.FieldDescriptor FN_NODE_SEARCH;
     private static final Descriptors.FieldDescriptor FN_NODE_ATTRS;
     private static final Descriptors.FieldDescriptor FN_NODE_PROPS;
     private static final Descriptors.FieldDescriptor FN_LABEL;
+
+    private static final List<ModelType> FLOW_NODE_MODEL_TYPES = List.of(
+            ModelType.STANDARD_MODEL, ModelType.DATA_EXPORT_MODEL);
 
     private static final Descriptors.Descriptor FLOW_EDGE;
     private static final Descriptors.FieldDescriptor FE_SOURCE;
@@ -81,6 +85,7 @@ public class FlowValidator {
         FN_INPUTS = field(FLOW_NODE, FlowNode.INPUTS_FIELD_NUMBER);
         FN_OUTPUTS = field(FLOW_NODE, FlowNode.OUTPUTS_FIELD_NUMBER);
         FN_RESOURCES = field(FLOW_NODE, FlowNode.RESOURCES_FIELD_NUMBER);
+        FN_MODEL_TYPE = field(FLOW_NODE, FlowNode.MODELTYPE_FIELD_NUMBER);
         FN_NODE_SEARCH = field(FLOW_NODE, FlowNode.NODESEARCH_FIELD_NUMBER);
         FN_NODE_ATTRS = field(FLOW_NODE, FlowNode.NODEATTRS_FIELD_NUMBER);
         FN_NODE_PROPS = field(FLOW_NODE, FlowNode.NODEPROPS_FIELD_NUMBER);
@@ -149,6 +154,11 @@ public class FlowValidator {
         var isModelNode = msg.getNodeType() == FlowNodeType.MODEL_NODE;
         var isModelNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.MODEL_NODE.name());
 
+        // Export model nodes are the only model nodes that can have no outputs
+        var outputsRule = isExportModelNode(msg)
+                ? CommonValidators.onlyIf(isModelNode, isModelNodeQualifier)
+                : CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier);
+
         var isOutputNode = msg.getNodeType() == FlowNodeType.OUTPUT_NODE;
         var isOutputNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.OUTPUT_NODE.name());
 
@@ -176,7 +186,7 @@ public class FlowValidator {
                 .pop();
 
         ctx = ctx.pushRepeated(FN_OUTPUTS)
-                .apply(CommonValidators.ifAndOnlyIf(isModelNode, isModelNodeQualifier))
+                .apply(outputsRule)
                 .applyRepeated(CommonValidators::identifier, String.class)
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
@@ -190,6 +200,12 @@ public class FlowValidator {
                 .applyRepeated(CommonValidators::notTracReserved, String.class)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
                 .applyRepeated(CommonValidators.uniqueContextCheck(knownSockets, FN_RESOURCES.getName()))
+                .pop();
+
+        ctx = ctx.push(FN_MODEL_TYPE)
+                .apply(CommonValidators.onlyIf(isModelNode, isModelNodeQualifier))
+                .apply(CommonValidators::recognizedEnum, ModelType.class)
+                .apply(CommonValidators::allowedEnums, ModelType.class, FLOW_NODE_MODEL_TYPES)
                 .pop();
 
         ctx = ctx.push(FN_NODE_SEARCH)
@@ -326,6 +342,7 @@ public class FlowValidator {
 
         ctx.apply(FlowValidator::oneEdgePerTarget, FlowDefinition.class);
         ctx.apply(FlowValidator::noUnusedNodes, FlowDefinition.class);
+        ctx.apply(FlowValidator::exportModelNodes, FlowDefinition.class);
         ctx.apply(FlowValidator::cyclicRedundancyCheck, FlowDefinition.class);
 
         return ctx;
@@ -469,8 +486,11 @@ public class FlowValidator {
 
                 var incomingEdges = edgesByTarget.get(target);
 
-                if (incomingEdges == null || incomingEdges == 0)
-                    ctx.error(String.format("Target [%s] is not supplied by any edge", target));
+                // Inputs of export model nodes can be left unconnected
+                if (incomingEdges == null || incomingEdges == 0) {
+                    if (!isExportModelNode(node))
+                        ctx.error(String.format("Target [%s] is not supplied by any edge", target));
+                }
 
                 else if (incomingEdges > 1)
                     ctx.error(String.format("Target [%s] is supplied by %d edges", target, incomingEdges));
@@ -498,11 +518,41 @@ public class FlowValidator {
             if (node.getNodeType() == FlowNodeType.INPUT_NODE && !usedNodes.contains(nodeName))
                 ctx = ctx.error(String.format("Input node [%s] is not used", nodeName));
 
-            if (node.getNodeType() == FlowNodeType.MODEL_NODE && !usedNodes.contains(nodeName))
+            if (node.getNodeType() == FlowNodeType.MODEL_NODE && !isExportModelNode(node) && !usedNodes.contains(nodeName))
                 ctx = ctx.error(String.format("The outputs of model node [%s] are not used", nodeName));
 
             if (node.getNodeType() == FlowNodeType.RESOURCE_NODE && !usedNodes.contains(nodeName))
                 ctx = ctx.error(String.format("Resource node [%s] is not used", nodeName));
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext exportModelNodes(FlowDefinition flow, ValidationContext ctx) {
+
+        var connectedTargets = flow.getEdgesList().stream()
+                .map(FlowEdge::getTarget)
+                .map(FlowValidator::socketKey)
+                .collect(Collectors.toSet());
+
+        var exportModelNodes = flow.getNodesMap().entrySet().stream()
+                .filter(node -> isExportModelNode(node.getValue()))
+                .map(Map.Entry::getKey)
+                .sorted()
+                .collect(Collectors.toList());
+
+        if (exportModelNodes.size() > 1)
+            ctx = ctx.error(String.format("A flow can have at most one export model node, found [%s]", String.join(", ", exportModelNodes)));
+
+        for (var nodeName : exportModelNodes) {
+
+            var node = flow.getNodesOrThrow(nodeName);
+
+            var anyInputConnected = node.getInputsList().stream()
+                    .anyMatch(input -> connectedTargets.contains(nodeName + '.' + input));
+
+            if (!anyInputConnected)
+                ctx = ctx.error(String.format("Export model node [%s] does not have any inputs connected", nodeName));
         }
 
         return ctx;
@@ -579,6 +629,11 @@ public class FlowValidator {
         }
 
         return ctx;
+    }
+
+    private static boolean isExportModelNode(FlowNode node) {
+
+        return node.getNodeType() == FlowNodeType.MODEL_NODE && node.getModelType() == ModelType.DATA_EXPORT_MODEL;
     }
 
     private static String socketKey(FlowSocket socket) {
