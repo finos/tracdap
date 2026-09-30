@@ -17,8 +17,10 @@
 
 package org.finos.tracdap.common.metadata.store.jdbc;
 
+import org.finos.tracdap.common.db.dialects.IDialect;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
+import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.store.PlatformConfigRecord;
 import org.finos.tracdap.metadata.MetadataFormat;
@@ -29,12 +31,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.text.MessageFormat;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 class JdbcPlatformConfigImpl {
@@ -45,9 +49,17 @@ class JdbcPlatformConfigImpl {
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
+    private final IDialect dialect;
+    private final AtomicInteger mappingStage;
+
+    JdbcPlatformConfigImpl(IDialect dialect) {
+        this.dialect = dialect;
+        this.mappingStage = new AtomicInteger();
+    }
+
     PlatformConfigEntry createPlatformConfigEntry(
             Connection conn, String configClass, String configKey,
-            Instant timestamp, byte[] value) throws SQLException {
+            Instant timestamp, UserMetadata user, byte[] value) throws SQLException {
 
         var current = selectCurrentRow(conn, configClass, configKey);
 
@@ -62,14 +74,14 @@ class JdbcPlatformConfigImpl {
         if (current != null)
             closeCurrentRow(conn, configClass, configKey, timestamp);
 
-        insertRow(conn, newEntry, timestamp, value);
+        insertRow(conn, newEntry, timestamp, value, timestamp, user.userId(), user.userName(), user);
 
         return newEntry;
     }
 
     PlatformConfigEntry updatePlatformConfigEntry(
             Connection conn, PlatformConfigEntry priorEntry,
-            Instant timestamp, byte[] value) throws SQLException {
+            Instant timestamp, UserMetadata user, byte[] value) throws SQLException {
 
         var current = requireCurrentRow(conn, priorEntry);
 
@@ -77,13 +89,14 @@ class JdbcPlatformConfigImpl {
         var newEntry = buildEntry(priorEntry.getConfigClass(), priorEntry.getConfigKey(), newVersion, timestamp, false);
 
         closeCurrentRow(conn, priorEntry.getConfigClass(), priorEntry.getConfigKey(), timestamp);
-        insertRow(conn, newEntry, timestamp, value);
+        insertRow(conn, newEntry, timestamp, value, current.createTime, current.createUserId, current.createUserName, user);
 
         return newEntry;
     }
 
     PlatformConfigEntry deletePlatformConfigEntry(
-            Connection conn, PlatformConfigEntry priorEntry, Instant timestamp) throws SQLException {
+            Connection conn, PlatformConfigEntry priorEntry,
+            Instant timestamp, UserMetadata user) throws SQLException {
 
         var current = requireCurrentRow(conn, priorEntry);
 
@@ -91,7 +104,7 @@ class JdbcPlatformConfigImpl {
         var newEntry = buildEntry(priorEntry.getConfigClass(), priorEntry.getConfigKey(), newVersion, timestamp, true);
 
         closeCurrentRow(conn, priorEntry.getConfigClass(), priorEntry.getConfigKey(), timestamp);
-        insertRow(conn, newEntry, timestamp, current.value);
+        insertRow(conn, newEntry, timestamp, current.value, current.createTime, current.createUserId, current.createUserName, user);
 
         return newEntry;
     }
@@ -106,19 +119,56 @@ class JdbcPlatformConfigImpl {
             throw new EMetadataNotFound(message);
         }
 
-        var entry = buildEntry(configClass, configKey, current.version, current.timestamp, current.deleted);
-
-        return new PlatformConfigRecord(entry, current.value);
+        return buildRecord(configClass, configKey, current);
     }
 
     List<PlatformConfigRecord> loadPlatformConfigEntries(
             Connection conn, List<PlatformConfigEntry> configKeys, boolean includeDeleted) throws SQLException {
 
+        // Requires the key mapping table to be prepared in the current transaction
+
+        var mappingStage = insertKeysForMapping(conn, configKeys);
+
+        var query =
+                "select km.config_class, km.config_key, \n" +
+                "  pc.config_version, pc.config_timestamp, pc.config_deleted, pc.config_value, \n" +
+                "  pc.create_time, pc.create_user_id, pc.create_user_name, pc.update_user_id, pc.update_user_name \n" +
+                "from key_mapping km \n" +
+                "left join platform_config pc \n" +
+                "  on pc.config_class = km.config_class \n" +
+                "  and pc.config_key = km.config_key \n" +
+                "  and pc.config_is_latest = ? \n" +
+                "where km.mapping_stage = ? \n" +
+                "order by km.ordering";
+
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled())
+            log.debug("QUERY loadPlatformConfigEntries: \n{}", query);
+
         var records = new ArrayList<PlatformConfigRecord>(configKeys.size());
 
-        for (var key : configKeys) {
-            var record = loadPlatformConfigEntry(conn, key.getConfigClass(), key.getConfigKey(), includeDeleted);
-            records.add(record);
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setBoolean(1, true);
+            stmt.setInt(2, mappingStage);
+
+            try (var rs = stmt.executeQuery()) {
+
+                while (rs.next()) {
+
+                    var configClass = rs.getString(1);
+                    var configKey = rs.getString(2);
+                    var row = readRow(rs, 3);
+
+                    if (row == null || (row.deleted && !includeDeleted)) {
+                        var message = MessageFormat.format(MISSING_ENTRY, configClass, configKey);
+                        throw new EMetadataNotFound(message);
+                    }
+
+                    records.add(buildRecord(configClass, configKey, row));
+                }
+            }
         }
 
         return records;
@@ -191,7 +241,8 @@ class JdbcPlatformConfigImpl {
         // There is currently no support for reading a specific prior version or an as-of timestamp
 
         var query =
-                "select config_version, config_timestamp, config_deleted, config_value \n" +
+                "select config_version, config_timestamp, config_deleted, config_value, \n" +
+                "  create_time, create_user_id, create_user_name, update_user_id, update_user_name \n" +
                 "from platform_config where config_class = ? and config_key = ? and config_is_latest = ?";
 
         if (log.isDebugEnabled())
@@ -208,24 +259,80 @@ class JdbcPlatformConfigImpl {
                 if (!rs.next())
                     return null;
 
-                var version = rs.getInt(1);
-                var timestamp = rs.getTimestamp(2).toInstant();
-                var deleted = rs.getBoolean(3);
-                var value = rs.getBytes(4);
-
-                return new CurrentRow(version, timestamp, deleted, value);
+                return readRow(rs, 1);
             }
         }
     }
 
-    private void insertRow(Connection conn, PlatformConfigEntry entry, Instant timestamp, byte[] value) throws SQLException {
+    private CurrentRow readRow(ResultSet rs, int firstColumn) throws SQLException {
+
+        var sqlTimestamp = rs.getTimestamp(firstColumn + 1);
+
+        // Unmatched rows from an outer join have no timestamp
+        if (sqlTimestamp == null)
+            return null;
+
+        var version = rs.getInt(firstColumn);
+        var timestamp = sqlTimestamp.toInstant();
+        var deleted = rs.getBoolean(firstColumn + 2);
+        var value = rs.getBytes(firstColumn + 3);
+
+        var sqlCreateTime = rs.getTimestamp(firstColumn + 4);
+        var createTime = sqlCreateTime != null ? sqlCreateTime.toInstant() : null;
+        var createUserId = rs.getString(firstColumn + 5);
+        var createUserName = rs.getString(firstColumn + 6);
+        var updateUserId = rs.getString(firstColumn + 7);
+        var updateUserName = rs.getString(firstColumn + 8);
+
+        return new CurrentRow(
+                version, timestamp, deleted, value,
+                createTime, createUserId, createUserName,
+                updateUserId, updateUserName);
+    }
+
+    private int insertKeysForMapping(Connection conn, List<PlatformConfigEntry> configKeys) throws SQLException {
+
+        var query =
+                "insert into key_mapping (config_class, config_key, mapping_stage, ordering)\n" +
+                "values (?, ?, ?, ?)";
+
+        query = query.replaceFirst("key_mapping", JdbcDialects.mappingTableName(dialect));
+
+        if (log.isDebugEnabled())
+            log.debug("QUERY insertKeysForMapping (platform_config): \n{}", query);
+
+        var stage = mappingStage.incrementAndGet();
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            for (var i = 0; i < configKeys.size(); i++) {
+
+                stmt.clearParameters();
+                stmt.setString(1, configKeys.get(i).getConfigClass());
+                stmt.setString(2, configKeys.get(i).getConfigKey());
+                stmt.setInt(3, stage);
+                stmt.setInt(4, i);
+                stmt.addBatch();
+            }
+
+            stmt.executeBatch();
+        }
+
+        return stage;
+    }
+
+    private void insertRow(
+            Connection conn, PlatformConfigEntry entry, Instant timestamp, byte[] value,
+            Instant createTime, String createUserId, String createUserName,
+            UserMetadata updateUser) throws SQLException {
 
         var query =
                 "insert into platform_config (\n" +
                 "  config_class, config_key, config_version, config_timestamp, config_is_latest, config_deleted,\n" +
-                "  meta_format, meta_version, config_value\n" +
+                "  meta_format, meta_version, config_value,\n" +
+                "  create_time, create_user_id, create_user_name, update_user_id, update_user_name\n" +
                 ")\n" +
-                "values (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         if (log.isDebugEnabled())
             log.debug("QUERY insertRow (platform_config): \n{}", query);
@@ -241,6 +348,11 @@ class JdbcPlatformConfigImpl {
             stmt.setInt(7, MetadataFormat.PROTO.getNumber());
             stmt.setInt(8, MetadataVersion.CURRENT.getNumber());
             stmt.setBytes(9, value);
+            stmt.setTimestamp(10, createTime != null ? Timestamp.from(createTime) : null);
+            stmt.setString(11, createUserId);
+            stmt.setString(12, createUserName);
+            stmt.setString(13, updateUser.userId());
+            stmt.setString(14, updateUser.userName());
 
             stmt.executeUpdate();
         }
@@ -269,6 +381,16 @@ class JdbcPlatformConfigImpl {
         }
     }
 
+    private PlatformConfigRecord buildRecord(String configClass, String configKey, CurrentRow row) {
+
+        var entry = buildEntry(configClass, configKey, row.version, row.timestamp, row.deleted);
+
+        return new PlatformConfigRecord(
+                entry, row.value,
+                row.createTime, row.createUserId, row.createUserName,
+                row.updateUserId, row.updateUserName);
+    }
+
     private PlatformConfigEntry buildEntry(
             String configClass, String configKey, int version, Instant timestamp, boolean deleted) {
 
@@ -287,12 +409,26 @@ class JdbcPlatformConfigImpl {
         final Instant timestamp;
         final boolean deleted;
         final byte[] value;
+        final Instant createTime;
+        final String createUserId;
+        final String createUserName;
+        final String updateUserId;
+        final String updateUserName;
 
-        CurrentRow(int version, Instant timestamp, boolean deleted, byte[] value) {
+        CurrentRow(
+                int version, Instant timestamp, boolean deleted, byte[] value,
+                Instant createTime, String createUserId, String createUserName,
+                String updateUserId, String updateUserName) {
+
             this.version = version;
             this.timestamp = timestamp;
             this.deleted = deleted;
             this.value = value;
+            this.createTime = createTime;
+            this.createUserId = createUserId;
+            this.createUserName = createUserName;
+            this.updateUserId = updateUserId;
+            this.updateUserName = updateUserName;
         }
     }
 }

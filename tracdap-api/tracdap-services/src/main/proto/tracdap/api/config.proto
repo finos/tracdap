@@ -210,6 +210,9 @@ message PlatformConfigReadResponse {
 
   /// Definition of the config entry.
   metadata.ObjectDefinition definition = 2;
+
+  /// Controlled attributes for the config entry (config class and key, create and update time and user).
+  map<string, metadata.Value> attrs = 3;
 }
 
 /**

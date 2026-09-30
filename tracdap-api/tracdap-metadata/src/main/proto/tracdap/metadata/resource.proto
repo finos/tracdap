@@ -97,3 +97,23 @@ message CredentialDefinition {
    */
   map<string, string> secrets = 2;
 }
+
+/**
+ * Definition of a platform-level identity
+ *
+ * TRAC stores identities and assigns their keys, but places no requirement on their content.
+ * The meaning of the properties and secrets is defined by the extension that manages identities.
+ */
+message IdentityDefinition {
+
+  /// Properties of this identity
+  map<string, string> properties = 1;
+
+  /**
+   * Secret properties of this identity
+   *
+   * Secret values are stored in metadata as supplied, and are masked when identities are read
+   * through the admin API.
+   */
+  map<string, string> secrets = 2;
+}

@@ -15,29 +15,22 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.proxy.rest.match;
+package org.finos.tracdap.svc.amin.test;
 
-import org.finos.tracdap.gateway.proxy.rest.RestApiRequest;
+import org.finos.tracdap.common.plugin.ITracExtension;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IConfigWriteHook;
 
 
-public class RequestMatcher implements Matcher<RestApiRequest> {
+public class TestConfigHookExtension implements ITracExtension {
 
-    private final Matcher<String> methodMatcher;
-    private final PathMatcher pathMatcher;
-
-    public RequestMatcher(Matcher<String> methodMatcher, PathMatcher pathMatcher) {
-        this.methodMatcher = methodMatcher;
-        this.pathMatcher = pathMatcher;
+    @Override
+    public String extensionName() {
+        return "TEST_CONFIG_HOOK";
     }
 
     @Override
-    public boolean matches(RestApiRequest request) {
-
-        return methodMatcher.matches(request.httpMethod()) &&
-                pathMatcher.matches(request.pathSegments());
-    }
-
-    public int compareSpecificity(RequestMatcher other) {
-        return pathMatcher.compareSpecificity(other.pathMatcher);
+    public void runStartupLogic(PluginRegistry registry) {
+        registry.addSingleton(IConfigWriteHook.class, new TestConfigWriteHook());
     }
 }

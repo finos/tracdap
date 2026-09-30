@@ -267,7 +267,9 @@ public class AdminApiValidator {
     @Validator(method = "createPlatformConfigObject")
     public static ValidationContext createPlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
 
-        ctx = commonPlatformWriteRequest(ctx);
+        var generatedKey = ValidationConstants.GENERATED_KEY_OBJECT_TYPES.contains(msg.getDefinition().getObjectType());
+
+        ctx = commonPlatformWriteRequest(ctx, generatedKey);
 
         // No prior version for create calls
         ctx = ctx.push(PCWR_PRIOR_ENTRY)
@@ -286,7 +288,7 @@ public class AdminApiValidator {
     @Validator(method = "updatePlatformConfigObject")
     public static ValidationContext updatePlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
 
-        ctx = commonPlatformWriteRequest(ctx);
+        ctx = commonPlatformWriteRequest(ctx, false);
 
         ctx = ctx.push(PCWR_PRIOR_ENTRY)
                 .apply(CommonValidators::required)
@@ -306,7 +308,7 @@ public class AdminApiValidator {
     @Validator(method = "deletePlatformConfigObject")
     public static ValidationContext deletePlatformConfigObject(PlatformConfigWriteRequest msg, ValidationContext ctx) {
 
-        ctx = commonPlatformWriteRequest(ctx);
+        ctx = commonPlatformWriteRequest(ctx, false);
 
         ctx = ctx.push(PCWR_PRIOR_ENTRY)
                 .apply(CommonValidators::required)
@@ -322,17 +324,26 @@ public class AdminApiValidator {
         return ctx;
     }
 
-    private static ValidationContext commonPlatformWriteRequest(ValidationContext ctx) {
+    private static ValidationContext commonPlatformWriteRequest(ValidationContext ctx, boolean generatedKey) {
 
         ctx = ctx.push(PCWR_CONFIG_CLASS)
                 .apply(CommonValidators::required)
                 .apply(CommonValidators::configKey)
                 .pop();
 
-        ctx = ctx.push(PCWR_CONFIG_KEY)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::configKey)
-                .pop();
+        if (generatedKey) {
+
+            ctx = ctx.push(PCWR_CONFIG_KEY)
+                    .apply(CommonValidators::omitted)
+                    .pop();
+        }
+        else {
+
+            ctx = ctx.push(PCWR_CONFIG_KEY)
+                    .apply(CommonValidators::required)
+                    .apply(CommonValidators::configKey)
+                    .pop();
+        }
 
         return ctx;
     }

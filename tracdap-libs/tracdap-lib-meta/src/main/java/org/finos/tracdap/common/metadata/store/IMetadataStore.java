@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.common.metadata.store;
 
+import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.metadata.*;
 
 import java.time.Instant;
@@ -90,11 +91,11 @@ public interface IMetadataStore {
     // no tenant dimension, no version history and no separate generic object store to join to
     // The store itself resolves the next version number, so create/update/delete are atomic
 
-    PlatformConfigEntry createPlatformConfigEntry(String configClass, String configKey, Instant timestamp, byte[] value);
+    PlatformConfigEntry createPlatformConfigEntry(String configClass, String configKey, Instant timestamp, UserMetadata user, byte[] value);
 
-    PlatformConfigEntry updatePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, byte[] value);
+    PlatformConfigEntry updatePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, UserMetadata user, byte[] value);
 
-    PlatformConfigEntry deletePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp);
+    PlatformConfigEntry deletePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, UserMetadata user);
 
     PlatformConfigRecord loadPlatformConfigEntry(String configClass, String configKey, boolean includeDeleted);
 

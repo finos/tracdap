@@ -18,6 +18,7 @@
 package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.api.internal.ConfigUpdateType;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EUnexpected;
@@ -30,6 +31,10 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.ConfigWrite;
+import org.finos.tracdap.common.service.IConfigReader;
+import org.finos.tracdap.common.service.IConfigWriteHook;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
 
@@ -46,12 +51,16 @@ public class ConfigService {
     private final IMetadataStore metadataStore;
     private final BundleLoader bundleLoader;
     private final UuidFactory objectIdFactory;
+    private final PluginRegistry registry;
+    private final IConfigReader configReader;
 
-    public ConfigService(IMetadataStore metadataStore) {
+    public ConfigService(IMetadataStore metadataStore, PluginRegistry registry, IConfigReader configReader) {
         this.validator = new Validator();
         this.metadataStore = metadataStore;
         this.bundleLoader = new BundleLoader(metadataStore);
         this.objectIdFactory = new UuidFactory();
+        this.registry = registry;
+        this.configReader = configReader;
     }
 
     public ConfigWriteResponse createConfigObject(ConfigWriteRequest request) {
@@ -65,6 +74,14 @@ public class ConfigService {
         // Get request and user metadata from the current gRPC context
         var requestMetadata = RequestMetadata.get(Context.current());
         var userMetadata = UserMetadata.get(Context.current());
+
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+
+        if (hook != null) {
+            var writes = hookWrites(tenant, ConfigUpdateType.CREATE, requests, null, null, userMetadata);
+            requests = hookTransform(hook, requests, writes);
+            hookValidate(hook, writes, requests);
+        }
 
         // Look for deleted entries, the API allows creating if an existing entry is deleted
         // All requests in a batch have the same config class (this is enforced in validation)
@@ -106,8 +123,19 @@ public class ConfigService {
         var priorSelectors = priorEntries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
         var priorObjects = metadataStore.loadObjects(tenant, priorSelectors);
 
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+        List<ConfigWrite> writes = null;
+
+        if (hook != null) {
+            writes = hookWrites(tenant, ConfigUpdateType.UPDATE, requests, priorEntries, priorObjects, userMetadata);
+            requests = hookTransform(hook, requests, writes);
+        }
+
         // Version semantics must apply to object definitions
         validateDefinitionUpdates(requests, priorObjects);
+
+        if (hook != null)
+            hookValidate(hook, writes, requests);
 
         // Build new metadata objects
         var objects = updateObjects(tenant, requests, priorObjects, requestMetadata, userMetadata);
@@ -142,6 +170,14 @@ public class ConfigService {
         var priorKeys = requests.stream().map(ConfigWriteRequest::getPriorEntry).collect(Collectors.toList());
         var priorEntries = metadataStore.loadConfigEntries(tenant, priorKeys, /* includeDeleted = */ false);
         var priorSelectors = priorEntries.stream().map(entry -> entry.getDetails().getObjectSelector()).collect(Collectors.toList());
+
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+
+        if (hook != null) {
+            var priorObjects = metadataStore.loadObjects(tenant, priorSelectors);
+            var writes = hookWrites(tenant, ConfigUpdateType.DELETE, requests, priorEntries, priorObjects, userMetadata);
+            hookValidate(hook, writes, null);
+        }
 
         // Build new metadata objects with the deleted flag set
         var tags = deleteObjects(priorSelectors);
@@ -416,6 +452,48 @@ public class ConfigService {
         }
 
         return builder.build();
+    }
+
+    private List<ConfigWrite> hookWrites(
+            String tenant, ConfigUpdateType operation, List<ConfigWriteRequest> requests,
+            List<ConfigEntry> priorEntries, List<Tag> priorObjects, UserMetadata userMetadata) {
+
+        var writes = new ArrayList<ConfigWrite>(requests.size());
+
+        for (int i = 0; i < requests.size(); i++) {
+
+            var request = requests.get(i);
+            var priorEntry = priorEntries != null ? priorEntries.get(i) : null;
+            var priorDefinition = priorObjects != null ? priorObjects.get(i).getDefinition() : null;
+            var definition = request.hasDefinition() ? request.getDefinition() : null;
+
+            writes.add(ConfigWrite.forTenant(
+                    tenant, operation, request.getConfigClass(), request.getConfigKey(),
+                    priorEntry, priorDefinition, definition, userMetadata, configReader));
+        }
+
+        return writes;
+    }
+
+    private List<ConfigWriteRequest> hookTransform(
+            IConfigWriteHook hook, List<ConfigWriteRequest> requests, List<ConfigWrite> writes) {
+
+        var transformed = new ArrayList<ConfigWriteRequest>(requests.size());
+
+        for (int i = 0; i < requests.size(); i++) {
+            var definition = hook.transform(writes.get(i));
+            transformed.add(requests.get(i).toBuilder().setDefinition(definition).build());
+        }
+
+        return transformed;
+    }
+
+    private void hookValidate(IConfigWriteHook hook, List<ConfigWrite> writes, List<ConfigWriteRequest> requests) {
+
+        for (int i = 0; i < writes.size(); i++) {
+            var definition = requests != null ? requests.get(i).getDefinition() : null;
+            hook.validate(writes.get(i), definition);
+        }
     }
 
     private void validateDefinitionUpdates(List<ConfigWriteRequest> requests, List<Tag> priorVersions) {

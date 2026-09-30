@@ -24,6 +24,7 @@ import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
@@ -67,7 +68,7 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
         readBatch = new JdbcReadBatchImpl(this.dialect);
         writeBatch = new JdbcWriteBatchImpl(this.dialect, readBatch);
         search = new JdbcSearchImpl();
-        platformConfig = new JdbcPlatformConfigImpl();
+        platformConfig = new JdbcPlatformConfigImpl(this.dialect);
     }
 
     @Override
@@ -606,26 +607,26 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
     // -----------------------------------------------------------------------------------------------------------------
 
     @Override
-    public PlatformConfigEntry createPlatformConfigEntry(String configClass, String configKey, Instant timestamp, byte[] value) {
+    public PlatformConfigEntry createPlatformConfigEntry(String configClass, String configKey, Instant timestamp, UserMetadata user, byte[] value) {
 
         return wrapTransaction(conn -> {
-            return platformConfig.createPlatformConfigEntry(conn, configClass, configKey, timestamp, value);
+            return platformConfig.createPlatformConfigEntry(conn, configClass, configKey, timestamp, user, value);
         });
     }
 
     @Override
-    public PlatformConfigEntry updatePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, byte[] value) {
+    public PlatformConfigEntry updatePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, UserMetadata user, byte[] value) {
 
         return wrapTransaction(conn -> {
-            return platformConfig.updatePlatformConfigEntry(conn, priorEntry, timestamp, value);
+            return platformConfig.updatePlatformConfigEntry(conn, priorEntry, timestamp, user, value);
         });
     }
 
     @Override
-    public PlatformConfigEntry deletePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp) {
+    public PlatformConfigEntry deletePlatformConfigEntry(PlatformConfigEntry priorEntry, Instant timestamp, UserMetadata user) {
 
         return wrapTransaction(conn -> {
-            return platformConfig.deletePlatformConfigEntry(conn, priorEntry, timestamp);
+            return platformConfig.deletePlatformConfigEntry(conn, priorEntry, timestamp, user);
         });
     }
 
@@ -641,6 +642,7 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
     public List<PlatformConfigRecord> loadPlatformConfigEntries(List<PlatformConfigEntry> configKeys, boolean includeDeleted) {
 
         return wrapTransaction(conn -> {
+            prepareMappingTable(conn);
             return platformConfig.loadPlatformConfigEntries(conn, configKeys, includeDeleted);
         });
     }

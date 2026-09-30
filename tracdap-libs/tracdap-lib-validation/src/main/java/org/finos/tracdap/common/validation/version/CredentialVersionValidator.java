@@ -15,29 +15,22 @@
  * limitations under the License.
  */
 
-package org.finos.tracdap.gateway.proxy.rest.match;
+package org.finos.tracdap.common.validation.version;
 
-import org.finos.tracdap.gateway.proxy.rest.RestApiRequest;
+import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationType;
+import org.finos.tracdap.common.validation.core.Validator;
+import org.finos.tracdap.metadata.CredentialDefinition;
 
 
-public class RequestMatcher implements Matcher<RestApiRequest> {
+@Validator(type = ValidationType.VERSION)
+public class CredentialVersionValidator {
 
-    private final Matcher<String> methodMatcher;
-    private final PathMatcher pathMatcher;
+    @Validator
+    public static ValidationContext credentialVersion(CredentialDefinition current, CredentialDefinition prior, ValidationContext ctx) {
 
-    public RequestMatcher(Matcher<String> methodMatcher, PathMatcher pathMatcher) {
-        this.methodMatcher = methodMatcher;
-        this.pathMatcher = pathMatcher;
-    }
+        // Credential properties and secrets can all change between versions
 
-    @Override
-    public boolean matches(RestApiRequest request) {
-
-        return methodMatcher.matches(request.httpMethod()) &&
-                pathMatcher.matches(request.pathSegments());
-    }
-
-    public int compareSpecificity(RequestMatcher other) {
-        return pathMatcher.compareSpecificity(other.pathMatcher);
+        return ctx;
     }
 }

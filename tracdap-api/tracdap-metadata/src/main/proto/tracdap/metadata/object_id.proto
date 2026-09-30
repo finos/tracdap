@@ -43,6 +43,7 @@ enum ObjectType {
   CONFIG = 10;
   RESOURCE = 11;
   CREDENTIAL = 12;
+  IDENTITY = 13;
 }
 
 

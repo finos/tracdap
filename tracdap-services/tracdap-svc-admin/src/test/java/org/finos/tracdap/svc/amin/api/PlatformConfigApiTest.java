@@ -21,10 +21,13 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.service.PlatformStateManager;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.PlatformConfigEntry;
+import org.finos.tracdap.metadata.Value;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.test.helpers.PlatformTest;
@@ -401,6 +404,147 @@ abstract class PlatformConfigApiTest {
     }
 
     @Test
+    void readReturnsProvenanceAttrs() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("readReturnsProvenanceAttrs")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var rtConfig = adminApi.readPlatformConfigObject(PlatformConfigReadRequest.newBuilder()
+                .setEntry(writeResponse.getEntry())
+                .build());
+
+        var attrs = rtConfig.getAttrsMap();
+        var entryTime = timestampValue(rtConfig.getEntry());
+
+        assertEquals(MetadataCodec.encodeValue("readReturnsProvenanceAttrs"), attrs.get(MetadataConstants.TRAC_CONFIG_CLASS));
+        assertEquals(MetadataCodec.encodeValue("entry1"), attrs.get(MetadataConstants.TRAC_CONFIG_KEY));
+
+        assertEquals(entryTime, attrs.get(MetadataConstants.TRAC_CREATE_TIME));
+        assertEquals(entryTime, attrs.get(MetadataConstants.TRAC_UPDATE_TIME));
+        assertFalse(attrs.get(MetadataConstants.TRAC_CREATE_USER_ID).getStringValue().isEmpty());
+        assertFalse(attrs.get(MetadataConstants.TRAC_CREATE_USER_NAME).getStringValue().isEmpty());
+        assertEquals(attrs.get(MetadataConstants.TRAC_CREATE_USER_ID), attrs.get(MetadataConstants.TRAC_UPDATE_USER_ID));
+        assertEquals(attrs.get(MetadataConstants.TRAC_CREATE_USER_NAME), attrs.get(MetadataConstants.TRAC_UPDATE_USER_NAME));
+    }
+
+    @Test
+    void updateKeepsCreateAttrs() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("updateKeepsCreateAttrs")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var v1 = adminApi.readPlatformConfigObject(PlatformConfigReadRequest.newBuilder()
+                .setEntry(writeResponse.getEntry())
+                .build());
+
+        var writeResponse2 = adminApi.updatePlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("updateKeepsCreateAttrs")
+                .setConfigKey("entry1")
+                .setPriorEntry(writeResponse.getEntry())
+                .setDefinition(SampleMetadata.dummyVersionForType(configObj))
+                .build());
+
+        var v2 = adminApi.readPlatformConfigObject(PlatformConfigReadRequest.newBuilder()
+                .setEntry(writeResponse2.getEntry())
+                .build());
+
+        assertEquals(2, v2.getEntry().getConfigVersion());
+        assertEquals(timestampValue(v1.getEntry()), v2.getAttrsOrThrow(MetadataConstants.TRAC_CREATE_TIME));
+        assertEquals(timestampValue(v2.getEntry()), v2.getAttrsOrThrow(MetadataConstants.TRAC_UPDATE_TIME));
+        assertNotEquals(v2.getAttrsOrThrow(MetadataConstants.TRAC_CREATE_TIME), v2.getAttrsOrThrow(MetadataConstants.TRAC_UPDATE_TIME));
+        assertEquals(v1.getAttrsOrThrow(MetadataConstants.TRAC_CREATE_USER_ID), v2.getAttrsOrThrow(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(v2.containsAttrs(MetadataConstants.TRAC_UPDATE_USER_ID));
+    }
+
+    @Test
+    void readBatchReturnsProvenanceAttrs() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("readBatchReturnsProvenanceAttrs")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var readBatchResponse = adminApi.readPlatformConfigBatch(PlatformConfigReadBatchRequest.newBuilder()
+                .addEntries(writeResponse.getEntry())
+                .build());
+
+        var attrs = readBatchResponse.getEntries(0).getAttrsMap();
+
+        assertEquals(MetadataCodec.encodeValue("entry1"), attrs.get(MetadataConstants.TRAC_CONFIG_KEY));
+        assertTrue(attrs.containsKey(MetadataConstants.TRAC_CREATE_TIME));
+        assertTrue(attrs.containsKey(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(attrs.containsKey(MetadataConstants.TRAC_UPDATE_USER_ID));
+    }
+
+    @Test
+    void maskedCredentialKeepsAttrs() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CREDENTIAL);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("maskedCredentialKeepsAttrs")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var rtConfig = adminApi.readPlatformConfigObject(PlatformConfigReadRequest.newBuilder()
+                .setEntry(writeResponse.getEntry())
+                .build());
+
+        var batchConfig = adminApi.readPlatformConfigBatch(PlatformConfigReadBatchRequest.newBuilder()
+                .addEntries(writeResponse.getEntry())
+                .build());
+
+        for (var secret : rtConfig.getDefinition().getCredential().getSecretsMap().values())
+            assertEquals("", secret);
+
+        assertTrue(rtConfig.containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+        assertTrue(batchConfig.getEntries(0).containsAttrs(MetadataConstants.TRAC_CREATE_USER_ID));
+    }
+
+    @Test
+    void updateChangingObjectTypeFails() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
+
+        var writeResponse = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("updateChangingObjectTypeFails")
+                .setConfigKey("entry1")
+                .setDefinition(configObj)
+                .build());
+
+        var typeChange = PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("updateChangingObjectTypeFails")
+                .setConfigKey("entry1")
+                .setPriorEntry(writeResponse.getEntry())
+                .setDefinition(SampleMetadata.dummyDefinitionForType(ObjectType.CREDENTIAL))
+                .build();
+
+        var error = assertThrows(StatusRuntimeException.class, () -> adminApi.updatePlatformConfigObject(typeChange));
+        assertEquals(Status.Code.FAILED_PRECONDITION, error.getStatus().getCode());
+
+        var rtConfig = adminApi.readPlatformConfigObject(PlatformConfigReadRequest.newBuilder()
+                .setEntry(writeResponse.getEntry())
+                .build());
+
+        assertEquals(1, rtConfig.getEntry().getConfigVersion());
+        assertEquals(configObj, rtConfig.getDefinition());
+    }
+
+    @Test
     void listEntries() {
 
         var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
@@ -462,5 +606,9 @@ abstract class PlatformConfigApiTest {
         assertEquals(org.finos.tracdap.api.internal.ReceivedCode.OK, status.getCode());
         assertTrue(stateManager.hasConfig("entry1"));
         assertEquals(configObj, stateManager.getConfig("entry1"));
+    }
+
+    private static Value timestampValue(PlatformConfigEntry entry) {
+        return MetadataCodec.encodeValue(MetadataCodec.decodeDatetime(entry.getConfigTimestamp()));
     }
 }
