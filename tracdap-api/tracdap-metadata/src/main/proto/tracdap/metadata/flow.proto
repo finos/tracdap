@@ -72,6 +72,8 @@ message FlowNode {
   repeated string outputs = 3;
   repeated string resources = 9;
 
+  ModelType modelType = 10;
+
   SearchExpression nodeSearch = 4;
   repeated TagUpdate nodeAttrs = 5;
   map<string, Value> nodeProps = 8;

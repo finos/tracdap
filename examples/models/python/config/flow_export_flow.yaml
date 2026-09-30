@@ -1,0 +1,17 @@
+nodes:
+
+  customer_loans:
+    nodeType: "INPUT_NODE"
+
+  pnl_aggregation:
+    nodeType: "MODEL_NODE"
+    inputs: [customer_loans]
+    outputs: [profit_by_region]
+
+  data_export:
+    nodeType: "MODEL_NODE"
+    modelType: "DATA_EXPORT_MODEL"
+    inputs: [profit_by_region]
+
+  profit_by_region:
+    nodeType: "OUTPUT_NODE"

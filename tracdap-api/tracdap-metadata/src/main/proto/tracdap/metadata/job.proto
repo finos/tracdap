@@ -154,6 +154,8 @@ message RunFlowJob {
   map<string, string> resources = 8;
 
   repeated TagUpdate outputAttrs = 7;
+
+  repeated string exportStorageAccess = 9;
 }
 
 /**
