@@ -163,8 +163,8 @@ public class FlowValidator {
         var isOutputNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.OUTPUT_NODE.name());
 
         // Search expressions are not allowed for parameter or resource nodes
-        var notParameterNode = msg.getNodeType() == FlowNodeType.PARAMETER_NODE;
-        var notParameterNodeQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), FlowNodeType.PARAMETER_NODE.name());
+        var searchAllowed = msg.getNodeType() != FlowNodeType.PARAMETER_NODE && msg.getNodeType() != FlowNodeType.RESOURCE_NODE;
+        var searchNotAllowedQualifier = String.format("%s == %s", FN_NODE_TYPE.getName(), msg.getNodeType().name());
 
 
         var knownSockets = new HashMap<String, String>();
@@ -209,7 +209,7 @@ public class FlowValidator {
                 .pop();
 
         ctx = ctx.push(FN_NODE_SEARCH)
-                .apply(CommonValidators.onlyIf(notParameterNode, notParameterNodeQualifier, true))
+                .apply(CommonValidators.onlyIf(searchAllowed, searchNotAllowedQualifier, true))
                 .apply(SearchValidator::searchExpression, SearchExpression.class)
                 .pop();
 

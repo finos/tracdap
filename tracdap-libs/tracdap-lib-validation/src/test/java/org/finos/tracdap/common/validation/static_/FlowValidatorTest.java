@@ -25,6 +25,7 @@ import org.finos.tracdap.metadata.*;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 
 
 public class FlowValidatorTest extends BaseValidatorTest {
@@ -931,5 +932,78 @@ public class FlowValidatorTest extends BaseValidatorTest {
                 .build();
 
         expectInvalid(flow);
+    }
+
+    private static FlowDefinition flowWithAllNodeTypes(String searchNode) {
+
+        var keySearch = SearchExpression.newBuilder()
+                .setTerm(SearchTerm.newBuilder()
+                .setAttrName("key")
+                .setAttrType(BasicType.STRING)
+                .setOperator(SearchOperator.EQ)
+                .setSearchValue(MetadataCodec.encodeValue("customer_loans")))
+                .build();
+
+        var nodes = new HashMap<String, FlowNode.Builder>();
+        nodes.put("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE));
+        nodes.put("param_1", FlowNode.newBuilder().setNodeType(FlowNodeType.PARAMETER_NODE));
+        nodes.put("resource_1", FlowNode.newBuilder().setNodeType(FlowNodeType.RESOURCE_NODE));
+        nodes.put("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                .addInputs("input_1")
+                .addParameters("param_1")
+                .addResources("resource_1")
+                .addOutputs("output_1"));
+        nodes.put("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE));
+
+        if (searchNode != null)
+            nodes.get(searchNode).setNodeSearch(keySearch);
+
+        var flow = FlowDefinition.newBuilder();
+        nodes.forEach((name, node) -> flow.putNodes(name, node.build()));
+
+        return flow
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("input_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("input_1")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("param_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("param_1")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("resource_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("resource_1")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("output_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("output_1")))
+                .build();
+    }
+
+    @Test
+    void nodeSearch_none_ok() {
+        expectValid(flowWithAllNodeTypes(null));
+    }
+
+    @Test
+    void nodeSearch_inputNode_ok() {
+        expectValid(flowWithAllNodeTypes("input_1"));
+    }
+
+    @Test
+    void nodeSearch_outputNode_ok() {
+        expectValid(flowWithAllNodeTypes("output_1"));
+    }
+
+    @Test
+    void nodeSearch_modelNode_ok() {
+        expectValid(flowWithAllNodeTypes("model_1"));
+    }
+
+    @Test
+    void nodeSearch_parameterNode() {
+        expectInvalid(flowWithAllNodeTypes("param_1"));
+    }
+
+    @Test
+    void nodeSearch_resourceNode() {
+        expectInvalid(flowWithAllNodeTypes("resource_1"));
     }
 }
