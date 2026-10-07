@@ -672,8 +672,11 @@ class CaptureJobTest(CaptureTestBase):
 
         self.staging.joinpath("big.csv").write_bytes(b"id\n" + b"1\n" * (1024 * 1024))
 
-        with self.assertRaisesRegex(ex.EStorageRequest, re.escape(cfg_p.ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE)):
+        with self.assertRaises(ex.EStorageRequest) as error_context:
             self._run_job({"big": _declared("big.csv", _schema(("id", meta.BasicType.INTEGER)))}, capture_size_mb=1)
+
+        self.assertIn("[captureMaxSize]", str(error_context.exception))
+        self.assertIn(cfg_p.ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE, str(error_context.exception))
 
 
 class CaptureDevModeTest(CaptureTestBase):

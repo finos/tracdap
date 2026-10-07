@@ -287,6 +287,7 @@ public class CaptureDataTest {
 
         Assertions.assertEquals(JobStatusCode.FAILED, jobStatus.getStatusCode());
         Assertions.assertTrue(jobStatus.getStatusMessage().contains("capture size limit"), jobStatus.getStatusMessage());
+        Assertions.assertTrue(jobStatus.getStatusMessage().contains("[captureMaxSize]"), jobStatus.getStatusMessage());
 
         Assertions.assertEquals(0, searchJobOutputs(ObjectType.DATA, jobKey).size());
         Assertions.assertEquals(0, outputsByName(ObjectType.FILE, jobKey).size());

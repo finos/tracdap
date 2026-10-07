@@ -110,7 +110,8 @@ class CaptureReader:
         if file_stat.size > size_limit:
             raise _ex.EStorageRequest(
                 f"Capture [{capture_name}] failed: File size [{file_stat.size}] bytes exceeds the capture size limit" +
-                f" [{size_limit}] bytes, set by the [{_cfg_p.ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE}] property")
+                f" [{size_limit}] bytes, set by [captureMaxSize] in the platform's executor config" +
+                f" (the [{_cfg_p.ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE}] property when running locally)")
 
         content = file_storage.read_bytes(storage_path)
         content_hash = hashlib.sha256(content).hexdigest()
