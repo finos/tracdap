@@ -398,6 +398,60 @@ class PolarsDataConverterTest(unittest.TestCase, DataConverterSuite):
 
 
 
+class ArrowToTracMappingTest(unittest.TestCase):
+
+    def test_mapped_types(self):
+
+        mapped_types = {
+            pa.bool_(): _meta.BasicType.BOOLEAN,
+            pa.int8(): _meta.BasicType.INTEGER,
+            pa.int16(): _meta.BasicType.INTEGER,
+            pa.int32(): _meta.BasicType.INTEGER,
+            pa.int64(): _meta.BasicType.INTEGER,
+            pa.uint8(): _meta.BasicType.INTEGER,
+            pa.uint16(): _meta.BasicType.INTEGER,
+            pa.uint32(): _meta.BasicType.INTEGER,
+            pa.uint64(): _meta.BasicType.INTEGER,
+            pa.float16(): _meta.BasicType.FLOAT,
+            pa.float32(): _meta.BasicType.FLOAT,
+            pa.float64(): _meta.BasicType.FLOAT,
+            pa.string(): _meta.BasicType.STRING,
+            pa.utf8(): _meta.BasicType.STRING,
+            pa.large_string(): _meta.BasicType.STRING,
+            pa.date32(): _meta.BasicType.DATE,
+            pa.date64(): _meta.BasicType.DATE,
+            pa.decimal128(31, 10): _meta.BasicType.DECIMAL,
+            pa.decimal256(38, 12): _meta.BasicType.DECIMAL,
+            pa.timestamp("ms"): _meta.BasicType.DATETIME,
+            pa.timestamp("us", tz="UTC"): _meta.BasicType.DATETIME,
+            pa.timestamp("ns", tz="Europe/London"): _meta.BasicType.DATETIME,
+            pa.dictionary(pa.int32(), pa.utf8()): _meta.BasicType.STRING,
+            pa.dictionary(pa.int8(), pa.int64()): _meta.BasicType.INTEGER,
+            pa.dictionary(pa.int32(), pa.large_string()): _meta.BasicType.STRING}
+
+        for arrow_type, trac_type in mapped_types.items():
+            with self.subTest(arrow_type=str(arrow_type)):
+                self.assertEqual(trac_type, _data.DataMapping.arrow_to_trac_type(arrow_type))
+
+    def test_dictionary_field_is_categorical(self):
+
+        arrow_schema = pa.schema([pa.field("category", pa.dictionary(pa.int32(), pa.utf8()))])
+        trac_schema = _data.DataMapping.arrow_to_trac_schema(arrow_schema)
+
+        field = trac_schema.table.fields[0]
+        self.assertEqual(_meta.BasicType.STRING, field.fieldType)
+        self.assertTrue(field.categorical)
+
+    def test_unmapped_types(self):
+
+        unmapped_types = [pa.null(), pa.binary(), pa.time64("us"), pa.list_(pa.int32())]
+
+        for arrow_type in unmapped_types:
+            with self.subTest(arrow_type=str(arrow_type)):
+                with self.assertRaises(_ex.ETracInternal):
+                    _data.DataMapping.arrow_to_trac_type(arrow_type)
+
+
 class DataConformanceTest(unittest.TestCase):
 
     @classmethod

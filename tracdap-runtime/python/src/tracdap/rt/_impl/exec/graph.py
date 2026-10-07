@@ -357,6 +357,37 @@ class LoadDataNode(Node[_data.DataItem]):
 
 
 @_node_type
+class CaptureFileNode(Node[_data.DataItem]):
+
+    """
+    Read a single file from external storage, as an unchanged copy of the source
+    """
+
+    capture_name: str
+    location: _meta.ExternalLocation
+    size_limit: int
+
+
+@_node_type
+class DecodeTableNode(Node[_data.DataItem]):
+
+    """
+    Decode a captured file into a table, conformed to its declared schema or the file's own schema
+    """
+
+    capture_name: str
+    file_item_id: NodeId[_data.DataItem]
+    storage_key: str
+    format_code: str
+    schema_source: _meta.CaptureSchemaSource
+    schema: _tp.Optional[_meta.SchemaDefinition]
+    file_id: _meta.TagHeader
+
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
+        return {self.file_item_id: DependencyType.HARD}
+
+
+@_node_type
 class SaveDataNode(Node[_data.DataSpec]):
 
     """

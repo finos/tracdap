@@ -13,12 +13,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import dataclasses as _dc
 import itertools as _itr
 import typing as _tp
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt._impl.core.capture as _capture
+import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
@@ -191,6 +194,9 @@ class GraphBuilder:
 
     def build_import_export_data_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
+        if job_def.jobType == _meta.JobType.IMPORT_DATA and job_def.importData.captures:
+            return self.build_capture_job(job_def, job_push_id)
+
         # TODO: These are processed as regular calculation jobs for now
         # That might be ok, but is worth reviewing
 
@@ -207,6 +213,152 @@ class GraphBuilder:
             job_def, job_push_id,
             target_selector, target_def,
             job_details)
+
+    def build_capture_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
+
+        job_details = job_def.importData
+
+        if job_details.model is not None and job_details.model.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] cannot use a model with captures"))
+
+        capture_outputs = set(job_details.captures.keys())
+
+        for capture_name in job_details.captures.keys():
+            if f"{capture_name}_file" in capture_outputs:
+                self._error(_ex.EJobValidation(f"Capture [{capture_name}_file] clashes with the file output of capture [{capture_name}]"))
+
+        size_limit = _util.read_property(
+            self._sys_config.properties,
+            _cfg_p.ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE,
+            _cfg_p.ConfigKDefaults.RUNTIME_LIMIT_CAPTURE_SIZE,
+            int) * 1024 * 1024
+
+        capture_sections = [
+            self._build_capture_section(
+                capture_name, capture, job_details.priorOutputs, size_limit,
+                explicit_deps=[job_push_id])
+            for capture_name, capture in job_details.captures.items()]
+
+        main_section = self._join_sections(*capture_sections)
+
+        output_ids = list(nid for nid, n in main_section.nodes.items() if isinstance(n, SaveDataNode))
+        output_keys = dict((nid, nid.name.replace(":SAVE", "")) for nid in output_ids)
+
+        result_section = self.build_job_result(
+            output_ids, output_keys,
+            explicit_deps=[job_push_id, *main_section.must_run])
+
+        return self._join_sections(main_section, result_section)
+
+    def _build_capture_section(
+            self, capture_name: str, capture: _meta.CaptureSource,
+            prior_outputs: _tp.Dict[str, _meta.TagSelector], size_limit: int,
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            -> GraphSection:
+
+        nodes = dict()
+        file_output_name = f"{capture_name}_file"
+
+        location = capture.location
+
+        if location is None or not location.storageKey or not location.storagePath:
+            self._error(_ex.EJobValidation(f"Capture [{capture_name}] requires a storage location and path"))
+            return GraphSection(nodes)
+
+        extension = _capture.CaptureFormats.file_extension(location.storagePath)
+        capture_format = _capture.CaptureFormats.for_extension(extension) if extension else None
+
+        if capture_format is None:
+            self._error(_ex.EJobValidation(
+                f"Capture [{capture_name}] has an unsupported file type [{location.storagePath}]" +
+                f" (the file name must end in .csv, .parquet or .arrow)"))
+            return GraphSection(nodes)
+
+        schema_def, schema_id = self._capture_schema(capture_name, capture, capture_format)
+
+        if schema_def is None and capture.schemaSource != _meta.CaptureSchemaSource.CAPTURE_SCHEMA_FILE:
+            return GraphSection(nodes)
+
+        # File IDs are needed to build the decode node, which records the captured file on the dataset
+        file_id, storage_id, prior_file_spec = self._allocate_file_output_ids(prior_outputs.get(file_output_name))
+
+        capture_id = NodeId(f"{file_output_name}:CAPTURE", self._job_namespace, _data.DataItem)
+        nodes[capture_id] = CaptureFileNode(
+            capture_id, capture_name, location, size_limit,
+            explicit_deps=explicit_deps)
+
+        file_view_id = NodeId.of(file_output_name, self._job_namespace, _data.DataView)
+        nodes[file_view_id] = DataViewNode(file_view_id, None, capture_id)
+
+        file_item_id = NodeId(f"{file_output_name}:ITEM", self._job_namespace, _data.DataItem)
+        nodes[file_item_id] = DataItemNode(file_item_id, file_view_id)
+
+        # The FILE is stored under its output name, its definition carries the source file name
+        file_type = _capture.CaptureFormats.file_type(extension, capture_format)
+        file_spec = _storage.build_file_spec(
+            file_id, storage_id, file_output_name, file_type,
+            self._sys_config, prior_spec=prior_file_spec)
+
+        source_name = location.storagePath.split("/")[-1]
+        file_def = _dc.replace(file_spec.definition, name=source_name, extension=extension)
+        file_spec = _dc.replace(file_spec, definition=file_def)
+
+        file_save_id = NodeId.of(f"{file_output_name}:SAVE", self._job_namespace, _data.DataSpec)
+        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+
+        decode_id = NodeId(f"{capture_name}:DECODE", self._job_namespace, _data.DataItem)
+        nodes[decode_id] = DecodeTableNode(
+            decode_id, capture_name, capture_id,
+            location.storageKey, capture_format.format_code,
+            capture.schemaSource, schema_def, file_id)
+
+        data_view_id = NodeId.of(capture_name, self._job_namespace, _data.DataView)
+        nodes[data_view_id] = DataViewNode(data_view_id, schema_def, decode_id)
+
+        if schema_def is not None:
+            output_schema = _meta.ModelOutputSchema(objectType=_meta.ObjectType.DATA, schema=schema_def)
+        else:
+            output_schema = _meta.ModelOutputSchema(objectType=_meta.ObjectType.DATA, dynamic=True)
+
+        self._build_data_output(
+            capture_name, output_schema, data_view_id,
+            prior_outputs.get(capture_name), nodes, explicit_deps=None,
+            schema_id=schema_id)
+
+        return GraphSection(nodes)
+
+    def _capture_schema(
+            self, capture_name: str, capture: _meta.CaptureSource,
+            capture_format: _capture.CaptureFormat) \
+            -> _tp.Tuple[_tp.Optional[_meta.SchemaDefinition], _tp.Optional[_meta.TagSelector]]:
+
+        has_schema_id = capture.schemaId is not None and capture.schemaId.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET
+        has_schema = capture.schema is not None
+
+        if capture.schemaSource == _meta.CaptureSchemaSource.CAPTURE_SCHEMA_DECLARED:
+
+            if has_schema_id:
+                schema_obj = _util.get_job_metadata(capture.schemaId, self._job_config)
+                schema_header = _util.get_job_mapping(capture.schemaId, self._job_config)
+                return schema_obj.schema, _util.selector_for(schema_header)
+
+            if has_schema:
+                return capture.schema, None
+
+            self._error(_ex.EJobValidation(f"Capture [{capture_name}] has a declared schema source but no schema"))
+
+        elif capture.schemaSource == _meta.CaptureSchemaSource.CAPTURE_SCHEMA_FILE:
+
+            if has_schema_id or has_schema:
+                self._error(_ex.EJobValidation(f"Capture [{capture_name}] uses the file's schema, so it can't also declare one"))
+
+            elif capture_format.format_code == "CSV":
+                self._error(_ex.EJobValidation(f"Capture [{capture_name}] is a CSV file, which needs a declared schema"))
+
+        else:
+            self._error(_ex.EJobValidation(f"Capture [{capture_name}] requires a schema source"))
+
+        return None, None
 
     def build_run_model_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
@@ -540,7 +692,7 @@ class GraphBuilder:
         nodes[data_view_id] = DataViewNode(data_view_id, data_spec.schema, data_load_id)
         outputs.add(data_view_id)
 
-    def _build_data_output(self, output_name, output_schema, data_view_id, prior_selector, nodes, explicit_deps):
+    def _build_data_output(self, output_name, output_schema, data_view_id, prior_selector, nodes, explicit_deps, schema_id=None):
 
         # Map one data item from each view, since outputs are single part/delta
         data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
@@ -582,7 +734,8 @@ class GraphBuilder:
                 data_id, storage_id, output_name,
                 output_schema.schema,
                 self._sys_config,
-                prior_spec=prior_spec)
+                prior_spec=prior_spec,
+                schema_id=schema_id)
 
             # Save operation uses the statically produced schema info
             nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
@@ -628,16 +781,7 @@ class GraphBuilder:
         file_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
         nodes[file_item_id] = DataItemNode(file_item_id, file_view_id, explicit_deps=explicit_deps)
 
-        if prior_selector is None:
-            # New output - Allocate new TRAC object IDs
-            prior_spec = None
-            file_id = self._allocate_id(_meta.ObjectType.FILE)
-            storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
-        else:
-            # New version - Get the prior version metadata and bump the object IDs
-            prior_spec = self._build_file_spec(prior_selector) if prior_selector else None
-            file_id = _util.new_object_version(prior_spec.primary_id)
-            storage_id = _util.new_object_version(prior_spec.storage_id)
+        file_id, storage_id, prior_spec = self._allocate_file_output_ids(prior_selector)
 
         # File spec can always be built ahead of time (no equivalent of dynamic schemas)
         file_spec = _storage.build_file_spec(
@@ -649,6 +793,21 @@ class GraphBuilder:
         # Graph node for the save operation
         file_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
         nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+
+    def _allocate_file_output_ids(self, prior_selector):
+
+        if prior_selector is None:
+            # New output - Allocate new TRAC object IDs
+            prior_spec = None
+            file_id = self._allocate_id(_meta.ObjectType.FILE)
+            storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
+        else:
+            # New version - Get the prior version metadata and bump the object IDs
+            prior_spec = self._build_file_spec(prior_selector) if prior_selector else None
+            file_id = _util.new_object_version(prior_spec.primary_id)
+            storage_id = _util.new_object_version(prior_spec.storage_id)
+
+        return file_id, storage_id, prior_spec
 
     def _build_file_spec(self, file_selector):
 

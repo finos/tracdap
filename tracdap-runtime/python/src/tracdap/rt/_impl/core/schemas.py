@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import io
 import logging
 import typing as tp
 import types as ts
@@ -61,6 +62,26 @@ class SchemaLoader:
                 schema_data = _data.DataConformance.conform_to_schema(schema_data, schema_of_schema)
 
             return cls._decode_schema_data(schema_data)
+
+        except _ex.EData as e:
+
+            err = f"Invalid schema file [{schema_file}]: {str(e)}"
+            cls._log.exception(err)
+            raise _ex.ERuntimeValidation(err) from e
+
+    @classmethod
+    def load_schema_data(cls, schema_data: bytes, schema_file: str) -> _meta.SchemaDefinition:
+
+        try:
+
+            csv_options = {"lenient_csv_parser": True, "lenient_missing_columns": True}
+            csv_format = _storage.FormatManager.get_data_format("text/csv", csv_options)
+
+            schema_of_schema = _data.DataMapping.trac_to_arrow_schema(cls.__SCHEMA_OF_SCHEMA)
+            schema_table = csv_format.read_table(io.BytesIO(schema_data), schema_of_schema)
+            schema_table = _data.DataConformance.conform_to_schema(schema_table, schema_of_schema)
+
+            return cls._decode_schema_data(schema_table)
 
         except _ex.EData as e:
 

@@ -27,6 +27,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.context as _ctx
 import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.core.type_system as _types
+import tracdap.rt._impl.core.capture as _capture
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.resources as _resources
@@ -550,6 +551,36 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
         return data_spec
 
 
+class CaptureFileFunc(NodeFunction[_data.DataItem]):
+
+    def __init__(self, node: CaptureFileNode, storage: _storage.StorageManager):
+        super().__init__()
+        self.node = node
+        self.reader = _capture.CaptureReader(storage)
+
+    def _execute(self, ctx: NodeContext) -> _data.DataItem:
+
+        return self.reader.read_file(self.node.capture_name, self.node.location, self.node.size_limit)
+
+
+class DecodeTableFunc(NodeFunction[_data.DataItem]):
+
+    def __init__(self, node: DecodeTableNode, storage: _storage.StorageManager):
+        super().__init__()
+        self.node = node
+        self.decoder = _capture.CaptureDecoder(storage)
+
+    def _execute(self, ctx: NodeContext) -> _data.DataItem:
+
+        file_item = _ctx_lookup(self.node.file_item_id, ctx)
+
+        return self.decoder.decode_table(
+            self.node.capture_name, file_item,
+            self.node.storage_key, self.node.format_code,
+            self.node.schema_source, self.node.schema,
+            self.node.file_id)
+
+
 # MODEL EXECUTION
 # ---------------
 
@@ -882,6 +913,12 @@ class FunctionResolver:
     def resolve_save_data(self, node: SaveDataNode):
         return SaveDataFunc(node, self._resources.get_storage())
 
+    def resolve_capture_file(self, node: CaptureFileNode):
+        return CaptureFileFunc(node, self._resources.get_storage())
+
+    def resolve_decode_table(self, node: DecodeTableNode):
+        return DecodeTableFunc(node, self._resources.get_storage())
+
     def resolve_import_model_node(self, node: ImportModelNode):
         return ImportModelFunc(node, self._resources.get_models())
 
@@ -920,6 +957,8 @@ class FunctionResolver:
         ResourceNode: resolve_resource_node,
         LoadDataNode: resolve_load_data,
         SaveDataNode: resolve_save_data,
+        CaptureFileNode: resolve_capture_file,
+        DecodeTableNode: resolve_decode_table,
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node
     }

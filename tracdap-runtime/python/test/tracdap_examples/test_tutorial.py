@@ -159,6 +159,13 @@ class TutorialModelsTest(unittest.TestCase):
 
         launch.launch_model(BulkDataImport, job_config, sys_config, dev_mode=True)
 
+    def test_capture_job(self):
+
+        job_config = self.examples_root.joinpath("config/capture_job.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_job(job_config, sys_config, dev_mode=True)
+
     def test_data_export(self):
 
         # The export job needs the outputs of the using data example
