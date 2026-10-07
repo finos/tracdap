@@ -274,6 +274,15 @@ public class ImportExportDataTest {
 
         Assertions.assertEquals(ObjectType.STORAGE, storageTag.getDefinition().getObjectType());
         Assertions.assertTrue(storageTag.containsAttrs("trac_create_job"));
+
+        var storageObjectAttr = storageTag.getAttrsOrThrow("trac_storage_object");
+        Assertions.assertEquals(MetadataUtil.objectKey(dataTag.getHeader()), MetadataCodec.decodeStringValue(storageObjectAttr));
+
+        // Attributes reported by the model belong to the dataset, not its storage
+        Assertions.assertFalse(storageTag.containsAttrs("trac_import_location_key"));
+        Assertions.assertFalse(storageTag.containsAttrs("original_file_name"));
+        Assertions.assertFalse(storageTag.containsAttrs("original_file_size"));
+        Assertions.assertFalse(storageTag.containsAttrs("original_file_modified_date"));
     }
 
     @Test @Order(301)
