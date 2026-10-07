@@ -177,7 +177,7 @@ public class TracOrchestratorService extends TracServiceBase {
             var jobExecutor = new JobExecutor<>(registry);
             registry.addSingleton(JobExecutor.class, jobExecutor);
 
-            var jobProcessor = new JobProcessor(platformConfig.getExecutor(), tenantState, commonConcerns, registry);
+            var jobProcessor = new JobProcessor(tenantState, commonConcerns, registry);
             registry.addSingleton(JobProcessor.class, jobProcessor);
 
             var jobManager = new JobManager(platformConfig, registry);
