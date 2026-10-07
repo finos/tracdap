@@ -18,9 +18,11 @@
 package org.finos.tracdap.common.validation;
 
 import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.metadata.FileType;
 import org.finos.tracdap.metadata.ObjectType;
 
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 
@@ -95,6 +97,13 @@ public class ValidationConstants {
 
     // Limit config keys to valid identifiers for now
     public static final Pattern CONFIG_KEY = MetadataConstants.VALID_IDENTIFIER;
+
+    // File formats a capture can read, keyed by lower-case file extension
+    // Kept in step with the capture formats in the Python runtime
+    public static final Map<String, FileType> CAPTURE_FORMATS = Map.of(
+            "csv", FileType.newBuilder().setExtension("csv").setMimeType("text/csv").build(),
+            "parquet", FileType.newBuilder().setExtension("parquet").setMimeType("application/vnd.apache.parquet").build(),
+            "arrow", FileType.newBuilder().setExtension("arrow").setMimeType("application/vnd.apache.arrow.file").build());
 
     // Property keys can also use dotted syntax
     public static final Pattern PROPERTY_KEY = Pattern.compile(

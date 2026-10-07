@@ -73,6 +73,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor IDJ_INPUTS;
     private static final Descriptors.FieldDescriptor IDJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor IDJ_STORAGE_ACCESS;
+    private static final Descriptors.FieldDescriptor IDJ_CAPTURES;
 
     private static final Descriptors.Descriptor EXPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor EDJ_MODEL;
@@ -114,6 +115,7 @@ public class JobConsistencyValidator {
         IDJ_INPUTS = field(IMPORT_DATA_JOB, ImportDataJob.INPUTS_FIELD_NUMBER);
         IDJ_PRIOR_OUTPUTS = field(IMPORT_DATA_JOB, ImportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
         IDJ_STORAGE_ACCESS = field(IMPORT_DATA_JOB, ImportDataJob.STORAGEACCESS_FIELD_NUMBER);
+        IDJ_CAPTURES = field(IMPORT_DATA_JOB, ImportDataJob.CAPTURES_FIELD_NUMBER);
 
         EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
         EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
@@ -260,6 +262,9 @@ public class JobConsistencyValidator {
     @SuppressWarnings("unchecked")
     public static ValidationContext importDataJob(ImportDataJob job, ValidationContext ctx) {
 
+        if (job.getCapturesCount() > 0)
+            return captureImportJob(job, ctx);
+
         var metadata = ctx.getMetadataBundle();
         var modelObj = metadata.getObject(job.getModel());
 
@@ -339,6 +344,61 @@ public class JobConsistencyValidator {
         ctx = ctx.pushRepeated(EDJ_STORAGE_ACCESS)
                 .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
                 .pop();
+
+        return ctx;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ValidationContext captureImportJob(ImportDataJob job, ValidationContext ctx) {
+
+        return ctx.pushMap(IDJ_CAPTURES, ImportDataJob::getCapturesMap)
+                .apply(JobConsistencyValidator::captureSources, Map.class)
+                .pop();
+    }
+
+    private static ValidationContext captureSources(Map<String, CaptureSource> captures, ValidationContext ctx) {
+
+        for (var capture : captures.entrySet()) {
+
+            var captureName = capture.getKey();
+            var fileOutputName = captureName + "_file";
+
+            if (captures.containsKey(fileOutputName)) {
+                ctx = ctx.error(String.format(
+                        "Capture [%s] clashes with the file output of capture [%s]",
+                        fileOutputName, captureName));
+            }
+
+            ctx = captureSource(captureName, capture.getValue(), ctx);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext captureSource(String captureName, CaptureSource capture, ValidationContext ctx) {
+
+        // A capture-only import has no model input to take a schema from
+        if (capture.getSchemaSource() == CaptureSchemaSource.CAPTURE_SCHEMA_SOURCE_NOT_SET)
+            ctx = ctx.error(String.format("Capture [%s] requires a schema source", captureName));
+
+        if (capture.hasSchemaId()) {
+
+            var schemaObj = ctx.getMetadataBundle().getObject(capture.getSchemaId());
+
+            if (schemaObj == null) {
+                ctx = ctx.error(String.format(
+                        "Metadata is not available for the schema of capture [%s] (%s)",
+                        captureName, MetadataUtil.objectKey(capture.getSchemaId())));
+            }
+            else if (schemaObj.getObjectType() != ObjectType.SCHEMA) {
+                ctx = ctx.error(String.format(
+                        "The schema of capture [%s] is not a SCHEMA object (got %s)",
+                        captureName, schemaObj.getObjectType()));
+            }
+        }
+
+        if (capture.hasLocation())
+            ctx = storageAccessIsExternalStorage(capture.getLocation().getStorageKey(), ctx);
 
         return ctx;
     }

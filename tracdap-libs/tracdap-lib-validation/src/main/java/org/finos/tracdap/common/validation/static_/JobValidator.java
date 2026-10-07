@@ -84,6 +84,7 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor IDJ_IMPORTS;
     private static final Descriptors.FieldDescriptor IDJ_OUTPUT_ATTRS;
     private static final Descriptors.FieldDescriptor IDJ_IMPORT_ATTRS;
+    private static final Descriptors.FieldDescriptor IDJ_CAPTURES;
 
     private static final Descriptors.Descriptor EXPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor EDJ_MODEL;
@@ -139,6 +140,7 @@ public class JobValidator {
         IDJ_IMPORTS = field(IMPORT_DATA_JOB, ImportDataJob.IMPORTS_FIELD_NUMBER);
         IDJ_OUTPUT_ATTRS = field(IMPORT_DATA_JOB, ImportDataJob.OUTPUTATTRS_FIELD_NUMBER);
         IDJ_IMPORT_ATTRS = field(IMPORT_DATA_JOB, ImportDataJob.IMPORTATTRS_FIELD_NUMBER);
+        IDJ_CAPTURES = field(IMPORT_DATA_JOB, ImportDataJob.CAPTURES_FIELD_NUMBER);
 
         EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
         EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
@@ -299,6 +301,9 @@ public class JobValidator {
     @Validator
     public static ValidationContext importDataJob(ImportDataJob msg, ValidationContext ctx) {
 
+        if (msg.getCapturesCount() > 0)
+            return captureImportJob(msg, ctx);
+
         ctx = ctx.push(IDJ_MODEL)
                 .apply(CommonValidators::required)
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
@@ -319,6 +324,42 @@ public class JobValidator {
             ctx = ctx.pushRepeated(IDJ_IMPORT_ATTRS)
                     .error("The importAttrs field is not currently supported and must be empty")
                     .pop();
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext captureImportJob(ImportDataJob msg, ValidationContext ctx) {
+
+        if (msg.hasModel()) {
+            ctx = ctx.push(IDJ_MODEL)
+                    .error("A model cannot be used with captures")
+                    .pop();
+        }
+
+        ctx = ctx.pushMap(IDJ_CAPTURES)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(CaptureValidator::captureSource, CaptureSource.class)
+                .pop();
+
+        ctx = outputAttrs(ctx, IDJ_OUTPUT_ATTRS);
+
+        var notUsed = List.of(
+                Map.entry(IDJ_PARAMETERS, msg.getParametersCount()),
+                Map.entry(IDJ_INPUTS, msg.getInputsCount()),
+                Map.entry(IDJ_PRIOR_OUTPUTS, msg.getPriorOutputsCount()),
+                Map.entry(IDJ_STORAGE_ACCESS, msg.getStorageAccessCount()),
+                Map.entry(IDJ_IMPORTS, msg.getImportsCount()),
+                Map.entry(IDJ_IMPORT_ATTRS, msg.getImportAttrsCount()));
+
+        for (var field : notUsed) {
+            if (field.getValue() > 0) {
+                var err = String.format("The %s field is not used with captures and must be empty", field.getKey().getName());
+                ctx = field.getKey().isMapField()
+                        ? ctx.pushMap(field.getKey()).error(err).pop()
+                        : ctx.pushRepeated(field.getKey()).error(err).pop();
+            }
         }
 
         return ctx;

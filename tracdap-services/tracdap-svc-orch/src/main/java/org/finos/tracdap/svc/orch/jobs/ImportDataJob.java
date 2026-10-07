@@ -30,11 +30,16 @@ import java.util.*;
 
 public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
 
+    private final CaptureImportLogic captureLogic = new CaptureImportLogic();
+
     @Override
     public List<TagSelector> requiredMetadata(JobDefinition job) {
 
         if (job.getJobType() != JobType.IMPORT_DATA)
             throw new EUnexpected();
+
+        if (CaptureImportLogic.isCaptureJob(job))
+            return captureLogic.requiredMetadata(job.getImportData());
 
         var importData = job.getImportData();
 
@@ -48,6 +53,9 @@ public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
 
     @Override
     public List<String> requiredResources(JobDefinition job, MetadataBundle metadata) {
+
+        if (CaptureImportLogic.isCaptureJob(job))
+            return captureLogic.requiredResources(job.getImportData());
 
         var resources = new HashSet<String>();
 
@@ -78,6 +86,9 @@ public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
     @Override
     public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
+        if (CaptureImportLogic.isCaptureJob(job))
+            return captureLogic.expectedOutputs(job.getImportData());
+
         var importDataJob = job.getImportData();
 
         var modelObj = metadata.getObject(importDataJob.getModel());
@@ -88,6 +99,9 @@ public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
 
     @Override
     public JobResult processResult(JobConfig jobConfig, JobResult jobResult, Map<String, TagHeader> resultIds) {
+
+        if (CaptureImportLogic.isCaptureJob(jobConfig.getJob()))
+            return captureLogic.processResult(jobConfig.getJob().getImportData(), jobResult, resultIds);
 
         var importData = jobConfig.getJob().getImportData();
 

@@ -36,6 +36,7 @@ import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagUpdate;
@@ -72,6 +73,7 @@ public class JobProcessor {
 
 
     public JobProcessor(
+            PluginConfig executorConfig,
             TenantConfigManager tenantState,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
@@ -82,7 +84,7 @@ public class JobProcessor {
         this.storageClient = registry.getSingleton(TracStorageApiGrpc.TracStorageApiBlockingStub.class);
         this.executor = registry.getSingleton(JobExecutor.class);
 
-        this.lifecycle = new JobProcessorHelpers(tenantState, commonConcerns, registry);
+        this.lifecycle = new JobProcessorHelpers(executorConfig, tenantState, commonConcerns, registry);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {

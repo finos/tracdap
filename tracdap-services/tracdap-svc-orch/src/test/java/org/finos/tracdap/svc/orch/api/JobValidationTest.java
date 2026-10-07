@@ -1916,4 +1916,291 @@ public class JobValidationTest {
 
         expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Export storage access is only allowed");
     }
+
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // CAPTURE-ONLY IMPORT DATA JOBS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private static final String CAPTURE_STORAGE = "UNIT_TEST_EXTERNAL_STORAGE";
+
+    private TagSelector createCaptureSchema() {
+
+        var writeRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.SCHEMA)
+                        .setSchema(SampleData.BASIC_TABLE_SCHEMA))
+                .build();
+
+        return MetadataUtil.selectorFor(metaClient.createObject(writeRequest));
+    }
+
+    private CaptureSource.Builder declaredCapture(String storagePath) {
+
+        return CaptureSource.newBuilder()
+                .setLocation(ExternalLocation.newBuilder()
+                        .setStorageKey(CAPTURE_STORAGE)
+                        .setStoragePath(storagePath))
+                .setSchemaSource(CaptureSchemaSource.CAPTURE_SCHEMA_DECLARED)
+                .setSchemaId(createCaptureSchema());
+    }
+
+    private CaptureSource.Builder fileSchemaCapture(String storagePath) {
+
+        return CaptureSource.newBuilder()
+                .setLocation(ExternalLocation.newBuilder()
+                        .setStorageKey(CAPTURE_STORAGE)
+                        .setStoragePath(storagePath))
+                .setSchemaSource(CaptureSchemaSource.CAPTURE_SCHEMA_FILE);
+    }
+
+    private JobStatus validateCaptureJob(ImportDataJob.Builder importData) {
+
+        var request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_DATA)
+                        .setImportData(importData))
+                .build();
+
+        return orchClient.validateJob(request);
+    }
+
+    private void expectCaptureInvalid(ImportDataJob.Builder importData, Status.Code expectedCode, String expectedMessage) {
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validateCaptureJob(importData));
+        Assertions.assertEquals(expectedCode, e.getStatus().getCode());
+
+        var trailers = e.getTrailers();
+        var errorDetails = trailers != null ? trailers.get(TRAC_ERROR_DETAILS_KEY) : null;
+
+        var errorMessages = errorDetails != null
+                ? errorDetails.getItemsList().stream().map(TracErrorItem::getDetail).collect(Collectors.toList())
+                : new ArrayList<String>();
+
+        errorMessages.add(e.getStatus().getDescription());
+
+        Assertions.assertTrue(
+                errorMessages.stream().anyMatch(msg -> msg != null && msg.contains(expectedMessage)),
+                "Expected error [" + expectedMessage + "], got " + errorMessages);
+    }
+
+    @Test
+    public void captureData_validateOk() {
+
+        var importData = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("2026-09/loans_2026-09-30.csv").build())
+                .putCaptures("rates", declaredCapture("rates.PARQUET").build())
+                .putCaptures("fx", fileSchemaCapture("fx.parquet").build())
+                .putCaptures("prices", fileSchemaCapture("prices.arrow").build())
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("business_segments")
+                        .setValue(MetadataCodec.encodeValue("retail")));
+
+        var response = validateCaptureJob(importData);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+    }
+
+    @Test
+    public void captureData_modelWithCaptures() {
+
+        var modelSelector = createDataImportModel(List.of());
+
+        var importData = ImportDataJob.newBuilder()
+                .setModel(modelSelector)
+                .putCaptures("loans", declaredCapture("loans.csv").build());
+
+        expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "A model cannot be used with captures");
+    }
+
+    @Test
+    public void captureData_badLocation() {
+
+        var noLocation = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").clearLocation().build());
+
+        expectCaptureInvalid(noLocation, Status.Code.INVALID_ARGUMENT, "source");
+
+        var badKey = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder().setStorageKey("not a key").setStoragePath("loans.csv"))
+                        .build());
+
+        expectCaptureInvalid(badKey, Status.Code.INVALID_ARGUMENT, "storageKey");
+
+        for (var path : List.of("../loans.csv", "data/../../loans.csv", "C:\\loans.csv")) {
+
+            var badPath = ImportDataJob.newBuilder()
+                    .putCaptures("loans", declaredCapture(path).build());
+
+            expectCaptureInvalid(badPath, Status.Code.INVALID_ARGUMENT, "storagePath");
+        }
+
+        var badFileName = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("data/PRN.csv").build());
+
+        expectCaptureInvalid(badFileName, Status.Code.INVALID_ARGUMENT, "reserved filename");
+    }
+
+    @Test
+    public void captureData_badExtension() {
+
+        for (var path : List.of("loans", "loans.txt", "loans.csv.zip", "data.csv/loans")) {
+
+            var importData = ImportDataJob.newBuilder()
+                    .putCaptures("loans", declaredCapture(path).build());
+
+            expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "cannot be captured");
+        }
+    }
+
+    @Test
+    public void captureData_schemaSourceMismatch() {
+
+        var declaredNoSchema = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").clearSchemaId().build());
+
+        expectCaptureInvalid(declaredNoSchema, Status.Code.INVALID_ARGUMENT, "schemaSpecifier");
+
+        var inlineSchema = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").setSchema(SampleData.BASIC_TABLE_SCHEMA).build());
+
+        expectCaptureInvalid(inlineSchema, Status.Code.INVALID_ARGUMENT, "inline schema is not supported");
+
+        var fileWithSchemaId = ImportDataJob.newBuilder()
+                .putCaptures("fx", fileSchemaCapture("fx.parquet").setSchemaId(createCaptureSchema()).build());
+
+        expectCaptureInvalid(fileWithSchemaId, Status.Code.INVALID_ARGUMENT, "cannot also declare a schema");
+
+        var fileSchemaCsv = ImportDataJob.newBuilder()
+                .putCaptures("loans", fileSchemaCapture("loans.csv").build());
+
+        expectCaptureInvalid(fileSchemaCsv, Status.Code.INVALID_ARGUMENT, "needs a declared schema");
+
+        var wrongSchemaType = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").setSchemaId(basicDataSelector).build());
+
+        expectCaptureInvalid(wrongSchemaType, Status.Code.INVALID_ARGUMENT, "schemaId");
+    }
+
+    @Test
+    public void captureData_noSchemaSource() {
+
+        var importData = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .setSchemaSource(CaptureSchemaSource.CAPTURE_SCHEMA_SOURCE_NOT_SET)
+                        .build());
+
+        expectCaptureInvalid(importData, Status.Code.FAILED_PRECONDITION, "requires a schema source");
+    }
+
+    @Test
+    public void captureData_schemaNotAvailable() {
+
+        var missingSchema = MetadataUtil.selectorFor(TagHeader.newBuilder()
+                .setObjectType(ObjectType.SCHEMA)
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build());
+
+        var importData = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").setSchemaId(missingSchema).build());
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validateCaptureJob(importData));
+        Assertions.assertNotEquals(Status.Code.OK, e.getStatus().getCode());
+    }
+
+    @Test
+    public void captureData_storageNotExternal() {
+
+        var internalStorage = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder().setStorageKey("UNIT_TEST_STORAGE").setStoragePath("loans.csv"))
+                        .build());
+
+        expectCaptureInvalid(internalStorage, Status.Code.FAILED_PRECONDITION, "is the wrong type");
+
+        var unknownStorage = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder().setStorageKey("NOT_CONFIGURED").setStoragePath("loans.csv"))
+                        .build());
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validateCaptureJob(unknownStorage));
+        Assertions.assertNotEquals(Status.Code.OK, e.getStatus().getCode());
+    }
+
+    @Test
+    public void captureData_outputClash() {
+
+        var importData = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .putCaptures("loans_file", declaredCapture("loans_2.csv").build());
+
+        expectCaptureInvalid(importData, Status.Code.FAILED_PRECONDITION, "clashes with the file output");
+    }
+
+    @Test
+    public void captureData_badNamesAndAttrs() {
+
+        var badName = ImportDataJob.newBuilder()
+                .putCaptures("trac_loans", declaredCapture("loans.csv").build());
+
+        expectCaptureInvalid(badName, Status.Code.INVALID_ARGUMENT, "reserved identifier");
+
+        var reservedDataAttr = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .addDataAttrs(TagUpdate.newBuilder()
+                                .setAttrName("trac_import_content_hash")
+                                .setValue(MetadataCodec.encodeValue("forged")))
+                        .build());
+
+        expectCaptureInvalid(reservedDataAttr, Status.Code.INVALID_ARGUMENT, "trac_import_content_hash");
+
+        var reservedFileAttr = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .addFileAttrs(TagUpdate.newBuilder()
+                                .setAttrName("trac_capture_file")
+                                .setValue(MetadataCodec.encodeValue("forged")))
+                        .build());
+
+        expectCaptureInvalid(reservedFileAttr, Status.Code.INVALID_ARGUMENT, "trac_capture_file");
+    }
+
+    @Test
+    public void captureData_fieldsMustBeEmpty() {
+
+        var withParameters = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .putParameters("param", MetadataCodec.encodeValue(1));
+
+        expectCaptureInvalid(withParameters, Status.Code.INVALID_ARGUMENT, "parameters field is not used with captures");
+
+        var withInputs = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .putInputs("input", basicDataSelector);
+
+        expectCaptureInvalid(withInputs, Status.Code.INVALID_ARGUMENT, "inputs field is not used with captures");
+
+        var withOutputs = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .putOutputs("output", basicDataSelector);
+
+        expectCaptureInvalid(withOutputs, Status.Code.INVALID_ARGUMENT, "Outputs must be empty");
+
+        var withPriorOutputs = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .putPriorOutputs("loans", basicDataSelector);
+
+        expectCaptureInvalid(withPriorOutputs, Status.Code.INVALID_ARGUMENT, "priorOutputs field is not used with captures");
+
+        var withStorageAccess = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .addStorageAccess(CAPTURE_STORAGE);
+
+        expectCaptureInvalid(withStorageAccess, Status.Code.INVALID_ARGUMENT, "storageAccess field is not used with captures");
+    }
 }

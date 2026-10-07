@@ -49,6 +49,9 @@ public class ConfigKeys {
     public static final String STORAGE_DEFAULT_FORMAT = "storage.default.format";
     public static final String STORAGE_DEFAULT_LAYOUT = "storage.default.layout";
 
+    // Runtime limits
+    public static final String RUNTIME_LIMIT_CAPTURE_SIZE = "runtime.limit.captureSize";
+
     // Runtime results
     public static final String RESULT_ENABLED = "result.enabled";
     public static final String RESULT_LOGS_ENABLED = "result.logs.enabled";

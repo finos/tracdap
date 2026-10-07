@@ -52,6 +52,7 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 public class JobProcessorHelpers {
 
     public static final String RESULT_PATH_TEMPLATE = "%d/%s/%s/trac_job_result.json";
+    public static final String CAPTURE_MAX_SIZE_CONFIG_KEY = "captureMaxSize";
 
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
@@ -63,12 +64,16 @@ public class JobProcessorHelpers {
     private final ConfigManager configManager;
     private final Validator validator = new Validator();
 
+    private final String captureSizeLimit;
+
 
     public JobProcessorHelpers(
+            PluginConfig executorConfig,
             TenantConfigManager tenantState,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
+        this.captureSizeLimit = executorConfig.getPropertiesOrDefault(CAPTURE_MAX_SIZE_CONFIG_KEY, null);
         this.tenantState = tenantState;
         this.commonConcerns = commonConcerns;
 
@@ -352,6 +357,10 @@ public class JobProcessorHelpers {
 
         var sysConfig = RuntimeConfig.newBuilder();
         sysConfig.putAllProperties(tenantConfig.getPropertiesMap());
+
+        // The capture size limit is set per platform, tenants cannot override it
+        if (captureSizeLimit != null)
+            sysConfig.putProperties(ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE, captureSizeLimit);
         sysConfig.putAllResources(jobState.resources.getResources());
 
         var newState = jobState.clone();
