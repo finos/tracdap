@@ -122,6 +122,32 @@ message ResultDefinition {
   optional TagSelector logFileId = 4;
 
   map<string, TagSelector> outputs = 5;
+
+  /// Files written to external storage, keyed by placement name
+  map<string, PlacementRecord> placements = 6;
+}
+
+/**
+ * A file a job placed in external storage
+ */
+message PlacementRecord {
+
+  /// The DATA object placed, at the version used
+  TagSelector dataId = 1;
+
+  /// Where the file was written: storage key, the path actually written, protocol and location details
+  ExternalLocation location = 2;
+
+  /// Format code of the file written (e.g. CSV, PARQUET, ARROW_FILE)
+  string format = 3;
+
+  string mimeType = 4;
+
+  /// Size of the file written, in bytes
+  int64 size = 5;
+
+  /// SHA-256 of the bytes written, in hex
+  string contentHash = 6;
 }
 
 /**
@@ -264,6 +290,9 @@ enum CaptureSchemaSource {
 
 /**
  * Specification for an EXPORT_DATA job
+ *
+ * An export job places TRAC datasets in external storage, with no model. The model-based fields
+ * are not used by export jobs and must be empty. Export models run as export nodes in a flow.
  */
 message ExportDataJob {
 
@@ -275,9 +304,42 @@ message ExportDataJob {
   map<string, TagSelector> priorOutputs = 5;
 
   repeated string storageAccess = 6;
-  map<string, TagSelector> exports = 7;
+  map<string, TagSelector> exports = 7 [deprecated = true];
 
   repeated TagUpdate outputAttrs = 8;
+
+  /// Datasets to place in external storage, keyed by placement name
+  map<string, PlacementTarget> placements = 9;
+
+  /// What every placement in the job does when a file already exists at its path
+  PlacementConflict placementConflict = 10;
+}
+
+/**
+ * Place a TRAC dataset into external storage as a data file, as part of a job.
+ *
+ * The runtime encodes the dataset with TRAC's format codecs and writes one file.
+ * The job's RESULT records what was written.
+ */
+message PlacementTarget {
+
+  /// What to place
+  oneof source {
+    TagSelector dataId = 1;             // an existing DATA object
+  }
+
+  /// Where to place it: a single file path, whose extension sets the format
+  ExternalLocation location = 3;
+}
+
+/**
+ * What a placement does when a file already exists at its path
+ */
+enum PlacementConflict {
+  PLACEMENT_CONFLICT_NOT_SET = 0;       // same as PLACEMENT_SUFFIX
+  PLACEMENT_SUFFIX = 1;                 // write name-2.ext, name-3.ext, ... (the first free name)
+  PLACEMENT_OVERWRITE = 2;              // replace the existing file
+  PLACEMENT_FAIL = 3;                   // fail the job, before any placement writes
 }
 
 

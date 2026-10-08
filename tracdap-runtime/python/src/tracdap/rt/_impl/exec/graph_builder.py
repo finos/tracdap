@@ -21,6 +21,7 @@ import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.core.file_formats as _file_formats
+import tracdap.rt._impl.core.placement as _placement
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.resources as _resources
@@ -194,16 +195,16 @@ class GraphBuilder:
 
     def build_import_export_data_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
-        if job_def.jobType == _meta.JobType.IMPORT_DATA and job_def.importData.captures:
+        if job_def.jobType == _meta.JobType.EXPORT_DATA:
+            return self.build_placement_job(job_def, job_push_id)
+
+        if job_def.importData.captures:
             return self.build_capture_job(job_def, job_push_id)
 
         # TODO: These are processed as regular calculation jobs for now
         # That might be ok, but is worth reviewing
 
-        if job_def.jobType == _meta.JobType.IMPORT_DATA:
-            job_details = job_def.importData
-        else:
-            job_details = job_def.exportData
+        job_details = job_def.importData
 
         target_selector = job_details.model
         target_obj = _util.get_job_metadata(target_selector, self._job_config)
@@ -359,6 +360,116 @@ class GraphBuilder:
             self._error(_ex.EJobValidation(f"Capture [{capture_name}] requires a schema source"))
 
         return None, None
+
+    def build_placement_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
+
+        job_details = job_def.exportData
+
+        self._check_placement_job_fields(job_def.jobType, job_details)
+
+        if not job_details.placements:
+            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] requires at least one placement"))
+
+        conflict = job_details.placementConflict
+
+        if conflict is None or conflict == _meta.PlacementConflict.PLACEMENT_CONFLICT_NOT_SET:
+            conflict = _meta.PlacementConflict.PLACEMENT_SUFFIX
+        target_paths = dict()
+
+        nodes = dict()
+        prepare_ids = []
+
+        for placement_name, placement in job_details.placements.items():
+
+            prepare_id = self._build_placement_prepare(
+                placement_name, placement, conflict, target_paths,
+                nodes, explicit_deps=[job_push_id])
+
+            if prepare_id is not None:
+                prepare_ids.append(prepare_id)
+
+        # Nothing is written until every placement has been encoded
+        place_ids = dict()
+
+        for prepare_id in prepare_ids:
+
+            placement_name = prepare_id.name.replace(":PREPARE", "")
+            place_id = NodeId(f"{placement_name}:PLACE", self._job_namespace, _meta.PlacementRecord)
+            nodes[place_id] = PlaceFileNode(place_id, placement_name, prepare_id, conflict, explicit_deps=prepare_ids)
+            place_ids[placement_name] = place_id
+
+        main_section = GraphSection(nodes, must_run=list(place_ids.values()))
+
+        result_section = self.build_job_result(
+            [], placements=place_ids,
+            explicit_deps=[job_push_id, *main_section.must_run])
+
+        return self._join_sections(main_section, result_section)
+
+    def _check_placement_job_fields(self, job_type: _meta.JobType, job_details: _meta.ExportDataJob):
+
+        if job_details.model is not None and job_details.model.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(
+                f"Job type [{job_type.name}] takes no model, export models run as export nodes in a flow"))
+
+        unused_fields = {
+            "parameters": job_details.parameters, "inputs": job_details.inputs,
+            "outputs": job_details.outputs, "priorOutputs": job_details.priorOutputs,
+            "storageAccess": job_details.storageAccess, "exports": job_details.exports,
+            "outputAttrs": job_details.outputAttrs}
+
+        for field_name, field_value in unused_fields.items():
+            if field_value:
+                self._error(_ex.EJobValidation(
+                    f"Job type [{job_type.name}] does not use [{field_name}], it must be empty"))
+
+    def _build_placement_prepare(
+            self, placement_name: str, placement: _meta.PlacementTarget,
+            conflict: _meta.PlacementConflict, target_paths: _tp.Dict[_tp.Tuple[str, str], str],
+            nodes: _tp.Dict[NodeId, Node], explicit_deps: _tp.List[NodeId]) \
+            -> _tp.Optional[NodeId]:
+
+        if placement.dataId is None or placement.dataId.objectType == _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(f"Placement [{placement_name}] requires a dataset (dataId)"))
+            return None
+
+        location = placement.location
+
+        if location is None or not location.storageKey or not location.storagePath:
+            self._error(_ex.EJobValidation(f"Placement [{placement_name}] requires a storage location and path"))
+            return None
+
+        extension = _file_formats.ExternalFileFormats.file_extension(location.storagePath)
+        file_format = _file_formats.ExternalFileFormats.for_extension(extension) if extension else None
+
+        if file_format is None:
+            self._error(_ex.EJobValidation(
+                f"Placement [{placement_name}] has an unsupported file type [{location.storagePath}]" +
+                f" (the file name must end in .csv, .parquet or .arrow)"))
+            return None
+
+        target_key = (location.storageKey, location.storagePath.lower())
+
+        if target_key in target_paths:
+            self._error(_ex.EJobValidation(
+                f"Placements [{target_paths[target_key]}] and [{placement_name}] write to the same path" +
+                f" [{location.storagePath}] in [{location.storageKey}]"))
+            return None
+
+        target_paths[target_key] = placement_name
+
+        input_outputs = set()
+        self._build_data_input(placement_name, placement.dataId, nodes, input_outputs, explicit_deps)
+        data_view_id = input_outputs.pop()
+
+        data_id = _util.get_job_mapping(placement.dataId, self._job_config)
+
+        prepare_id = NodeId(f"{placement_name}:PREPARE", self._job_namespace, _placement.PreparedPlacement)
+        nodes[prepare_id] = PreparePlacementNode(
+            prepare_id, placement_name, data_view_id, data_id,
+            location, file_format, conflict)
+
+        return prepare_id
 
     def build_run_model_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
@@ -899,8 +1010,6 @@ class GraphBuilder:
         # Set up storage access for import / export data jobs, and export models in flows
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
             storage_access = job_def.importData.storageAccess
-        elif job_def.jobType == _meta.JobType.EXPORT_DATA:
-            storage_access = job_def.exportData.storageAccess
         elif job_def.jobType == _meta.JobType.RUN_FLOW and model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL:
             storage_access = job_def.runFlow.exportStorageAccess
         else:
@@ -1126,8 +1235,6 @@ class GraphBuilder:
 
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
             allowed_model_types = [_meta.ModelType.DATA_IMPORT_MODEL]
-        elif job_def.jobType == _meta.JobType.EXPORT_DATA:
-            allowed_model_types = [_meta.ModelType.DATA_EXPORT_MODEL]
         else:
             allowed_model_types = [_meta.ModelType.STANDARD_MODEL]
 
@@ -1255,7 +1362,8 @@ class GraphBuilder:
     def build_job_result(
             self, output_ids: _tp.List[NodeId[JOB_OUTPUT_TYPE]],
             output_keys: _tp.Optional[_tp.Dict[NodeId, str]] = None,
-            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None,
+            placements: _tp.Optional[_tp.Dict[str, NodeId[_meta.PlacementRecord]]] = None) \
             -> GraphSection:
 
         if output_keys:
@@ -1271,11 +1379,14 @@ class GraphBuilder:
             self._job_config.jobId,
             self._job_config.resultId,
             named_outputs, unnamed_outputs,
+            placements=placements or dict(),
             explicit_deps=explicit_deps)
 
         result_nodes = {result_node_id: result_node}
 
-        return GraphSection(result_nodes, inputs=set(output_ids), must_run=[result_node_id])
+        result_inputs = {*output_ids, *(placements or dict()).values()}
+
+        return GraphSection(result_nodes, inputs=result_inputs, must_run=[result_node_id])
 
     def build_dynamic_outputs(self, source_id: NodeId, output_names: _tp.List[str]) -> GraphUpdate:
 

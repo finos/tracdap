@@ -28,6 +28,7 @@ import tracdap.rt._impl.exec.context as _ctx
 import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.core.type_system as _types
 import tracdap.rt._impl.core.capture as _capture
+import tracdap.rt._impl.core.placement as _placement
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.resources as _resources
@@ -581,6 +582,36 @@ class DecodeTableFunc(NodeFunction[_data.DataItem]):
             self.node.file_id)
 
 
+class PreparePlacementFunc(NodeFunction[_placement.PreparedPlacement]):
+
+    def __init__(self, node: PreparePlacementNode, writer: _placement.PlacementWriter):
+        super().__init__()
+        self.node = node
+        self.writer = writer
+
+    def _execute(self, ctx: NodeContext) -> _placement.PreparedPlacement:
+
+        data_view = _ctx_lookup(self.node.data_view_id, ctx)
+
+        return self.writer.prepare(
+            self.node.placement_name, data_view, self.node.data_id,
+            self.node.location, self.node.file_format, self.node.conflict)
+
+
+class PlaceFileFunc(NodeFunction[_meta.PlacementRecord]):
+
+    def __init__(self, node: PlaceFileNode, writer: _placement.PlacementWriter):
+        super().__init__()
+        self.node = node
+        self.writer = writer
+
+    def _execute(self, ctx: NodeContext) -> _meta.PlacementRecord:
+
+        prepared = _ctx_lookup(self.node.prepared_id, ctx)
+
+        return self.writer.place(prepared, self.node.conflict)
+
+
 # MODEL EXECUTION
 # ---------------
 
@@ -732,6 +763,9 @@ class JobResultFunc(NodeFunction[_cfg.JobResult]):
 
         self._process_named_outputs(self.node.named_outputs, ctx, job_result)
         self._process_unnamed_outputs(self.node.unnamed_outputs, ctx, job_result)
+
+        for placement_name, placement_id in self.node.placements.items():
+            result_def.placements[placement_name] = _ctx_lookup(placement_id, ctx)
 
         # TODO: Handle individual failed results
 
@@ -919,6 +953,15 @@ class FunctionResolver:
     def resolve_decode_table(self, node: DecodeTableNode):
         return DecodeTableFunc(node, self._resources.get_storage())
 
+    def resolve_prepare_placement(self, node: PreparePlacementNode):
+        return PreparePlacementFunc(node, self._placement_writer())
+
+    def resolve_place_file(self, node: PlaceFileNode):
+        return PlaceFileFunc(node, self._placement_writer())
+
+    def _placement_writer(self) -> _placement.PlacementWriter:
+        return _placement.PlacementWriter(self._resources.get_storage(), self._resources.get_scratch_dir())
+
     def resolve_import_model_node(self, node: ImportModelNode):
         return ImportModelFunc(node, self._resources.get_models())
 
@@ -959,6 +1002,8 @@ class FunctionResolver:
         SaveDataNode: resolve_save_data,
         CaptureFileNode: resolve_capture_file,
         DecodeTableNode: resolve_decode_table,
+        PreparePlacementNode: resolve_prepare_placement,
+        PlaceFileNode: resolve_place_file,
         RunModelNode: resolve_run_model_node,
         ImportModelNode: resolve_import_model_node
     }

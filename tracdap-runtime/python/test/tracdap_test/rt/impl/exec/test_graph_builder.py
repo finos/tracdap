@@ -302,22 +302,17 @@ class GraphBuilderImportExportTest(unittest.TestCase):
         self.assertEqual({"sample_data:SAVE"}, self._node_names(job_graph, graph.SaveDataNode))
         self.assertEqual(1, len(self._node_names(job_graph, graph.RunModelNode)))
 
-    def test_export_model_job(self):
-
-        job_graph = self._build_job(meta.JobType.EXPORT_DATA, meta.ModelType.DATA_EXPORT_MODEL)
-
-        self.assertEqual(set(), self._node_names(job_graph, graph.SaveDataNode))
-        self.assertEqual(1, len(self._node_names(job_graph, graph.RunModelNode)))
-
     def test_import_job_standard_model(self):
 
         with self.assertRaisesRegex(ex.EJobValidation, re.escape("Job type [IMPORT_DATA] cannot use model type [STANDARD_MODEL]")):
             self._build_job(meta.JobType.IMPORT_DATA, meta.ModelType.STANDARD_MODEL)
 
-    def test_export_job_import_model(self):
+    def test_export_job_model_rejected(self):
 
-        with self.assertRaisesRegex(ex.EJobValidation, re.escape("Job type [EXPORT_DATA] cannot use model type [DATA_IMPORT_MODEL]")):
-            self._build_job(meta.JobType.EXPORT_DATA, meta.ModelType.DATA_IMPORT_MODEL)
+        for model_type in [meta.ModelType.DATA_EXPORT_MODEL, meta.ModelType.DATA_IMPORT_MODEL]:
+            with self.subTest(model_type=model_type.name):
+                with self.assertRaisesRegex(ex.EJobValidation, re.escape("Job type [EXPORT_DATA] takes no model")):
+                    self._build_job(meta.JobType.EXPORT_DATA, model_type)
 
     def test_import_job_no_model(self):
 
