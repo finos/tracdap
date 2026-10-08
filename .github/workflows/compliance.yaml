@@ -168,12 +168,16 @@ jobs:
           name: compliance-reports-python
           path: build/compliance/**
 
+      # CVE-2026-104851 (GHSA-27vj-qcqg-25rc) is in fsspec's ReferenceFileSystem (the reference:// protocol), which renders
+      # template fields from Kerchunk reference JSON in an unsandboxed Jinja2 environment. The runtime never opens a
+      # reference filesystem: it only constructs GCSFileSystem and AzureBlobFileSystem directly, and never resolves fsspec
+      # URLs or protocol strings, so the vulnerable code path is not used.
       - name: Pip-audit Dependency Check
         env:
           PIP_AUDIT_PROGRESS_SPINNER: "off"
         run: |
           pip install --quiet pip-audit
-          pip-audit --ignore-vuln PYSEC-2026-3740
+          pip-audit --ignore-vuln PYSEC-2026-3740 --ignore-vuln CVE-2026-104851
 
   web_api_compliance:
 
