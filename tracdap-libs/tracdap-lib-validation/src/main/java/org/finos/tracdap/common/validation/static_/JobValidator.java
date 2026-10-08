@@ -86,6 +86,10 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor IDJ_IMPORT_ATTRS;
     private static final Descriptors.FieldDescriptor IDJ_CAPTURES;
 
+    private static final Descriptors.Descriptor CAPTURE_SOURCE;
+    private static final Descriptors.OneofDescriptor CS_SOURCE;
+    private static final Descriptors.FieldDescriptor CS_LOCATION;
+
     private static final Descriptors.Descriptor EXPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor EDJ_MODEL;
     private static final Descriptors.FieldDescriptor EDJ_PARAMETERS;
@@ -142,6 +146,10 @@ public class JobValidator {
         IDJ_IMPORT_ATTRS = field(IMPORT_DATA_JOB, ImportDataJob.IMPORTATTRS_FIELD_NUMBER);
         IDJ_CAPTURES = field(IMPORT_DATA_JOB, ImportDataJob.CAPTURES_FIELD_NUMBER);
 
+        CAPTURE_SOURCE = CaptureSource.getDescriptor();
+        CS_LOCATION = field(CAPTURE_SOURCE, CaptureSource.LOCATION_FIELD_NUMBER);
+        CS_SOURCE = CS_LOCATION.getContainingOneof();
+
         EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
         EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
         EDJ_PARAMETERS = field(EXPORT_DATA_JOB, ExportDataJob.PARAMETERS_FIELD_NUMBER);
@@ -165,7 +173,8 @@ public class JobValidator {
 
         return ctx
                 .apply(JobValidator::job, JobDefinition.class, /* isClientRequest = */ true)
-                .apply(JobValidator::outputsMustBeEmpty, JobDefinition.class);
+                .apply(JobValidator::outputsMustBeEmpty, JobDefinition.class)
+                .apply(JobValidator::locationDetailsMustBeEmpty, JobDefinition.class);
     }
 
     public static ValidationContext job(JobDefinition msg, boolean isClientRequest, ValidationContext ctx) {
@@ -504,5 +513,29 @@ public class JobValidator {
         }
 
         return ctx;
+    }
+
+    public static ValidationContext locationDetailsMustBeEmpty(JobDefinition msg, ValidationContext ctx) {
+
+        if (msg.getJobType() != JobType.IMPORT_DATA)
+            return ctx;
+
+        return ctx.pushOneOf(JD_JOB_DETAILS)
+                .apply(JobValidator::locationDetailsMustBeEmpty, ImportDataJob.class)
+                .pop();
+    }
+
+    private static ValidationContext locationDetailsMustBeEmpty(ImportDataJob msg, ValidationContext ctx) {
+
+        return ctx.pushMap(IDJ_CAPTURES)
+                .applyMapValues(JobValidator::locationDetailsMustBeEmpty, CaptureSource.class)
+                .pop();
+    }
+
+    private static ValidationContext locationDetailsMustBeEmpty(CaptureSource msg, ValidationContext ctx) {
+
+        return ctx.pushOneOf(CS_SOURCE)
+                .applyOneOf(CS_LOCATION, ExternalLocationValidator::locationDetailsMustBeEmpty, ExternalLocation.class)
+                .pop();
     }
 }

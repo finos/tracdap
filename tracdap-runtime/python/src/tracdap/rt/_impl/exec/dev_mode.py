@@ -22,7 +22,7 @@ import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.core.capture as _capture
+import tracdap.rt._impl.core.file_formats as _file_formats
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
@@ -902,8 +902,8 @@ class DevModeTranslator:
             capture.schema = self._process_capture_schema(capture_name, capture.schema)
 
             # Unsupported file types are reported by the graph builder
-            extension = _capture.CaptureFormats.file_extension(capture.location.storagePath) if capture.location else None
-            capture_format = _capture.CaptureFormats.for_extension(extension) if extension else None
+            extension = _file_formats.ExternalFileFormats.file_extension(capture.location.storagePath) if capture.location else None
+            capture_format = _file_formats.ExternalFileFormats.for_extension(extension) if extension else None
 
             if capture_format is None:
                 continue
@@ -914,7 +914,7 @@ class DevModeTranslator:
 
             file_socket = _meta.ModelOutputSchema(
                 objectType=_meta.ObjectType.FILE,
-                fileType=_capture.CaptureFormats.file_type(extension, capture_format))
+                fileType=_file_formats.ExternalFileFormats.file_type(extension, capture_format))
 
             for key, socket in [(capture_name, data_socket), (f"{capture_name}_file", file_socket)]:
 

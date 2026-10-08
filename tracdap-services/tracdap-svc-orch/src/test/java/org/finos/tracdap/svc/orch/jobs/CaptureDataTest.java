@@ -154,6 +154,25 @@ public class CaptureDataTest {
 
         var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
 
+        // The stored job records where each storage key pointed, without credentials
+
+        var jobObj = platform.metaClientBlocking().readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
+                .build());
+
+        for (var capture : jobObj.getDefinition().getJob().getImportData().getCapturesMap().values()) {
+
+            var recordedLocation = capture.getLocation();
+
+            Assertions.assertEquals(EXTERNAL_STORAGE_KEY, recordedLocation.getStorageKey());
+            Assertions.assertEquals("LOCAL", recordedLocation.getProtocol());
+            Assertions.assertEquals(Set.of("rootPath"), recordedLocation.getLocationDetailsMap().keySet());
+            Assertions.assertEquals(
+                    externalStorageDir.toAbsolutePath().normalize(),
+                    Path.of(recordedLocation.getLocationDetailsOrThrow("rootPath")).toAbsolutePath().normalize());
+        }
+
         var datasets = outputsByName(ObjectType.DATA, jobKey);
         var files = outputsByName(ObjectType.FILE, jobKey);
 

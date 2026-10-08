@@ -20,7 +20,7 @@ import typing as _tp
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
-import tracdap.rt._impl.core.capture as _capture
+import tracdap.rt._impl.core.file_formats as _file_formats
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.resources as _resources
@@ -265,8 +265,8 @@ class GraphBuilder:
             self._error(_ex.EJobValidation(f"Capture [{capture_name}] requires a storage location and path"))
             return GraphSection(nodes)
 
-        extension = _capture.CaptureFormats.file_extension(location.storagePath)
-        capture_format = _capture.CaptureFormats.for_extension(extension) if extension else None
+        extension = _file_formats.ExternalFileFormats.file_extension(location.storagePath)
+        capture_format = _file_formats.ExternalFileFormats.for_extension(extension) if extension else None
 
         if capture_format is None:
             self._error(_ex.EJobValidation(
@@ -294,7 +294,7 @@ class GraphBuilder:
         nodes[file_item_id] = DataItemNode(file_item_id, file_view_id)
 
         # The FILE is stored under its output name, its definition carries the source file name
-        file_type = _capture.CaptureFormats.file_type(extension, capture_format)
+        file_type = _file_formats.ExternalFileFormats.file_type(extension, capture_format)
         file_spec = _storage.build_file_spec(
             file_id, storage_id, file_output_name, file_type,
             self._sys_config, prior_spec=prior_file_spec)
@@ -329,7 +329,7 @@ class GraphBuilder:
 
     def _capture_schema(
             self, capture_name: str, capture: _meta.CaptureSource,
-            capture_format: _capture.CaptureFormat) \
+            capture_format: _file_formats.ExternalFileFormat) \
             -> _tp.Tuple[_tp.Optional[_meta.SchemaDefinition], _tp.Optional[_meta.TagSelector]]:
 
         has_schema_id = capture.schemaId is not None and capture.schemaId.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET

@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import dataclasses as dc
 import hashlib
 import io
 import pathlib
@@ -33,42 +32,6 @@ import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.type_system as _types
-
-
-@dc.dataclass(frozen=True)
-class CaptureFormat:
-
-    format_code: str
-    mime_type: str
-
-
-class CaptureFormats:
-
-    # Kept in step with CAPTURE_FORMATS in the platform validation library
-    __CAPTURE_FORMATS = {
-        "CSV": CaptureFormat("CSV", "text/csv"),
-        "PARQUET": CaptureFormat("PARQUET", "application/vnd.apache.parquet"),
-        "ARROW_FILE": CaptureFormat("ARROW_FILE", "application/vnd.apache.arrow.file")
-    }
-
-    @classmethod
-    def file_extension(cls, storage_path: str) -> tp.Optional[str]:
-
-        suffix = pathlib.PurePosixPath(storage_path).suffix
-        return suffix[1:] if len(suffix) > 1 else None
-
-    @classmethod
-    def for_extension(cls, extension: str) -> tp.Optional[CaptureFormat]:
-
-        try:
-            codec = _storage.FormatManager.get_data_format(f".{extension.lower()}", format_options={})
-            return cls.__CAPTURE_FORMATS.get(codec.format_code())
-        except _ex.EStorageConfig:
-            return None
-
-    @classmethod
-    def file_type(cls, extension: str, capture_format: CaptureFormat) -> _meta.FileType:
-        return _meta.FileType(extension.lower(), capture_format.mime_type)
 
 
 def _attr(attr_name: str, value: tp.Any) -> _meta.TagUpdate:

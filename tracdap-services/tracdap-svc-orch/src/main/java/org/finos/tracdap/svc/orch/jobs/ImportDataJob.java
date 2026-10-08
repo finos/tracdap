@@ -73,6 +73,9 @@ public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
     @Override
     public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
+        if (CaptureImportLogic.isCaptureJob(job))
+            return captureLogic.applyJobTransform(job, resources);
+
         // No transformations currently required
         return job;
     }

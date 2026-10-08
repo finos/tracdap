@@ -2053,8 +2053,32 @@ public class JobValidationTest {
             var importData = ImportDataJob.newBuilder()
                     .putCaptures("loans", declaredCapture(path).build());
 
-            expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "cannot be captured");
+            expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "is not a supported data file");
         }
+    }
+
+    @Test
+    public void captureData_clientLocationDetails() {
+
+        var protocol = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder()
+                                .setStorageKey(CAPTURE_STORAGE)
+                                .setStoragePath("loans.csv")
+                                .setProtocol("LOCAL"))
+                        .build());
+
+        expectCaptureInvalid(protocol, Status.Code.INVALID_ARGUMENT, "protocol of an external location is set by the platform");
+
+        var locationDetails = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder()
+                                .setStorageKey(CAPTURE_STORAGE)
+                                .setStoragePath("loans.csv")
+                                .putLocationDetails("rootPath", "/tmp"))
+                        .build());
+
+        expectCaptureInvalid(locationDetails, Status.Code.INVALID_ARGUMENT, "location details of an external location are set by the platform");
     }
 
     @Test

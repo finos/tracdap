@@ -244,6 +244,13 @@ message ExternalLocation {
 
   /// Path of a single file, relative to the resource root
   string storagePath = 2;
+
+  /// Protocol of the storage resource when the job was submitted; set by the platform
+  string protocol = 3;
+
+  /// Location properties of the storage resource when the job was submitted (e.g. bucket, container, prefix,
+  /// root path); set by the platform, never credentials
+  map<string, string> locationDetails = 4;
 }
 
 /**

@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.*;
 
@@ -49,6 +50,23 @@ class CaptureImportLogic extends RunModelOrFlow {
             storageKeys.add(capture.getLocation().getStorageKey());
 
         return new ArrayList<>(storageKeys);
+    }
+
+    JobDefinition applyJobTransform(JobDefinition job, ResourceBundle resources) {
+
+        var importData = job.getImportData().toBuilder();
+
+        for (var capture : job.getImportData().getCapturesMap().entrySet()) {
+
+            var location = ExternalLocationDetails.recordLocationDetails(capture.getValue().getLocation(), resources);
+            var recorded = capture.getValue().toBuilder().setLocation(location).build();
+
+            importData.putCaptures(capture.getKey(), recorded);
+        }
+
+        return job.toBuilder()
+                .setImportData(importData)
+                .build();
     }
 
     Map<ObjectType, Integer> expectedOutputs(org.finos.tracdap.metadata.ImportDataJob importData) {

@@ -37,6 +37,7 @@ import tracdap.rt._impl.runtime as runtime  # noqa
 import tracdap.rt._impl.core.capture as capture  # noqa
 import tracdap.rt._impl.core.config_parser as cfg_p  # noqa
 import tracdap.rt._impl.core.data as data  # noqa
+import tracdap.rt._impl.core.file_formats as file_formats  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
@@ -151,8 +152,8 @@ class CaptureDecodeTest(CaptureTestBase):
         storage_manager = storage.StorageManager(self._sys_config(staging_properties))
         file_id = util.new_object_id(meta.ObjectType.FILE)
 
-        extension = capture.CaptureFormats.file_extension(capture_source.location.storagePath)
-        capture_format = capture.CaptureFormats.for_extension(extension)
+        extension = file_formats.ExternalFileFormats.file_extension(capture_source.location.storagePath)
+        capture_format = file_formats.ExternalFileFormats.for_extension(extension)
 
         file_item = capture.CaptureReader(storage_manager).read_file(name, capture_source.location, size_limit)
 
@@ -370,17 +371,9 @@ class CaptureDecodeTest(CaptureTestBase):
 
         self._write_csv("LOANS.CSV", "id,amount,region\n1,10.5,north\n")
 
-        self.assertEqual("CSV", capture.CaptureFormats.for_extension("CSV").format_code)
-
         file_item, data_item, _ = self._capture(_declared("LOANS.CSV", _LOANS_SCHEMA))
 
         self.assertEqual([1], data_item.table.column("id").to_pylist())
-
-    def test_unsupported_extensions(self):
-
-        self.assertIsNone(capture.CaptureFormats.file_extension("loans"))
-        self.assertIsNone(capture.CaptureFormats.for_extension("txt"))
-        self.assertIsNone(capture.CaptureFormats.for_extension("json"))
 
     def test_provenance_attrs(self):
 

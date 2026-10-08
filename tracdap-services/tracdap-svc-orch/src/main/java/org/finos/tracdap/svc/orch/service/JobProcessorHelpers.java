@@ -22,6 +22,7 @@ import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.*;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EJobResult;
+import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -65,20 +66,44 @@ public class JobProcessorHelpers {
     private final Validator validator = new Validator();
 
     private final String captureSizeLimit;
+    private final Set<ModelType> refusedModelTypes;
 
 
     public JobProcessorHelpers(
-            PluginConfig executorConfig,
+            PlatformConfig platformConfig,
             TenantConfigManager tenantState,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
-        this.captureSizeLimit = executorConfig.getPropertiesOrDefault(CAPTURE_MAX_SIZE_CONFIG_KEY, null);
+        this.captureSizeLimit = platformConfig.getExecutor().getPropertiesOrDefault(CAPTURE_MAX_SIZE_CONFIG_KEY, null);
+        this.refusedModelTypes = refusedModelTypes(platformConfig);
         this.tenantState = tenantState;
         this.commonConcerns = commonConcerns;
 
         this.metaClient = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
         this.configManager = registry.getSingleton(ConfigManager.class);
+    }
+
+    private static Set<ModelType> refusedModelTypes(PlatformConfig platformConfig) {
+
+        var configValue = platformConfig.getConfigOrDefault(ConfigKeys.MODEL_IMPORT_REFUSED_TYPES, "");
+        var refusedTypes = EnumSet.noneOf(ModelType.class);
+
+        for (var typeName : configValue.split(",")) {
+
+            if (typeName.isBlank())
+                continue;
+
+            try {
+                refusedTypes.add(ModelType.valueOf(typeName.trim()));
+            }
+            catch (IllegalArgumentException e) {
+                var message = String.format("Invalid model type [%s] in [%s]", typeName.trim(), ConfigKeys.MODEL_IMPORT_REFUSED_TYPES);
+                throw new EStartup(message, e);
+            }
+        }
+
+        return refusedTypes;
     }
 
     JobState loadMetadata(JobState jobState) {
@@ -462,6 +487,9 @@ public class JobProcessorHelpers {
         // This is safest, but has the potential to lose useful error info in some cases
         validator.validateFixedObject(runtimeResult);
 
+        if (jobState.jobType == JobType.IMPORT_MODEL)
+            checkRefusedModelTypes(runtimeResult);
+
         var resultIds = buildResultLookup(runtimeResult);
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
@@ -600,6 +628,26 @@ public class JobProcessorHelpers {
         }
 
         return resultLookup;
+    }
+
+    private void checkRefusedModelTypes(JobResult runtimeResult) {
+
+        for (var resultObject : runtimeResult.getObjectsMap().values()) {
+
+            if (resultObject.getObjectType() != ObjectType.MODEL)
+                continue;
+
+            var modelType = resultObject.getModel().getModelType();
+
+            if (refusedModelTypes.contains(modelType)) {
+
+                var message = String.format(
+                        "Model type [%s] cannot be imported on this platform (refused by [%s] in the platform config)",
+                        modelType, ConfigKeys.MODEL_IMPORT_REFUSED_TYPES);
+
+                throw new EJobResult(message);
+            }
+        }
     }
 
     void saveJobResult(JobState jobState) {

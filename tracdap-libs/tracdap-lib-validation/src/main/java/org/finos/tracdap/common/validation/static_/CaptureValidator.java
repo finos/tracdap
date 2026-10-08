@@ -17,7 +17,6 @@
 
 package org.finos.tracdap.common.validation.static_;
 
-import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
@@ -25,15 +24,11 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
-import java.util.regex.Pattern;
-
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
 @Validator(type = ValidationType.STATIC)
 public class CaptureValidator {
-
-    private static final Pattern PATH_EXTENSION = Pattern.compile(".*\\.([^./\\\\]+)\\Z");
 
     private static final Descriptors.Descriptor CAPTURE_SOURCE;
     private static final Descriptors.OneofDescriptor CS_SOURCE;
@@ -44,10 +39,6 @@ public class CaptureValidator {
     private static final Descriptors.FieldDescriptor CS_SCHEMA;
     private static final Descriptors.FieldDescriptor CS_DATA_ATTRS;
     private static final Descriptors.FieldDescriptor CS_FILE_ATTRS;
-
-    private static final Descriptors.Descriptor EXTERNAL_LOCATION;
-    private static final Descriptors.FieldDescriptor EL_STORAGE_KEY;
-    private static final Descriptors.FieldDescriptor EL_STORAGE_PATH;
 
     static {
 
@@ -60,10 +51,6 @@ public class CaptureValidator {
         CS_SCHEMA_SPECIFIER = CS_SCHEMA_ID.getContainingOneof();
         CS_DATA_ATTRS = field(CAPTURE_SOURCE, CaptureSource.DATAATTRS_FIELD_NUMBER);
         CS_FILE_ATTRS = field(CAPTURE_SOURCE, CaptureSource.FILEATTRS_FIELD_NUMBER);
-
-        EXTERNAL_LOCATION = ExternalLocation.getDescriptor();
-        EL_STORAGE_KEY = field(EXTERNAL_LOCATION, ExternalLocation.STORAGEKEY_FIELD_NUMBER);
-        EL_STORAGE_PATH = field(EXTERNAL_LOCATION, ExternalLocation.STORAGEPATH_FIELD_NUMBER);
     }
 
     @Validator
@@ -71,7 +58,7 @@ public class CaptureValidator {
 
         ctx = ctx.pushOneOf(CS_SOURCE)
                 .apply(CommonValidators::required)
-                .applyOneOf(CS_LOCATION, CaptureValidator::externalLocation, ExternalLocation.class)
+                .applyOneOf(CS_LOCATION, ExternalLocationValidator::externalLocation, ExternalLocation.class)
                 .pop();
 
         ctx = ctx.push(CS_SCHEMA_SOURCE)
@@ -101,7 +88,7 @@ public class CaptureValidator {
                         .pop();
             }
 
-            if (msg.hasLocation() && "csv".equals(fileExtension(msg.getLocation().getStoragePath()))) {
+            if (msg.hasLocation() && "csv".equals(ExternalLocationValidator.fileExtension(msg.getLocation().getStoragePath()))) {
                 ctx = ctx.push(CS_SCHEMA_SOURCE)
                         .error("A CSV file has no schema of its own, a capture of a CSV file needs a declared schema")
                         .pop();
@@ -119,53 +106,5 @@ public class CaptureValidator {
                 .pop();
 
         return ctx;
-    }
-
-    @Validator
-    public static ValidationContext externalLocation(ExternalLocation msg, ValidationContext ctx) {
-
-        ctx = ctx.push(EL_STORAGE_KEY)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::identifier)
-                .pop();
-
-        ctx = ctx.push(EL_STORAGE_PATH)
-                .apply(CommonValidators::required)
-                .apply(CommonValidators::relativePath)
-                .apply(CaptureValidator::captureFileName)
-                .pop();
-
-        return ctx;
-    }
-
-    private static ValidationContext captureFileName(String storagePath, ValidationContext ctx) {
-
-        var segments = storagePath.split(ValidationConstants.PATH_SEPARATORS.pattern());
-        var fileName = segments[segments.length - 1];
-
-        ctx = CommonValidators.fileName(fileName, ctx);
-
-        if (ctx.failed())
-            return ctx;
-
-        var extension = fileExtension(storagePath);
-
-        if (extension == null || !ValidationConstants.CAPTURE_FORMATS.containsKey(extension)) {
-
-            var err = String.format(
-                    "File [%s] cannot be captured, the file name must end in one of %s",
-                    fileName, ValidationConstants.CAPTURE_FORMATS.keySet().stream().sorted().map(e -> "." + e).toList());
-
-            return ctx.error(err);
-        }
-
-        return ctx;
-    }
-
-    public static String fileExtension(String storagePath) {
-
-        var match = PATH_EXTENSION.matcher(storagePath);
-
-        return match.matches() ? match.group(1).toLowerCase() : null;
     }
 }

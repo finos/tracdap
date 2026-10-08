@@ -98,9 +98,9 @@ public class ValidationConstants {
     // Limit config keys to valid identifiers for now
     public static final Pattern CONFIG_KEY = MetadataConstants.VALID_IDENTIFIER;
 
-    // File formats a capture can read, keyed by lower-case file extension
-    // Kept in step with the capture formats in the Python runtime
-    public static final Map<String, FileType> CAPTURE_FORMATS = Map.of(
+    // File formats for data files in external storage, keyed by lower-case file extension
+    // Kept in step with the external file formats in the Python runtime
+    public static final Map<String, FileType> EXTERNAL_FILE_FORMATS = Map.of(
             "csv", FileType.newBuilder().setExtension("csv").setMimeType("text/csv").build(),
             "parquet", FileType.newBuilder().setExtension("parquet").setMimeType("application/vnd.apache.parquet").build(),
             "arrow", FileType.newBuilder().setExtension("arrow").setMimeType("application/vnd.apache.arrow.file").build());
