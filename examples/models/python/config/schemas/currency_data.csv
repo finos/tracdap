@@ -1,0 +1,4 @@
+field_name, field_type, label, categorical, business_key, not_null, format_code
+ccy_code, STRING, Currency code, true, true, true,
+spot_date, DATE, Spot date, , , true,
+dollar_rate, DECIMAL, Exchange rate against USD, , , true,

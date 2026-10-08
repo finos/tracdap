@@ -15,6 +15,7 @@
 
 import abc
 import copy
+import dataclasses as dc
 import datetime as dt
 import enum
 import pathlib
@@ -544,7 +545,8 @@ def build_data_spec(
         context_key: tp.Optional[str], trac_schema: _meta.SchemaDefinition,
         sys_config: _cfg.RuntimeConfig,
         prior_spec: tp.Optional[_data.DataSpec] = None,
-        metadata: tp.Optional[_api.RuntimeMetadata] = None) \
+        metadata: tp.Optional[_api.RuntimeMetadata] = None,
+        schema_id: tp.Optional[_meta.TagSelector] = None) \
         -> _data.DataSpec:
 
     if prior_spec is None:
@@ -555,6 +557,11 @@ def build_data_spec(
         layout_key = prior_spec.storage.layout
         layout = StorageLayout.select(layout_key, update=True)
         spec = layout.new_data_version(data_id, storage_id, context_key, trac_schema, prior_spec)
+
+    # An external schema is referenced from the definition, the spec keeps the schema for saving
+    if schema_id is not None:
+        data_def = dc.replace(spec.definition, schema=None, schemaId=schema_id)
+        spec = dc.replace(spec, definition=data_def, schema=trac_schema)
 
     # Attach metadata if it is available
     return spec.with_metadata(metadata) if metadata is not None else spec
@@ -1279,6 +1286,26 @@ class CommonDataStorage(IDataStorage):
         self.__pushdown_pandas = pushdown_pandas
         self.__pushdown_spark = pushdown_spark
 
+    def get_data_format(
+            self, storage_format: str,
+            storage_options: tp.Dict[str, tp.Any] = None) \
+            -> IDataFormat:
+
+        codec_properties = storage_options.copy() if storage_options else dict()
+
+        # Codec properties can be specified in the storage config
+        # Properties starting with the codec format code are considered codec properties
+
+        format_code = FormatManager.primary_format_code(storage_format)
+        format_code_pattern = re.compile(f"^{format_code}.", re.IGNORECASE)
+
+        for prop_key, prop_value in self.__config.properties.items():
+            if format_code_pattern.match(prop_key):
+                format_prop_key = prop_key[len(format_code) + 1:]
+                codec_properties[format_prop_key] = prop_value
+
+        return FormatManager.get_data_format(storage_format, codec_properties)
+
     def read_table(
             self, storage_path: str, storage_format: str,
             schema: tp.Optional[pa.Schema],
@@ -1287,20 +1314,7 @@ class CommonDataStorage(IDataStorage):
 
         try:
 
-            codec_properties = storage_options.copy() if storage_options else dict()
-
-            # Codec properties can be specified in the storage config
-            # Properties starting with the codec format code are considered codec properties
-
-            format_code = FormatManager.primary_format_code(storage_format)
-            format_code_pattern = re.compile(f"^{format_code}.", re.IGNORECASE)
-
-            for prop_key, prop_value in self.__config.properties.items():
-                if format_code_pattern.match(prop_key):
-                    format_prop_key = prop_key[len(format_code) + 1:]
-                    codec_properties[format_prop_key] = prop_value
-
-            codec = FormatManager.get_data_format(storage_format, codec_properties)
+            codec = self.get_data_format(storage_format, storage_options)
 
             stat = self.__file_storage.stat(storage_path)
 

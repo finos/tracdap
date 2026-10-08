@@ -24,6 +24,7 @@ option java_multiple_files = true;
 import "tracdap/metadata/type.proto";
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/tag_update.proto";
+import "tracdap/metadata/data.proto";
 
 
 /**
@@ -121,6 +122,32 @@ message ResultDefinition {
   optional TagSelector logFileId = 4;
 
   map<string, TagSelector> outputs = 5;
+
+  /// Files written to external storage, keyed by placement name
+  map<string, PlacementRecord> placements = 6;
+}
+
+/**
+ * A file a job placed in external storage
+ */
+message PlacementRecord {
+
+  /// The DATA object placed, at the version used
+  TagSelector dataId = 1;
+
+  /// Where the file was written: storage key, the path actually written, protocol and location details
+  ExternalLocation location = 2;
+
+  /// Format code of the file written (e.g. CSV, PARQUET, ARROW_FILE)
+  string format = 3;
+
+  string mimeType = 4;
+
+  /// Size of the file written, in bytes
+  int64 size = 5;
+
+  /// SHA-256 of the bytes written, in hex
+  string contentHash = 6;
 }
 
 /**
@@ -181,6 +208,9 @@ message ImportModelJob {
 
 /**
  * Specification for an IMPORT_DATA job
+ *
+ * An import job either runs an import model, or captures files with no model.
+ * For a capture job, model is not set and captures holds one or more captures.
  */
 message ImportDataJob {
 
@@ -192,14 +222,77 @@ message ImportDataJob {
   map<string, TagSelector> priorOutputs = 5;
 
   repeated string storageAccess = 6;
-  map<string, TagSelector> imports = 7;
+  map<string, TagSelector> imports = 7 [deprecated = true];
 
   repeated TagUpdate outputAttrs = 8;
-  repeated TagUpdate importAttrs = 9;
+  repeated TagUpdate importAttrs = 9 [deprecated = true];
+
+  /// Files to capture, keyed by capture name
+  map<string, CaptureSource> captures = 10;
+}
+
+/**
+ * Capture a data file into TRAC as part of a job.
+ *
+ * The runtime reads the file once. From those bytes it can keep a FILE object (the bytes unchanged)
+ * and a DATA object (decoded from the bytes).
+ */
+message CaptureSource {
+
+  /// Where the file comes from
+  oneof source {
+    ExternalLocation location = 1;      // capture from an external storage location
+  }
+
+  /// Where the dataset's schema comes from
+  CaptureSchemaSource schemaSource = 4;
+
+  /// The declared schema, for CAPTURE_SCHEMA_DECLARED
+  oneof schemaSpecifier {
+    TagSelector schemaId = 5;           // a SCHEMA object
+    SchemaDefinition schema = 6;        // inline; dev mode only, rejected by platform validation
+  }
+
+  /// Attributes for the captured DATA object
+  repeated TagUpdate dataAttrs = 8;
+
+  /// Attributes for the captured FILE object
+  repeated TagUpdate fileAttrs = 9;
+}
+
+/**
+ * A single file in an external storage location
+ */
+message ExternalLocation {
+
+  /// External storage resource key (an EXTERNAL_STORAGE resource)
+  string storageKey = 1;
+
+  /// Path of a single file, relative to the resource root
+  string storagePath = 2;
+
+  /// Protocol of the storage resource when the job was submitted; set by the platform
+  string protocol = 3;
+
+  /// Location properties of the storage resource when the job was submitted (e.g. bucket, container, prefix,
+  /// root path); set by the platform, never credentials
+  map<string, string> locationDetails = 4;
+}
+
+/**
+ * Where a captured dataset's schema comes from
+ */
+enum CaptureSchemaSource {
+  CAPTURE_SCHEMA_SOURCE_NOT_SET = 0;    // the job type's default, where it has one
+  CAPTURE_SCHEMA_DECLARED = 1;          // schemaId or schema
+  CAPTURE_SCHEMA_FILE = 2;              // the file's own schema (Parquet, Arrow)
 }
 
 /**
  * Specification for an EXPORT_DATA job
+ *
+ * An export job places TRAC datasets in external storage, with no model. The model-based fields
+ * are not used by export jobs and must be empty. Export models run as export nodes in a flow.
  */
 message ExportDataJob {
 
@@ -211,9 +304,42 @@ message ExportDataJob {
   map<string, TagSelector> priorOutputs = 5;
 
   repeated string storageAccess = 6;
-  map<string, TagSelector> exports = 7;
+  map<string, TagSelector> exports = 7 [deprecated = true];
 
   repeated TagUpdate outputAttrs = 8;
+
+  /// Datasets to place in external storage, keyed by placement name
+  map<string, PlacementTarget> placements = 9;
+
+  /// What every placement in the job does when a file already exists at its path
+  PlacementConflict placementConflict = 10;
+}
+
+/**
+ * Place a TRAC dataset into external storage as a data file, as part of a job.
+ *
+ * The runtime encodes the dataset with TRAC's format codecs and writes one file.
+ * The job's RESULT records what was written.
+ */
+message PlacementTarget {
+
+  /// What to place
+  oneof source {
+    TagSelector dataId = 1;             // an existing DATA object
+  }
+
+  /// Where to place it: a single file path, whose extension sets the format
+  ExternalLocation location = 3;
+}
+
+/**
+ * What a placement does when a file already exists at its path
+ */
+enum PlacementConflict {
+  PLACEMENT_CONFLICT_NOT_SET = 0;       // same as PLACEMENT_SUFFIX
+  PLACEMENT_SUFFIX = 1;                 // write name-2.ext, name-3.ext, ... (the first free name)
+  PLACEMENT_OVERWRITE = 2;              // replace the existing file
+  PLACEMENT_FAIL = 3;                   // fail the job, before any placement writes
 }
 
 

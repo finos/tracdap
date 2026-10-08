@@ -22,10 +22,12 @@ import tracdap.rt.api as _api
 import tracdap.rt.config as _cfg
 import tracdap.rt.metadata as _meta
 import tracdap.rt.exceptions as _ex
+import tracdap.rt._impl.core.file_formats as _file_formats
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
 import tracdap.rt._impl.core.repos as _repos
+import tracdap.rt._impl.core.schemas as _schemas
 import tracdap.rt._impl.core.models as _models
 import tracdap.rt._impl.core.storage as _storage
 import tracdap.rt._impl.core.type_system as _types
@@ -39,13 +41,17 @@ DEV_MODE_JOB_CONFIG = [
     re.compile(r"job\.\w+\.models\.\w+"),
     re.compile(r"job\.\w+\.model"),
     re.compile(r"job\.\w+\.flow"),
+    re.compile(r"job\.\w+\.captures\.\w+\.schema$"),
+    re.compile(r"job\.\w+\.placements\.\w+\.dataId$"),
 
     re.compile(r".*\.jobs\[\d+]\.\w+\.parameters\.\w+"),
     re.compile(r".*\.jobs\[\d+]\.\w+\.inputs\.\w+"),
     re.compile(r".*\.jobs\[\d+]\.\w+\.outputs\.\w+"),
     re.compile(r".*\.jobs\[\d+]\.\w+\.models\.\w+"),
     re.compile(r".*\.jobs\[\d+]\.\w+\.model"),
-    re.compile(r".*\.jobs\[\d+]\.\w+\.flow")
+    re.compile(r".*\.jobs\[\d+]\.\w+\.flow"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.captures\.\w+\.schema$"),
+    re.compile(r".*\.jobs\[\d+]\.\w+\.placements\.\w+\.dataId$")
 ]
 
 DEV_MODE_SYS_CONFIG = []
@@ -176,6 +182,14 @@ class DevModeTranslator:
 
         # Make all external resources available using their system resource keys
         job_def = self._process_resources(job_def)
+
+        # Placement jobs have no model, their inputs come from the placements
+        if job_def.jobType == _meta.JobType.EXPORT_DATA:
+            return self._process_placement_job(job_config, job_def)
+
+        # Capture jobs have no model, their outputs come from the captures
+        if job_def.jobType == _meta.JobType.IMPORT_DATA and job_def.importData.captures:
+            return self._process_capture_job(job_config, job_def)
 
         # Load and populate any models provided as a Python class or class name
         job_config, job_def = self._process_models(job_config, job_def, model_class)
@@ -882,6 +896,81 @@ class DevModeTranslator:
                 job_prior_outputs[key] = output_selector
 
         return job_config, job_def
+
+    def _process_capture_job(
+            self, job_config: _cfg.JobConfig, job_def: _meta.JobDefinition) \
+            -> tp.Tuple[_cfg.JobConfig, _meta.JobDefinition]:
+
+        job_detail = job_def.importData
+
+        for capture_name, capture in job_detail.captures.items():
+
+            capture.schema = self._process_schema_file(f"capture [{capture_name}]", capture.schema)
+
+            # Unsupported file types are reported by the graph builder
+            extension = _file_formats.ExternalFileFormats.file_extension(capture.location.storagePath) if capture.location else None
+            capture_format = _file_formats.ExternalFileFormats.for_extension(extension) if extension else None
+
+            if capture_format is None:
+                continue
+
+            data_socket = _meta.ModelOutputSchema(
+                objectType=_meta.ObjectType.DATA,
+                schema=capture.schema, dynamic=capture.schema is None)
+
+            file_socket = _meta.ModelOutputSchema(
+                objectType=_meta.ObjectType.FILE,
+                fileType=_file_formats.ExternalFileFormats.file_type(extension, capture_format))
+
+            for key, socket in [(capture_name, data_socket), (f"{capture_name}_file", file_socket)]:
+
+                if key not in job_detail.outputs:
+                    raise _ex.EJobValidation(f"Missing required output [{key}]")
+
+                supplied_output = job_detail.outputs.pop(key)
+                output_selector = self._process_socket(key, socket, supplied_output, job_config, is_output=True)
+
+                if output_selector is not None:
+                    job_detail.priorOutputs[key] = output_selector
+
+        return job_config, job_def
+
+    def _process_placement_job(
+            self, job_config: _cfg.JobConfig, job_def: _meta.JobDefinition) \
+            -> tp.Tuple[_cfg.JobConfig, _meta.JobDefinition]:
+
+        for placement_name, placement in job_def.exportData.placements.items():
+
+            data_value = placement.dataId
+            schema = None
+
+            # A dataset is a path, or a dict with a path and optionally a schema file (needed to read CSV)
+            if isinstance(data_value, dict) and "schema" in data_value:
+                data_value = dict(data_value)
+                schema = self._process_schema_file(f"placement [{placement_name}]", data_value.pop("schema"))
+
+            if isinstance(data_value, (str, dict)):
+                placement.dataId = self._process_data_socket(
+                    placement_name, data_value, schema, job_config, is_output=False)
+
+        return job_config, job_def
+
+    def _process_schema_file(
+            self, item_label: str, schema: tp.Union[_meta.SchemaDefinition, str, dict, None]) \
+            -> tp.Optional[_meta.SchemaDefinition]:
+
+        if schema is None or isinstance(schema, _meta.SchemaDefinition):
+            return schema
+
+        if isinstance(schema, dict):
+            return _cfg_p.ConfigParser(_meta.SchemaDefinition).parse(schema)
+
+        if isinstance(schema, str):
+            self._log.info(f"Loading schema for {item_label} from [{schema}]")
+            schema_data = self._config_mgr.load_config_file(schema)
+            return _schemas.SchemaLoader.load_schema_data(schema_data, schema)
+
+        raise _ex.EConfigParse(f"Invalid schema for {item_label}")
 
     def _process_socket(self, key, socket, supplied_value, job_config, is_output) -> _meta.TagSelector:
 

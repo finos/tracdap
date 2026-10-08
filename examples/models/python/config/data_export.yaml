@@ -1,13 +1,16 @@
-
 job:
   exportData:
 
-    parameters:
-      storage_key: exported_data
-      export_comment: "Exporting some example data"
+    placements:
 
-    inputs:
-      profit_by_region: outputs/using_data/profit_by_region.csv
+      profit_by_region_csv:
+        dataId: { path: outputs/using_data/profit_by_region.csv, schema: schemas/profit_by_region.csv }
+        location: { storageKey: exported_data, storagePath: data_export/profit_by_region.csv }
 
-    storageAccess:
-      - exported_data
+      profit_by_region_parquet:
+        dataId: { path: outputs/using_data/profit_by_region.csv, schema: schemas/profit_by_region.csv }
+        location: { storageKey: exported_data, storagePath: data_export/profit_by_region.parquet }
+
+      profit_by_region_arrow:
+        dataId: { path: outputs/using_data/profit_by_region.csv, schema: schemas/profit_by_region.csv }
+        location: { storageKey: exported_data, storagePath: data_export/profit_by_region.arrow }

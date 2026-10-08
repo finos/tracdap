@@ -13,12 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import dataclasses as _dc
 import itertools as _itr
 import typing as _tp
 
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 import tracdap.rt.exceptions as _ex
+import tracdap.rt._impl.core.file_formats as _file_formats
+import tracdap.rt._impl.core.placement as _placement
+import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt._impl.core.storage as _storage
@@ -191,13 +195,16 @@ class GraphBuilder:
 
     def build_import_export_data_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
+        if job_def.jobType == _meta.JobType.EXPORT_DATA:
+            return self.build_placement_job(job_def, job_push_id)
+
+        if job_def.importData.captures:
+            return self.build_capture_job(job_def, job_push_id)
+
         # TODO: These are processed as regular calculation jobs for now
         # That might be ok, but is worth reviewing
 
-        if job_def.jobType == _meta.JobType.IMPORT_DATA:
-            job_details = job_def.importData
-        else:
-            job_details = job_def.exportData
+        job_details = job_def.importData
 
         target_selector = job_details.model
         target_obj = _util.get_job_metadata(target_selector, self._job_config)
@@ -207,6 +214,262 @@ class GraphBuilder:
             job_def, job_push_id,
             target_selector, target_def,
             job_details)
+
+    def build_capture_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
+
+        job_details = job_def.importData
+
+        if job_details.model is not None and job_details.model.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] cannot use a model with captures"))
+
+        capture_outputs = set(job_details.captures.keys())
+
+        for capture_name in job_details.captures.keys():
+            if f"{capture_name}_file" in capture_outputs:
+                self._error(_ex.EJobValidation(f"Capture [{capture_name}_file] clashes with the file output of capture [{capture_name}]"))
+
+        size_limit = _util.read_property(
+            self._sys_config.properties,
+            _cfg_p.ConfigKeys.RUNTIME_LIMIT_CAPTURE_SIZE,
+            _cfg_p.ConfigKDefaults.RUNTIME_LIMIT_CAPTURE_SIZE,
+            int) * 1024 * 1024
+
+        capture_sections = [
+            self._build_capture_section(
+                capture_name, capture, job_details.priorOutputs, size_limit,
+                explicit_deps=[job_push_id])
+            for capture_name, capture in job_details.captures.items()]
+
+        main_section = self._join_sections(*capture_sections)
+
+        output_ids = list(nid for nid, n in main_section.nodes.items() if isinstance(n, SaveDataNode))
+        output_keys = dict((nid, nid.name.replace(":SAVE", "")) for nid in output_ids)
+
+        result_section = self.build_job_result(
+            output_ids, output_keys,
+            explicit_deps=[job_push_id, *main_section.must_run])
+
+        return self._join_sections(main_section, result_section)
+
+    def _build_capture_section(
+            self, capture_name: str, capture: _meta.CaptureSource,
+            prior_outputs: _tp.Dict[str, _meta.TagSelector], size_limit: int,
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            -> GraphSection:
+
+        nodes = dict()
+        file_output_name = f"{capture_name}_file"
+
+        location = capture.location
+
+        if location is None or not location.storageKey or not location.storagePath:
+            self._error(_ex.EJobValidation(f"Capture [{capture_name}] requires a storage location and path"))
+            return GraphSection(nodes)
+
+        extension = _file_formats.ExternalFileFormats.file_extension(location.storagePath)
+        capture_format = _file_formats.ExternalFileFormats.for_extension(extension) if extension else None
+
+        if capture_format is None:
+            self._error(_ex.EJobValidation(
+                f"Capture [{capture_name}] has an unsupported file type [{location.storagePath}]" +
+                f" (the file name must end in .csv, .parquet or .arrow)"))
+            return GraphSection(nodes)
+
+        schema_def, schema_id = self._capture_schema(capture_name, capture, capture_format)
+
+        if schema_def is None and capture.schemaSource != _meta.CaptureSchemaSource.CAPTURE_SCHEMA_FILE:
+            return GraphSection(nodes)
+
+        # File IDs are needed to build the decode node, which records the captured file on the dataset
+        file_id, storage_id, prior_file_spec = self._allocate_file_output_ids(prior_outputs.get(file_output_name))
+
+        capture_id = NodeId(f"{file_output_name}:CAPTURE", self._job_namespace, _data.DataItem)
+        nodes[capture_id] = CaptureFileNode(
+            capture_id, capture_name, location, size_limit,
+            explicit_deps=explicit_deps)
+
+        file_view_id = NodeId.of(file_output_name, self._job_namespace, _data.DataView)
+        nodes[file_view_id] = DataViewNode(file_view_id, None, capture_id)
+
+        file_item_id = NodeId(f"{file_output_name}:ITEM", self._job_namespace, _data.DataItem)
+        nodes[file_item_id] = DataItemNode(file_item_id, file_view_id)
+
+        # The FILE is stored under its output name, its definition carries the source file name
+        file_type = _file_formats.ExternalFileFormats.file_type(extension, capture_format)
+        file_spec = _storage.build_file_spec(
+            file_id, storage_id, file_output_name, file_type,
+            self._sys_config, prior_spec=prior_file_spec)
+
+        source_name = location.storagePath.split("/")[-1]
+        file_def = _dc.replace(file_spec.definition, name=source_name, extension=extension)
+        file_spec = _dc.replace(file_spec, definition=file_def)
+
+        file_save_id = NodeId.of(f"{file_output_name}:SAVE", self._job_namespace, _data.DataSpec)
+        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+
+        decode_id = NodeId(f"{capture_name}:DECODE", self._job_namespace, _data.DataItem)
+        nodes[decode_id] = DecodeTableNode(
+            decode_id, capture_name, capture_id,
+            location.storageKey, capture_format.format_code,
+            capture.schemaSource, schema_def, file_id)
+
+        data_view_id = NodeId.of(capture_name, self._job_namespace, _data.DataView)
+        nodes[data_view_id] = DataViewNode(data_view_id, schema_def, decode_id)
+
+        if schema_def is not None:
+            output_schema = _meta.ModelOutputSchema(objectType=_meta.ObjectType.DATA, schema=schema_def)
+        else:
+            output_schema = _meta.ModelOutputSchema(objectType=_meta.ObjectType.DATA, dynamic=True)
+
+        self._build_data_output(
+            capture_name, output_schema, data_view_id,
+            prior_outputs.get(capture_name), nodes, explicit_deps=None,
+            schema_id=schema_id)
+
+        return GraphSection(nodes)
+
+    def _capture_schema(
+            self, capture_name: str, capture: _meta.CaptureSource,
+            capture_format: _file_formats.ExternalFileFormat) \
+            -> _tp.Tuple[_tp.Optional[_meta.SchemaDefinition], _tp.Optional[_meta.TagSelector]]:
+
+        has_schema_id = capture.schemaId is not None and capture.schemaId.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET
+        has_schema = capture.schema is not None
+
+        if capture.schemaSource == _meta.CaptureSchemaSource.CAPTURE_SCHEMA_DECLARED:
+
+            if has_schema_id:
+                schema_obj = _util.get_job_metadata(capture.schemaId, self._job_config)
+                schema_header = _util.get_job_mapping(capture.schemaId, self._job_config)
+                return schema_obj.schema, _util.selector_for(schema_header)
+
+            if has_schema:
+                return capture.schema, None
+
+            self._error(_ex.EJobValidation(f"Capture [{capture_name}] has a declared schema source but no schema"))
+
+        elif capture.schemaSource == _meta.CaptureSchemaSource.CAPTURE_SCHEMA_FILE:
+
+            if has_schema_id or has_schema:
+                self._error(_ex.EJobValidation(f"Capture [{capture_name}] uses the file's schema, so it can't also declare one"))
+
+            elif capture_format.format_code == "CSV":
+                self._error(_ex.EJobValidation(f"Capture [{capture_name}] is a CSV file, which needs a declared schema"))
+
+        else:
+            self._error(_ex.EJobValidation(f"Capture [{capture_name}] requires a schema source"))
+
+        return None, None
+
+    def build_placement_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
+
+        job_details = job_def.exportData
+
+        self._check_placement_job_fields(job_def.jobType, job_details)
+
+        if not job_details.placements:
+            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] requires at least one placement"))
+
+        conflict = job_details.placementConflict
+
+        if conflict is None or conflict == _meta.PlacementConflict.PLACEMENT_CONFLICT_NOT_SET:
+            conflict = _meta.PlacementConflict.PLACEMENT_SUFFIX
+        target_paths = dict()
+
+        nodes = dict()
+        prepare_ids = []
+
+        for placement_name, placement in job_details.placements.items():
+
+            prepare_id = self._build_placement_prepare(
+                placement_name, placement, conflict, target_paths,
+                nodes, explicit_deps=[job_push_id])
+
+            if prepare_id is not None:
+                prepare_ids.append(prepare_id)
+
+        # Nothing is written until every placement has been encoded
+        place_ids = dict()
+
+        for prepare_id in prepare_ids:
+
+            placement_name = prepare_id.name.replace(":PREPARE", "")
+            place_id = NodeId(f"{placement_name}:PLACE", self._job_namespace, _meta.PlacementRecord)
+            nodes[place_id] = PlaceFileNode(place_id, placement_name, prepare_id, conflict, explicit_deps=prepare_ids)
+            place_ids[placement_name] = place_id
+
+        main_section = GraphSection(nodes, must_run=list(place_ids.values()))
+
+        result_section = self.build_job_result(
+            [], placements=place_ids,
+            explicit_deps=[job_push_id, *main_section.must_run])
+
+        return self._join_sections(main_section, result_section)
+
+    def _check_placement_job_fields(self, job_type: _meta.JobType, job_details: _meta.ExportDataJob):
+
+        if job_details.model is not None and job_details.model.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(
+                f"Job type [{job_type.name}] takes no model, export models run as export nodes in a flow"))
+
+        unused_fields = {
+            "parameters": job_details.parameters, "inputs": job_details.inputs,
+            "outputs": job_details.outputs, "priorOutputs": job_details.priorOutputs,
+            "storageAccess": job_details.storageAccess, "exports": job_details.exports,
+            "outputAttrs": job_details.outputAttrs}
+
+        for field_name, field_value in unused_fields.items():
+            if field_value:
+                self._error(_ex.EJobValidation(
+                    f"Job type [{job_type.name}] does not use [{field_name}], it must be empty"))
+
+    def _build_placement_prepare(
+            self, placement_name: str, placement: _meta.PlacementTarget,
+            conflict: _meta.PlacementConflict, target_paths: _tp.Dict[_tp.Tuple[str, str], str],
+            nodes: _tp.Dict[NodeId, Node], explicit_deps: _tp.List[NodeId]) \
+            -> _tp.Optional[NodeId]:
+
+        if placement.dataId is None or placement.dataId.objectType == _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(f"Placement [{placement_name}] requires a dataset (dataId)"))
+            return None
+
+        location = placement.location
+
+        if location is None or not location.storageKey or not location.storagePath:
+            self._error(_ex.EJobValidation(f"Placement [{placement_name}] requires a storage location and path"))
+            return None
+
+        extension = _file_formats.ExternalFileFormats.file_extension(location.storagePath)
+        file_format = _file_formats.ExternalFileFormats.for_extension(extension) if extension else None
+
+        if file_format is None:
+            self._error(_ex.EJobValidation(
+                f"Placement [{placement_name}] has an unsupported file type [{location.storagePath}]" +
+                f" (the file name must end in .csv, .parquet or .arrow)"))
+            return None
+
+        target_key = (location.storageKey, location.storagePath.lower())
+
+        if target_key in target_paths:
+            self._error(_ex.EJobValidation(
+                f"Placements [{target_paths[target_key]}] and [{placement_name}] write to the same path" +
+                f" [{location.storagePath}] in [{location.storageKey}]"))
+            return None
+
+        target_paths[target_key] = placement_name
+
+        input_outputs = set()
+        self._build_data_input(placement_name, placement.dataId, nodes, input_outputs, explicit_deps)
+        data_view_id = input_outputs.pop()
+
+        data_id = _util.get_job_mapping(placement.dataId, self._job_config)
+
+        prepare_id = NodeId(f"{placement_name}:PREPARE", self._job_namespace, _placement.PreparedPlacement)
+        nodes[prepare_id] = PreparePlacementNode(
+            prepare_id, placement_name, data_view_id, data_id,
+            location, file_format, conflict)
+
+        return prepare_id
 
     def build_run_model_job(self, job_def: _meta.JobDefinition, job_push_id: NodeId) -> GraphSection:
 
@@ -540,7 +803,7 @@ class GraphBuilder:
         nodes[data_view_id] = DataViewNode(data_view_id, data_spec.schema, data_load_id)
         outputs.add(data_view_id)
 
-    def _build_data_output(self, output_name, output_schema, data_view_id, prior_selector, nodes, explicit_deps):
+    def _build_data_output(self, output_name, output_schema, data_view_id, prior_selector, nodes, explicit_deps, schema_id=None):
 
         # Map one data item from each view, since outputs are single part/delta
         data_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
@@ -582,7 +845,8 @@ class GraphBuilder:
                 data_id, storage_id, output_name,
                 output_schema.schema,
                 self._sys_config,
-                prior_spec=prior_spec)
+                prior_spec=prior_spec,
+                schema_id=schema_id)
 
             # Save operation uses the statically produced schema info
             nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
@@ -628,16 +892,7 @@ class GraphBuilder:
         file_item_id = NodeId(f"{output_name}:ITEM", self._job_namespace, _data.DataItem)
         nodes[file_item_id] = DataItemNode(file_item_id, file_view_id, explicit_deps=explicit_deps)
 
-        if prior_selector is None:
-            # New output - Allocate new TRAC object IDs
-            prior_spec = None
-            file_id = self._allocate_id(_meta.ObjectType.FILE)
-            storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
-        else:
-            # New version - Get the prior version metadata and bump the object IDs
-            prior_spec = self._build_file_spec(prior_selector) if prior_selector else None
-            file_id = _util.new_object_version(prior_spec.primary_id)
-            storage_id = _util.new_object_version(prior_spec.storage_id)
+        file_id, storage_id, prior_spec = self._allocate_file_output_ids(prior_selector)
 
         # File spec can always be built ahead of time (no equivalent of dynamic schemas)
         file_spec = _storage.build_file_spec(
@@ -649,6 +904,21 @@ class GraphBuilder:
         # Graph node for the save operation
         file_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
         nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+
+    def _allocate_file_output_ids(self, prior_selector):
+
+        if prior_selector is None:
+            # New output - Allocate new TRAC object IDs
+            prior_spec = None
+            file_id = self._allocate_id(_meta.ObjectType.FILE)
+            storage_id = self._allocate_id(_meta.ObjectType.STORAGE)
+        else:
+            # New version - Get the prior version metadata and bump the object IDs
+            prior_spec = self._build_file_spec(prior_selector) if prior_selector else None
+            file_id = _util.new_object_version(prior_spec.primary_id)
+            storage_id = _util.new_object_version(prior_spec.storage_id)
+
+        return file_id, storage_id, prior_spec
 
     def _build_file_spec(self, file_selector):
 
@@ -740,8 +1010,6 @@ class GraphBuilder:
         # Set up storage access for import / export data jobs, and export models in flows
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
             storage_access = job_def.importData.storageAccess
-        elif job_def.jobType == _meta.JobType.EXPORT_DATA:
-            storage_access = job_def.exportData.storageAccess
         elif job_def.jobType == _meta.JobType.RUN_FLOW and model_def.modelType == _meta.ModelType.DATA_EXPORT_MODEL:
             storage_access = job_def.runFlow.exportStorageAccess
         else:
@@ -967,8 +1235,6 @@ class GraphBuilder:
 
         if job_def.jobType == _meta.JobType.IMPORT_DATA:
             allowed_model_types = [_meta.ModelType.DATA_IMPORT_MODEL]
-        elif job_def.jobType == _meta.JobType.EXPORT_DATA:
-            allowed_model_types = [_meta.ModelType.DATA_EXPORT_MODEL]
         else:
             allowed_model_types = [_meta.ModelType.STANDARD_MODEL]
 
@@ -1096,7 +1362,8 @@ class GraphBuilder:
     def build_job_result(
             self, output_ids: _tp.List[NodeId[JOB_OUTPUT_TYPE]],
             output_keys: _tp.Optional[_tp.Dict[NodeId, str]] = None,
-            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None,
+            placements: _tp.Optional[_tp.Dict[str, NodeId[_meta.PlacementRecord]]] = None) \
             -> GraphSection:
 
         if output_keys:
@@ -1112,11 +1379,14 @@ class GraphBuilder:
             self._job_config.jobId,
             self._job_config.resultId,
             named_outputs, unnamed_outputs,
+            placements=placements or dict(),
             explicit_deps=explicit_deps)
 
         result_nodes = {result_node_id: result_node}
 
-        return GraphSection(result_nodes, inputs=set(output_ids), must_run=[result_node_id])
+        result_inputs = {*output_ids, *(placements or dict()).values()}
+
+        return GraphSection(result_nodes, inputs=result_inputs, must_run=[result_node_id])
 
     def build_dynamic_outputs(self, source_id: NodeId, output_names: _tp.List[str]) -> GraphUpdate:
 

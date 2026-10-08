@@ -28,7 +28,6 @@ import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
-import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
@@ -50,10 +49,7 @@ import java.util.stream.Collectors;
 /**
  * Proves {@code JobProcessorHelpers.translateResourceSecrets} against real cloud storage, for all
  * three cloud storage plugins (S3, Azure Blob, GCS), using {@code default} credentials.
- * {@code SimpleCsvExport}/{@code SimpleCsvImport} ({@code tutorial.data_export}/
- * {@code tutorial.data_import}) are a genuine matched round-trip pair - same schema
- * ({@code profit_by_region.csv}), same CSV format on both sides - unlike
- * {@code DataExportExample}/{@code SimpleDataImport}, which share neither.
+ * A placement writes the dataset as a CSV file, and a capture declared with the same schema reads it back.
  * <p>
  * Deliberately does not attempt a {@code static}/{@code account_key} scenario with a made-up
  * secret: PyArrow's native S3/Azure filesystems always raise a plain {@code OSError} for an auth
@@ -92,6 +88,13 @@ public class ImportExportCloudStorageTest {
             new String[] {"munster", "1000.50"},
             new String[] {"leinster", "2000.75"});
 
+    private static final SchemaDefinition PROFIT_SCHEMA = SchemaDefinition.newBuilder()
+            .setSchemaType(SchemaType.TABLE)
+            .setTable(TableSchema.newBuilder()
+                    .addFields(FieldSchema.newBuilder().setFieldName("region").setFieldOrder(0).setFieldType(BasicType.STRING))
+                    .addFields(FieldSchema.newBuilder().setFieldName("gross_profit").setFieldOrder(1).setFieldType(BasicType.DECIMAL)))
+            .build();
+
     private static final int RESOURCE_PROPAGATION_RETRIES = 10;
     private static final long RESOURCE_PROPAGATION_RETRY_DELAY_MS = 200;
 
@@ -107,72 +110,21 @@ public class ImportExportCloudStorageTest {
             .startService(TracAdminService.class)
             .build();
 
-    static TagHeader exportModelId;
-    static TagHeader importModelId;
-    static SchemaDefinition exportInputSchema;
+    static TagHeader captureSchemaId;
     static TagHeader exportInputDataId;
 
-    @Test @Order(101)
-    void exportModelImport() throws Exception {
-
-        var modelVersion = GitHelpers.getCurrentCommit();
-        var modelStub = ModelDefinition.newBuilder()
-                .setLanguage("python")
-                .setRepository("TRAC_LOCAL_REPO")
-                .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.data_export.SimpleCsvExport")
-                .setVersion(modelVersion)
-                .build();
-
-        var modelAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("import_export_cloud_storage:simple_csv_export"))
-                .build());
-
-        var jobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("import_export_cloud_storage:import_simple_csv_export"))
-                .build());
-
-        var jobId = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
-        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId);
-        var modelDef = modelTag.getDefinition().getModel();
-
-        Assertions.assertEquals(ModelType.DATA_EXPORT_MODEL, modelDef.getModelType());
-
-        exportModelId = modelTag.getHeader();
-        exportInputSchema = modelDef.getInputsOrThrow("dataset").getSchema();
-    }
-
     @Test @Order(102)
-    void importModelImport() throws Exception {
+    void createCaptureSchema() {
 
-        var modelVersion = GitHelpers.getCurrentCommit();
-        var modelStub = ModelDefinition.newBuilder()
-                .setLanguage("python")
-                .setRepository("TRAC_LOCAL_REPO")
-                .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.data_import.SimpleCsvImport")
-                .setVersion(modelVersion)
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.SCHEMA)
+                        .setSchema(PROFIT_SCHEMA))
                 .build();
 
-        var modelAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("import_export_cloud_storage:simple_csv_import"))
-                .build());
-
-        var jobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("import_export_cloud_storage:import_simple_csv_import"))
-                .build());
-
-        var jobId = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
-        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId);
-        var modelDef = modelTag.getDefinition().getModel();
-
-        Assertions.assertEquals(ModelType.DATA_IMPORT_MODEL, modelDef.getModelType());
-
-        importModelId = modelTag.getHeader();
+        captureSchemaId = platform.metaClientBlocking().createObject(request);
     }
 
     @Test @Order(103)
@@ -182,7 +134,7 @@ public class ImportExportCloudStorageTest {
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSchema(exportInputSchema)
+                .setSchema(PROFIT_SCHEMA)
                 .setFormat("text/csv")
                 .setContent(ByteString.copyFrom(INPUT_CSV.getBytes(StandardCharsets.UTF_8)))
                 .addTagUpdates(TagUpdate.newBuilder()
@@ -313,11 +265,13 @@ public class ImportExportCloudStorageTest {
         var orchClient = platform.orchClientBlocking();
 
         var exportData = ExportDataJob.newBuilder()
-                .setModel(MetadataUtil.selectorFor(exportModelId))
-                .putParameters("storage_key", MetadataCodec.encodeValue(storageKey))
-                .putParameters("export_file", MetadataCodec.encodeValue(exportFile))
-                .putInputs("dataset", MetadataUtil.selectorFor(exportInputDataId))
-                .addStorageAccess(storageKey)
+                .putPlacements("profit_by_region", PlacementTarget.newBuilder()
+                        .setDataId(MetadataUtil.selectorFor(exportInputDataId))
+                        .setLocation(ExternalLocation.newBuilder()
+                                .setStorageKey(storageKey)
+                                .setStoragePath(exportFile))
+                        .build())
+                .setPlacementConflict(PlacementConflict.PLACEMENT_OVERWRITE)
                 .build();
 
         var jobRequest = JobRequest.newBuilder()
@@ -366,11 +320,15 @@ public class ImportExportCloudStorageTest {
 
         var orchClient = platform.orchClientBlocking();
 
+        var capture = CaptureSource.newBuilder()
+                .setLocation(ExternalLocation.newBuilder()
+                        .setStorageKey(storageKey)
+                        .setStoragePath(sourceFile))
+                .setSchemaSource(CaptureSchemaSource.CAPTURE_SCHEMA_DECLARED)
+                .setSchemaId(MetadataUtil.selectorFor(captureSchemaId));
+
         var importData = ImportDataJob.newBuilder()
-                .setModel(MetadataUtil.selectorFor(importModelId))
-                .putParameters("storage_key", MetadataCodec.encodeValue(storageKey))
-                .putParameters("source_file", MetadataCodec.encodeValue(sourceFile))
-                .addStorageAccess(storageKey)
+                .putCaptures("profit_by_region", capture.build())
                 .addOutputAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_data")
                         .setValue(MetadataCodec.encodeValue(jobAttrValue)))

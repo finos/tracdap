@@ -1,0 +1,5 @@
+CCY_CODE,spot_date,dollar_rate,rate_source
+EUR,2026-09-30,1.17,ECB
+GBP,2026-09-30,1.34,BOE
+JPY,2026-09-30,0.0067,BOJ
+CHF,2026-09-30,1.25,SNB

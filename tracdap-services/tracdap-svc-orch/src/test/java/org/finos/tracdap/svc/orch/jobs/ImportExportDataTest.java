@@ -21,28 +21,29 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
-import org.finos.tracdap.metadata.ImportDataJob;
 import org.finos.tracdap.metadata.ExportDataJob;
+import org.finos.tracdap.metadata.ImportDataJob;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
-import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 
 @Tag("integration")
@@ -53,8 +54,27 @@ public class ImportExportDataTest {
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
-    private static final String IMPORT_SOURCE_PATH = "examples/models/python/data/inputs/staging/sample_data.parquet";
     private static final String EXTERNAL_STORAGE_KEY = "TEST_EXTERNAL_STORAGE";
+
+    private static final SchemaDefinition PROFIT_SCHEMA = SchemaDefinition.newBuilder()
+            .setSchemaType(SchemaType.TABLE)
+            .setTable(TableSchema.newBuilder()
+                    .addFields(FieldSchema.newBuilder().setFieldName("region").setFieldOrder(0).setFieldType(BasicType.STRING))
+                    .addFields(FieldSchema.newBuilder().setFieldName("gross_profit").setFieldOrder(1).setFieldType(BasicType.DECIMAL)))
+            .build();
+
+    private static final Map<String, String> PLACEMENT_PATHS = Map.of(
+            "profit_csv", "placements/profit_by_region.csv",
+            "profit_parquet", "placements/profit_by_region.parquet",
+            "profit_arrow", "placements/profit_by_region.arrow");
+
+    private static final Map<String, String> PLACEMENT_FORMATS = Map.of(
+            "profit_csv", "CSV",
+            "profit_parquet", "PARQUET",
+            "profit_arrow", "ARROW_FILE");
+
+    private static final Set<JobStatusCode> COMPLETED_STATES = Set.of(
+            JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
@@ -68,227 +88,31 @@ public class ImportExportDataTest {
             .startService(TracAdminService.class)
             .build();
 
-    private final Logger log = LoggerFactory.getLogger(getClass());
-
-    static TagHeader importModelId;
-    static TagHeader exportModelId;
-    static SchemaDefinition exportInputSchema;
-
-    static TagHeader jobId_importDataModel;
-    static TagHeader jobId_exportDataModel;
-
-    static TagHeader jobId_importData;
+    static Path externalStorageDir;
     static TagHeader exportInputDataId;
-    static TagHeader jobId_exportData;
+
+    static TagHeader jobId_placeData;
+    static TagHeader jobId_placeAgain;
+    static TagHeader jobId_placeFail;
+
+    static ResultDefinition placeDataResult;
 
     @Test @Order(101)
     void prepareExternalStorage() throws Exception {
 
-        var externalStorageDir = platform.workingDir().resolve("external_storage");
+        externalStorageDir = platform.workingDir().resolve("external_storage");
         Files.createDirectories(externalStorageDir);
-
-        var sourcePath = platform.tracRepoDir().resolve(IMPORT_SOURCE_PATH);
-        Files.copy(sourcePath, externalStorageDir.resolve("sample_data.parquet"), StandardCopyOption.REPLACE_EXISTING);
     }
 
     @Test @Order(102)
-    void importDataModel() throws Exception {
-
-        log.info("Running IMPORT_MODEL job for SimpleDataImport...");
-
-        var modelVersion = GitHelpers.getCurrentCommit();
-        var modelStub = ModelDefinition.newBuilder()
-                .setLanguage("python")
-                .setRepository("TRAC_LOCAL_REPO")
-                .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.data_import.SimpleDataImport")
-                .setVersion(modelVersion)
-                .build();
-
-        var modelAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("import_export_data:simple_data_import"))
-                .build());
-
-        var jobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("import_export_data:import_simple_data_import"))
-                .build());
-
-        jobId_importDataModel = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
-    }
-
-    @Test @Order(103)
-    void importDataModel_result() {
-
-        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_importDataModel);
-        var modelDef = modelTag.getDefinition().getModel();
-
-        Assertions.assertEquals(ModelType.DATA_IMPORT_MODEL, modelDef.getModelType());
-        Assertions.assertEquals("tutorial.data_import.SimpleDataImport", modelDef.getEntryPoint());
-        Assertions.assertTrue(modelDef.getOutputsMap().containsKey("customer_loans"));
-
-        importModelId = modelTag.getHeader();
-    }
-
-    @Test @Order(104)
-    void exportDataModel() throws Exception {
-
-        log.info("Running IMPORT_MODEL job for DataExportExample...");
-
-        var modelVersion = GitHelpers.getCurrentCommit();
-        var modelStub = ModelDefinition.newBuilder()
-                .setLanguage("python")
-                .setRepository("TRAC_LOCAL_REPO")
-                .setPath("examples/models/python/src")
-                .setEntryPoint("tutorial.data_export.DataExportExample")
-                .setVersion(modelVersion)
-                .build();
-
-        var modelAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_model")
-                .setValue(MetadataCodec.encodeValue("import_export_data:data_export_example"))
-                .build());
-
-        var jobAttrs = List.of(TagUpdate.newBuilder()
-                .setAttrName("e2e_test_job")
-                .setValue(MetadataCodec.encodeValue("import_export_data:import_data_export_example"))
-                .build());
-
-        jobId_exportDataModel = Helpers.startModelImport(platform, TEST_TENANT, modelStub, modelAttrs, jobAttrs);
-    }
-
-    @Test @Order(105)
-    void exportDataModel_result() {
-
-        var modelTag = Helpers.waitForModelImport(platform, TEST_TENANT, jobId_exportDataModel);
-        var modelDef = modelTag.getDefinition().getModel();
-
-        Assertions.assertEquals(ModelType.DATA_EXPORT_MODEL, modelDef.getModelType());
-        Assertions.assertEquals("tutorial.data_export.DataExportExample", modelDef.getEntryPoint());
-        Assertions.assertTrue(modelDef.getInputsMap().containsKey("profit_by_region"));
-
-        exportModelId = modelTag.getHeader();
-        exportInputSchema = modelDef.getInputsOrThrow("profit_by_region").getSchema();
-    }
-
-    @Test @Order(201)
-    void importData() {
-
-        var orchClient = platform.orchClientBlocking();
-
-        var importData = ImportDataJob.newBuilder()
-                .setModel(MetadataUtil.selectorFor(importModelId))
-                .putParameters("storage_key", MetadataCodec.encodeValue(EXTERNAL_STORAGE_KEY))
-                .putParameters("source_file", MetadataCodec.encodeValue("sample_data.parquet"))
-                .addStorageAccess(EXTERNAL_STORAGE_KEY)
-                .addOutputAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_data")
-                        .setValue(MetadataCodec.encodeValue("import_export_data:customer_loans")))
-                .build();
-
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.IMPORT_DATA)
-                        .setImportData(importData))
-                .addJobAttrs(TagUpdate.newBuilder()
-                        .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("import_export_data:import_data")))
-                .build();
-
-        jobId_importData = Helpers.startJob(orchClient, jobRequest).getJobId();
-    }
-
-    @Test @Order(202)
-    void importData_result() {
-
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
-        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_importData);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var jobReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
-                .build();
-
-        var jobTag = metaClient.readObject(jobReq);
-        var importDataJob = jobTag.getDefinition().getJob().getImportData();
-
-        Assertions.assertEquals(JobType.IMPORT_DATA, jobTag.getDefinition().getJob().getJobType());
-        Assertions.assertEquals(MetadataUtil.objectKey(importModelId), MetadataUtil.objectKey(importDataJob.getModel()));
-        Assertions.assertTrue(importDataJob.getStorageAccessList().contains(EXTERNAL_STORAGE_KEY));
-
-        var dataSearch = MetadataSearchRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSearchParams(SearchParameters.newBuilder()
-                        .setObjectType(ObjectType.DATA)
-                        .setSearch(SearchExpression.newBuilder()
-                                .setTerm(SearchTerm.newBuilder()
-                                        .setAttrName("trac_create_job")
-                                        .setAttrType(BasicType.STRING)
-                                        .setOperator(SearchOperator.EQ)
-                                        .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
-                .build();
-
-        var dataSearchResult = metaClient.search(dataSearch);
-        Assertions.assertEquals(1, dataSearchResult.getSearchResultCount());
-
-        var searchResult = dataSearchResult.getSearchResult(0);
-        var dataReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(searchResult.getHeader()))
-                .build();
-
-        var dataTag = metaClient.readObject(dataReq);
-        var dataDef = dataTag.getDefinition().getData();
-        var outputAttr = dataTag.getAttrsOrThrow("e2e_test_data");
-        var fieldCountAttr = dataTag.getAttrsOrThrow("trac_schema_field_count");
-        var rowCountAttr = dataTag.getAttrsOrThrow("trac_data_row_count");
-        var jobTypeAttr = dataTag.getAttrsOrThrow("trac_job_type");
-        var importLocationAttr = dataTag.getAttrsOrThrow("trac_import_location_key");
-        var originalFileNameAttr = dataTag.getAttrsOrThrow("original_file_name");
-        var originalFileSizeAttr = dataTag.getAttrsOrThrow("original_file_size");
-
-        Assertions.assertEquals("import_export_data:customer_loans", MetadataCodec.decodeStringValue(outputAttr));
-        Assertions.assertEquals(5, MetadataCodec.decodeIntegerValue(fieldCountAttr));
-        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(rowCountAttr) > 0);
-        Assertions.assertEquals(1, dataDef.getPartsCount());
-        Assertions.assertTrue(dataTag.containsAttrs("trac_create_job"));
-        Assertions.assertEquals(JobType.IMPORT_DATA.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
-        Assertions.assertEquals(EXTERNAL_STORAGE_KEY, MetadataCodec.decodeStringValue(importLocationAttr));
-        Assertions.assertEquals("sample_data.parquet", MetadataCodec.decodeStringValue(originalFileNameAttr));
-        Assertions.assertTrue(MetadataCodec.decodeIntegerValue(originalFileSizeAttr) > 0);
-        Assertions.assertTrue(dataTag.containsAttrs("original_file_modified_date"));
-
-        var storageReq = MetadataReadRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setSelector(dataDef.getStorageId())
-                .build();
-
-        var storageTag = metaClient.readObject(storageReq);
-
-        Assertions.assertEquals(ObjectType.STORAGE, storageTag.getDefinition().getObjectType());
-        Assertions.assertTrue(storageTag.containsAttrs("trac_create_job"));
-    }
-
-    @Test @Order(301)
     void prepareExportInput() {
-
-        log.info("Loading export input data...");
-
-        var dataClient = platform.dataClientBlocking();
 
         var csvContent = "region,gross_profit\r\nmunster,1000.50\r\nleinster,2000.75\r\n"
                 .getBytes(StandardCharsets.UTF_8);
 
         var writeRequest = DataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSchema(exportInputSchema)
+                .setSchema(PROFIT_SCHEMA)
                 .setFormat("text/csv")
                 .setContent(ByteString.copyFrom(csvContent))
                 .addTagUpdates(TagUpdate.newBuilder()
@@ -296,22 +120,146 @@ public class ImportExportDataTest {
                         .setValue(MetadataCodec.encodeValue("import_export_data:profit_by_region")))
                 .build();
 
-        exportInputDataId = dataClient.createSmallDataset(writeRequest);
+        exportInputDataId = platform.dataClientBlocking().createSmallDataset(writeRequest);
+    }
+
+    @Test @Order(201)
+    void placeData() {
+
+        jobId_placeData = startPlacementJob(PlacementConflict.PLACEMENT_CONFLICT_NOT_SET, "place_data");
+    }
+
+    @Test @Order(202)
+    void placeData_result() throws Exception {
+
+        var jobStatus = waitForCompletion(jobId_placeData);
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode(), jobStatus.getStatusMessage());
+
+        var jobDef = readObject(MetadataUtil.selectorFor(jobStatus.getJobId())).getDefinition().getJob();
+        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
+
+        // The stored job records where the storage key pointed, without credentials
+
+        for (var placement : jobDef.getExportData().getPlacementsMap().values()) {
+            Assertions.assertEquals("LOCAL", placement.getLocation().getProtocol());
+            Assertions.assertEquals(Set.of("rootPath"), placement.getLocation().getLocationDetailsMap().keySet());
+        }
+
+        // The RESULT records each file placed, matching the bytes on disk
+
+        placeDataResult = readObject(jobDef.getResultId()).getDefinition().getResult();
+        var records = placeDataResult.getPlacementsMap();
+
+        Assertions.assertEquals(PLACEMENT_PATHS.keySet(), records.keySet());
+        Assertions.assertEquals(0, placeDataResult.getOutputsCount());
+
+        for (var placement : PLACEMENT_PATHS.entrySet()) {
+
+            var record = records.get(placement.getKey());
+            var placedFile = externalStorageDir.resolve(placement.getValue());
+
+            Assertions.assertTrue(Files.exists(placedFile), placement.getValue());
+            Assertions.assertEquals(placement.getValue(), record.getLocation().getStoragePath());
+            Assertions.assertEquals(EXTERNAL_STORAGE_KEY, record.getLocation().getStorageKey());
+            Assertions.assertEquals("LOCAL", record.getLocation().getProtocol());
+            Assertions.assertEquals(PLACEMENT_FORMATS.get(placement.getKey()), record.getFormat());
+            Assertions.assertEquals(Files.size(placedFile), record.getSize());
+            Assertions.assertEquals(sha256(placedFile), record.getContentHash());
+            Assertions.assertEquals(exportInputDataId.getObjectId(), record.getDataId().getObjectId());
+            Assertions.assertEquals(exportInputDataId.getObjectVersion(), record.getDataId().getObjectVersion());
+        }
+
+        var csvContent = Files.readString(externalStorageDir.resolve(PLACEMENT_PATHS.get("profit_csv")), StandardCharsets.UTF_8);
+        Assertions.assertTrue(csvContent.contains("munster"));
+        Assertions.assertTrue(csvContent.contains("leinster"));
+
+        // A placement creates no TRAC objects, the only FILE is the job log
+
+        Assertions.assertEquals(List.of(), searchJobOutputs(ObjectType.DATA, jobKey));
+        Assertions.assertEquals(List.of(placeDataResult.getLogFileId().getObjectId()), searchJobOutputs(ObjectType.FILE, jobKey));
+    }
+
+    @Test @Order(301)
+    void placeAgain_suffix() {
+
+        jobId_placeAgain = startPlacementJob(PlacementConflict.PLACEMENT_SUFFIX, "place_again");
+
+        var jobStatus = waitForCompletion(jobId_placeAgain);
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode(), jobStatus.getStatusMessage());
+
+        var jobDef = readObject(MetadataUtil.selectorFor(jobStatus.getJobId())).getDefinition().getJob();
+        var records = readObject(jobDef.getResultId()).getDefinition().getResult().getPlacementsMap();
+
+        Assertions.assertEquals("placements/profit_by_region-2.csv", records.get("profit_csv").getLocation().getStoragePath());
+        Assertions.assertTrue(Files.exists(externalStorageDir.resolve("placements/profit_by_region-2.parquet")));
     }
 
     @Test @Order(302)
-    void exportData() {
+    void placeAgain_fail() throws Exception {
 
-        var orchClient = platform.orchClientBlocking();
+        var filesBefore = listPlacedFiles();
 
-        var exportData = ExportDataJob.newBuilder()
-                .setModel(MetadataUtil.selectorFor(exportModelId))
-                .putParameters("storage_key", MetadataCodec.encodeValue(EXTERNAL_STORAGE_KEY))
-                .putParameters("no_overwrite", MetadataCodec.encodeValue(false))
-                .putParameters("export_comment", MetadataCodec.encodeValue("import_export_data e2e test"))
-                .putInputs("profit_by_region", MetadataUtil.selectorFor(exportInputDataId))
-                .addStorageAccess(EXTERNAL_STORAGE_KEY)
+        jobId_placeFail = startPlacementJob(PlacementConflict.PLACEMENT_FAIL, "place_fail");
+
+        var jobStatus = waitForCompletion(jobId_placeFail);
+        Assertions.assertEquals(JobStatusCode.FAILED, jobStatus.getStatusCode());
+        Assertions.assertTrue(jobStatus.getStatusMessage().contains("File already exists"), jobStatus.getStatusMessage());
+
+        Assertions.assertEquals(filesBefore, listPlacedFiles());
+    }
+
+    @Test @Order(401)
+    void captureBack() {
+
+        var schemaRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.SCHEMA)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.SCHEMA)
+                        .setSchema(PROFIT_SCHEMA))
                 .build();
+
+        var schemaId = platform.metaClientBlocking().createObject(schemaRequest);
+        var placedParquet = placeDataResult.getPlacementsOrThrow("profit_parquet");
+
+        var capture = CaptureSource.newBuilder()
+                .setLocation(ExternalLocation.newBuilder()
+                        .setStorageKey(EXTERNAL_STORAGE_KEY)
+                        .setStoragePath(placedParquet.getLocation().getStoragePath()))
+                .setSchemaSource(CaptureSchemaSource.CAPTURE_SCHEMA_DECLARED)
+                .setSchemaId(MetadataUtil.selectorFor(schemaId));
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_DATA)
+                        .setImportData(ImportDataJob.newBuilder().putCaptures("profit_by_region", capture.build())))
+                .build();
+
+        var captureJobId = Helpers.startJob(platform.orchClientBlocking(), jobRequest).getJobId();
+        var jobStatus = waitForCompletion(captureJobId);
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode(), jobStatus.getStatusMessage());
+
+        var captureJob = readObject(MetadataUtil.selectorFor(captureJobId)).getDefinition().getJob();
+        var captureResult = readObject(captureJob.getResultId()).getDefinition().getResult();
+        var capturedFile = readObject(captureResult.getOutputsOrThrow("profit_by_region_file"));
+
+        var capturedHash = MetadataCodec.decodeStringValue(capturedFile.getAttrsOrThrow("trac_import_content_hash"));
+        Assertions.assertEquals(placedParquet.getContentHash(), capturedHash);
+    }
+
+    private TagHeader startPlacementJob(PlacementConflict conflict, String jobLabel) {
+
+        var exportData = ExportDataJob.newBuilder().setPlacementConflict(conflict);
+
+        for (var placement : PLACEMENT_PATHS.entrySet()) {
+            exportData.putPlacements(placement.getKey(), PlacementTarget.newBuilder()
+                    .setDataId(MetadataUtil.selectorFor(exportInputDataId))
+                    .setLocation(ExternalLocation.newBuilder()
+                            .setStorageKey(EXTERNAL_STORAGE_KEY)
+                            .setStoragePath(placement.getValue()))
+                    .build());
+        }
 
         var jobRequest = JobRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -320,39 +268,43 @@ public class ImportExportDataTest {
                         .setExportData(exportData))
                 .addJobAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_job")
-                        .setValue(MetadataCodec.encodeValue("import_export_data:export_data")))
+                        .setValue(MetadataCodec.encodeValue("import_export_data:" + jobLabel)))
                 .build();
 
-        jobId_exportData = Helpers.startJob(orchClient, jobRequest).getJobId();
+        return Helpers.startJob(platform.orchClientBlocking(), jobRequest).getJobId();
     }
 
-    @Test @Order(303)
-    void exportData_result() throws Exception {
+    private static JobStatus waitForCompletion(TagHeader jobId) {
 
-        var metaClient = platform.metaClientBlocking();
-        var orchClient = platform.orchClientBlocking();
-
-        var jobStatus = Helpers.waitForJob(orchClient, TEST_TENANT, jobId_exportData);
-        var jobKey = MetadataUtil.objectKey(jobStatus.getJobId());
-
-        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
-
-        var jobReq = MetadataReadRequest.newBuilder()
+        var statusRequest = JobStatusRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setSelector(MetadataUtil.selectorFor(jobStatus.getJobId()))
+                .setSelector(MetadataUtil.selectorFor(jobId))
                 .build();
 
-        var jobTag = metaClient.readObject(jobReq);
-        var exportDataJob = jobTag.getDefinition().getJob().getExportData();
+        var jobStatus = platform.orchClientBlocking().checkJob(statusRequest);
 
-        Assertions.assertEquals(JobType.EXPORT_DATA, jobTag.getDefinition().getJob().getJobType());
-        Assertions.assertEquals(MetadataUtil.objectKey(exportModelId), MetadataUtil.objectKey(exportDataJob.getModel()));
+        while (!COMPLETED_STATES.contains(jobStatus.getStatusCode())) {
+            LockSupport.parkNanos(TimeUnit.SECONDS.toNanos(1));
+            jobStatus = platform.orchClientBlocking().checkJob(statusRequest);
+        }
 
-        // Export has no TRAC output - confirm deliberately, not just assumed
-        var dataSearch = MetadataSearchRequest.newBuilder()
+        return jobStatus;
+    }
+
+    private static org.finos.tracdap.metadata.Tag readObject(TagSelector selector) {
+
+        return platform.metaClientBlocking().readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selector)
+                .build());
+    }
+
+    private static List<String> searchJobOutputs(ObjectType objectType, String jobKey) {
+
+        var searchRequest = MetadataSearchRequest.newBuilder()
                 .setTenant(TEST_TENANT)
                 .setSearchParams(SearchParameters.newBuilder()
-                        .setObjectType(ObjectType.DATA)
+                        .setObjectType(objectType)
                         .setSearch(SearchExpression.newBuilder()
                                 .setTerm(SearchTerm.newBuilder()
                                         .setAttrName("trac_create_job")
@@ -361,42 +313,21 @@ public class ImportExportDataTest {
                                         .setSearchValue(MetadataCodec.encodeValue(jobKey)))))
                 .build();
 
-        var dataSearchResult = metaClient.search(dataSearch);
-        Assertions.assertEquals(0, dataSearchResult.getSearchResultCount());
-
-        var exportedFile = platform.workingDir().resolve("external_storage/data_export_example/profit_by_region.csv");
-        Assertions.assertTrue(Files.exists(exportedFile));
-
-        var exportedContent = Files.readString(exportedFile, StandardCharsets.UTF_8);
-        var exportedLines = exportedContent.strip().split("\n");
-
-        Assertions.assertEquals(3, exportedLines.length);
-        Assertions.assertTrue(exportedLines[0].contains("region"));
-        Assertions.assertTrue(exportedLines[0].contains("gross_profit"));
-        Assertions.assertTrue(exportedContent.contains("munster"));
-        Assertions.assertTrue(exportedContent.contains("leinster"));
+        return platform.metaClientBlocking().search(searchRequest).getSearchResultList().stream()
+                .map(tag -> tag.getHeader().getObjectId())
+                .collect(java.util.stream.Collectors.toList());
     }
 
-    @Test @Order(401)
-    void importData_missingResource() {
+    private static List<String> listPlacedFiles() throws Exception {
 
-        var orchClient = platform.orchClientBlocking();
+        try (var files = Files.list(externalStorageDir.resolve("placements"))) {
+            return files.map(f -> f.getFileName().toString()).sorted().collect(java.util.stream.Collectors.toList());
+        }
+    }
 
-        var importData = ImportDataJob.newBuilder()
-                .setModel(MetadataUtil.selectorFor(importModelId))
-                .putParameters("storage_key", MetadataCodec.encodeValue("STORAGE_THAT_IS_NOT_CONFIGURED"))
-                .putParameters("source_file", MetadataCodec.encodeValue("sample_data.parquet"))
-                .addStorageAccess("STORAGE_THAT_IS_NOT_CONFIGURED")
-                .build();
+    private static String sha256(Path path) throws Exception {
 
-        var jobRequest = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.IMPORT_DATA)
-                        .setImportData(importData))
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+        var digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path));
+        return String.format("%064x", new BigInteger(1, digest));
     }
 }

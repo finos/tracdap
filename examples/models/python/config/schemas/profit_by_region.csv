@@ -1,0 +1,3 @@
+field_name, field_type, label, categorical, business_key, not_null, format_code
+region, STRING, Customer home region, true, , ,
+gross_profit, DECIMAL, Total gross profit, , , ,
