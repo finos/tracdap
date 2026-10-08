@@ -18,7 +18,6 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
@@ -33,11 +32,6 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -47,7 +41,7 @@ import java.util.concurrent.locks.LockSupport;
 @Tag("integration")
 @Tag("int-e2e")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-public class RefusedModelTypesTest {
+public class ModelImportAllowListTest {
 
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
@@ -62,7 +56,6 @@ public class RefusedModelTypesTest {
             .runCacheDeploy(true)
             .addTenant(TEST_TENANT)
             .prepareLocalExecutor(true)
-            .preStartAction(RefusedModelTypesTest::refuseImportModels)
             .startService(TracMetadataService.class)
             .startService(TracDataService.class)
             .startService(TracOrchestratorService.class)
@@ -71,27 +64,6 @@ public class RefusedModelTypesTest {
 
     static TagHeader jobId_importModel;
     static TagHeader jobId_standardModel;
-
-    private static void refuseImportModels(PlatformTest platform) {
-
-        try {
-
-            var configFile = Path.of(platform.platformConfigUrl().toURI());
-            var config = Files.readString(configFile);
-
-            var refusedEntry = String.format("config:\n  %s: %s\n", ConfigKeys.MODEL_IMPORT_REFUSED_TYPES, ModelType.DATA_IMPORT_MODEL);
-            var updatedConfig = config.replaceFirst("config:\n", refusedEntry);
-
-            Assertions.assertNotEquals(config, updatedConfig);
-            Files.writeString(configFile, updatedConfig);
-        }
-        catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-        catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     @Test @Order(101)
     void importModel_refused() {
@@ -108,7 +80,7 @@ public class RefusedModelTypesTest {
 
         Assertions.assertEquals(JobStatusCode.FAILED, jobStatus.getStatusCode());
         Assertions.assertTrue(jobStatus.getStatusMessage().contains(ModelType.DATA_IMPORT_MODEL.name()), jobStatus.getStatusMessage());
-        Assertions.assertTrue(jobStatus.getStatusMessage().contains(ConfigKeys.MODEL_IMPORT_REFUSED_TYPES), jobStatus.getStatusMessage());
+        Assertions.assertTrue(jobStatus.getStatusMessage().contains("cannot be imported on the platform"), jobStatus.getStatusMessage());
 
         Assertions.assertEquals(0, searchModelsCreatedBy(jobId_importModel));
     }

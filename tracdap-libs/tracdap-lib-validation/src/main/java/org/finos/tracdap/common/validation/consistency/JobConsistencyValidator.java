@@ -68,11 +68,6 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RFJ_EXPORT_STORAGE_ACCESS;
 
     private static final Descriptors.Descriptor IMPORT_DATA_JOB;
-    private static final Descriptors.FieldDescriptor IDJ_MODEL;
-    private static final Descriptors.FieldDescriptor IDJ_PARAMETERS;
-    private static final Descriptors.FieldDescriptor IDJ_INPUTS;
-    private static final Descriptors.FieldDescriptor IDJ_PRIOR_OUTPUTS;
-    private static final Descriptors.FieldDescriptor IDJ_STORAGE_ACCESS;
     private static final Descriptors.FieldDescriptor IDJ_CAPTURES;
 
     private static final Descriptors.Descriptor EXPORT_DATA_JOB;
@@ -110,11 +105,6 @@ public class JobConsistencyValidator {
         RFJ_EXPORT_STORAGE_ACCESS = field(RUN_FLOW_JOB, RunFlowJob.EXPORTSTORAGEACCESS_FIELD_NUMBER);
 
         IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
-        IDJ_MODEL = field(IMPORT_DATA_JOB, ImportDataJob.MODEL_FIELD_NUMBER);
-        IDJ_PARAMETERS = field(IMPORT_DATA_JOB, ImportDataJob.PARAMETERS_FIELD_NUMBER);
-        IDJ_INPUTS = field(IMPORT_DATA_JOB, ImportDataJob.INPUTS_FIELD_NUMBER);
-        IDJ_PRIOR_OUTPUTS = field(IMPORT_DATA_JOB, ImportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
-        IDJ_STORAGE_ACCESS = field(IMPORT_DATA_JOB, ImportDataJob.STORAGEACCESS_FIELD_NUMBER);
         IDJ_CAPTURES = field(IMPORT_DATA_JOB, ImportDataJob.CAPTURES_FIELD_NUMBER);
 
         EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
@@ -262,46 +252,9 @@ public class JobConsistencyValidator {
     @SuppressWarnings("unchecked")
     public static ValidationContext importDataJob(ImportDataJob job, ValidationContext ctx) {
 
-        if (job.getCapturesCount() > 0)
-            return captureImportJob(job, ctx);
-
-        var metadata = ctx.getMetadataBundle();
-        var modelObj = metadata.getObject(job.getModel());
-
-        if (modelObj == null) {
-            var message = "Required metadata is not available for [" + MetadataUtil.objectKey(job.getModel()) + "]";
-            return ctx.push(IDJ_MODEL).error(message).pop();
-        }
-
-        var modelDef = modelObj.getModel();
-
-        if (modelDef.getModelType() != ModelType.DATA_IMPORT_MODEL) {
-
-            var message = String.format(
-                    "Model [%s] is not a data import model (expected %s, got %s)",
-                    MetadataUtil.objectKey(job.getModel()), ModelType.DATA_IMPORT_MODEL, modelDef.getModelType());
-
-            ctx = ctx.push(IDJ_MODEL).error(message).pop();
-        }
-
-        ctx.pushMap(IDJ_PARAMETERS, ImportDataJob::getParametersMap)
-                .apply(JobConsistencyValidator::runModelParameters, Map.class, modelDef.getParametersMap())
+        return ctx.pushMap(IDJ_CAPTURES, ImportDataJob::getCapturesMap)
+                .apply(JobConsistencyValidator::captureSources, Map.class)
                 .pop();
-
-        ctx.pushMap(IDJ_INPUTS, ImportDataJob::getInputsMap)
-                .apply(JobConsistencyValidator::runModelInputs, Map.class, modelDef.getInputsMap())
-                .pop();
-
-        // Prior outputs are optional, however any provided must be valid
-        ctx.pushMap(IDJ_PRIOR_OUTPUTS, ImportDataJob::getPriorOutputsMap)
-                .apply(JobConsistencyValidator::runModelPriorOutputs, Map.class, modelDef.getOutputsMap())
-                .pop();
-
-        ctx = ctx.pushRepeated(IDJ_STORAGE_ACCESS)
-                .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
-                .pop();
-
-        return ctx;
     }
 
     @Validator
@@ -349,13 +302,6 @@ public class JobConsistencyValidator {
     }
 
     @SuppressWarnings("unchecked")
-    private static ValidationContext captureImportJob(ImportDataJob job, ValidationContext ctx) {
-
-        return ctx.pushMap(IDJ_CAPTURES, ImportDataJob::getCapturesMap)
-                .apply(JobConsistencyValidator::captureSources, Map.class)
-                .pop();
-    }
-
     private static ValidationContext captureSources(Map<String, CaptureSource> captures, ValidationContext ctx) {
 
         for (var capture : captures.entrySet()) {

@@ -310,32 +310,20 @@ public class JobValidator {
     @Validator
     public static ValidationContext importDataJob(ImportDataJob msg, ValidationContext ctx) {
 
+        // Import models run only in local dev mode, on the platform an import job takes captures and no model
+
         if (msg.getCapturesCount() > 0)
             return captureImportJob(msg, ctx);
 
-        ctx = ctx.push(IDJ_MODEL)
-                .apply(CommonValidators::required)
-                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
-                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.MODEL)
+        if (msg.hasModel()) {
+            return ctx.push(IDJ_MODEL)
+                    .error("Import models run only in local dev mode, an import job on the platform takes captures and no model")
+                    .pop();
+        }
+
+        return ctx.pushMap(IDJ_CAPTURES)
+                .error("An import job on the platform requires at least one capture")
                 .pop();
-
-        ctx = importOrExportJob(ctx, IDJ_PARAMETERS, IDJ_INPUTS, IDJ_OUTPUTS, IDJ_PRIOR_OUTPUTS, IDJ_STORAGE_ACCESS);
-
-        ctx = outputAttrs(ctx, IDJ_OUTPUT_ATTRS);
-
-        if (msg.getImportsCount() > 0) {
-            ctx = ctx.pushMap(IDJ_IMPORTS)
-                    .error("The imports field is not currently supported and must be empty")
-                    .pop();
-        }
-
-        if (msg.getImportAttrsCount() > 0) {
-            ctx = ctx.pushRepeated(IDJ_IMPORT_ATTRS)
-                    .error("The importAttrs field is not currently supported and must be empty")
-                    .pop();
-        }
-
-        return ctx;
     }
 
     private static ValidationContext captureImportJob(ImportDataJob msg, ValidationContext ctx) {

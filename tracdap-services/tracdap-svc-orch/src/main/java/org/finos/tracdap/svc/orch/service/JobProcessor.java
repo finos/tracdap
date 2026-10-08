@@ -86,7 +86,7 @@ public class JobProcessor {
 
         var platformConfig = registry.getSingleton(ConfigManager.class).loadRootConfigObject(PlatformConfig.class);
 
-        this.lifecycle = new JobProcessorHelpers(platformConfig, tenantState, commonConcerns, registry);
+        this.lifecycle = new JobProcessorHelpers(platformConfig.getExecutor(), tenantState, commonConcerns, registry);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {

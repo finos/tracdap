@@ -1049,231 +1049,27 @@ public class JobValidationTest {
     }
 
     @Test
-    public void importData_validateOk() {
+    public void importData_importModelRejected() {
 
         var modelTags = List.of(TagUpdate.newBuilder()
                 .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_validate_ok"))
+                .setValue(MetadataCodec.encodeValue("import_data_import_model_rejected"))
                 .build());
 
-        var modelSelector = createDataImportModel(modelTags);
+        var importData = ImportDataJob.newBuilder()
+                .setModel(createDataImportModel(modelTags))
+                .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE");
 
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var response = orchClient.validateJob(request);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+        expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "Import models run only in local dev mode");
     }
 
     @Test
-    public void importData_badInput() {
+    public void importData_capturesRequired() {
 
-        // Model is required and is missing entirely
+        var importData = ImportDataJob.newBuilder()
+                .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE");
 
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_outputsMustBeEmpty() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_outputs_must_be_empty"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .putOutputs("output_data", basicDataSelector));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_wrongResourceType() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_wrong_resource_type"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_STORAGE"));  // INTERNAL_STORAGE, not EXTERNAL_STORAGE
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_wrongModelType() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_wrong_model_type"))
-                .build());
-
-        // A standard model, not a data import model
-        var modelSelector = createBasicModel(
-                SampleData.BASIC_TABLE_SCHEMA,
-                SampleData.BASIC_TABLE_SCHEMA_V2,
-                modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_missingResources() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_missing_resources"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("STORAGE_THAT_IS_NOT_CONFIGURED"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_missingParameter() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_missing_parameter"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags, Map.of("storage_key", BasicType.STRING), Map.of());
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_wrongParameterType() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_wrong_parameter_type"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags, Map.of("storage_key", BasicType.STRING), Map.of());
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putParameters("storage_key", MetadataCodec.encodeValue(123))  // Wrong type, model expects a string
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_wrongInputSchema() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_wrong_input_schema"))
-                .build());
-
-        var modelSelector = createDataImportModel(
-                modelTags, Map.of(), Map.of("reference_data", SampleData.BASIC_TABLE_SCHEMA));
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("reference_data", altDataSelector)  // Wrong schema, model expects basic data
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+        expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "requires at least one capture");
     }
 
     @Test
@@ -1505,88 +1301,6 @@ public class JobValidationTest {
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
         Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_reservedOutputAttr() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_reserved_output_attr"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .addOutputAttrs(TagUpdate.newBuilder()
-                                .setAttrName("trac_import_location_key")
-                                .setValue(MetadataCodec.encodeValue("spoofed_location"))));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_importsMustBeEmpty() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_imports_must_be_empty"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .putImports("import_one", basicDataSelector));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void importData_importAttrsMustBeEmpty() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("import_data_import_attrs_must_be_empty"))
-                .build());
-
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.IMPORT_DATA)
-                .setImportData(ImportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .addImportAttrs(TagUpdate.newBuilder()
-                                .setAttrName("business_date")
-                                .setValue(MetadataCodec.encodeValue("2024-01-01"))));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
     }
 
     @Test

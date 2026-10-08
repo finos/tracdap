@@ -27,7 +27,6 @@ public class ConfigKeys {
     public static final String SECRET_TYPE_KEY = "secret.type";
     public static final String SECRET_URL_KEY = "secret.url";
     public static final String SECRET_KEY_KEY = "secret.key";
-    public static final String MODEL_IMPORT_REFUSED_TYPES = "model.import.refusedTypes";
 
     public static final String TRAC_SECRET_TYPE = "TRAC_SECRET_TYPE";
     public static final String TRAC_SECRET_URL = "TRAC_SECRET_URL";

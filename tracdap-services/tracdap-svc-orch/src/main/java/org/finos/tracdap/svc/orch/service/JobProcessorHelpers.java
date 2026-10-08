@@ -22,7 +22,6 @@ import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.*;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.exception.EJobResult;
-import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -55,6 +54,11 @@ public class JobProcessorHelpers {
     public static final String RESULT_PATH_TEMPLATE = "%d/%s/%s/trac_job_result.json";
     public static final String CAPTURE_MAX_SIZE_CONFIG_KEY = "captureMaxSize";
 
+    // Model types the platform can import, import models run only in local dev mode
+    private static final Set<ModelType> IMPORTABLE_MODEL_TYPES = EnumSet.of(
+            ModelType.STANDARD_MODEL,
+            ModelType.DATA_EXPORT_MODEL);
+
     private final Logger log = LoggerFactory.getLogger(JobProcessorHelpers.class);
 
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
@@ -66,44 +70,20 @@ public class JobProcessorHelpers {
     private final Validator validator = new Validator();
 
     private final String captureSizeLimit;
-    private final Set<ModelType> refusedModelTypes;
 
 
     public JobProcessorHelpers(
-            PlatformConfig platformConfig,
+            PluginConfig executorConfig,
             TenantConfigManager tenantState,
             GrpcConcern commonConcerns,
             PluginRegistry registry) {
 
-        this.captureSizeLimit = platformConfig.getExecutor().getPropertiesOrDefault(CAPTURE_MAX_SIZE_CONFIG_KEY, null);
-        this.refusedModelTypes = refusedModelTypes(platformConfig);
+        this.captureSizeLimit = executorConfig.getPropertiesOrDefault(CAPTURE_MAX_SIZE_CONFIG_KEY, null);
         this.tenantState = tenantState;
         this.commonConcerns = commonConcerns;
 
         this.metaClient = registry.getSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
         this.configManager = registry.getSingleton(ConfigManager.class);
-    }
-
-    private static Set<ModelType> refusedModelTypes(PlatformConfig platformConfig) {
-
-        var configValue = platformConfig.getConfigOrDefault(ConfigKeys.MODEL_IMPORT_REFUSED_TYPES, "");
-        var refusedTypes = EnumSet.noneOf(ModelType.class);
-
-        for (var typeName : configValue.split(",")) {
-
-            if (typeName.isBlank())
-                continue;
-
-            try {
-                refusedTypes.add(ModelType.valueOf(typeName.trim()));
-            }
-            catch (IllegalArgumentException e) {
-                var message = String.format("Invalid model type [%s] in [%s]", typeName.trim(), ConfigKeys.MODEL_IMPORT_REFUSED_TYPES);
-                throw new EStartup(message, e);
-            }
-        }
-
-        return refusedTypes;
     }
 
     JobState loadMetadata(JobState jobState) {
@@ -488,7 +468,7 @@ public class JobProcessorHelpers {
         validator.validateFixedObject(runtimeResult);
 
         if (jobState.jobType == JobType.IMPORT_MODEL)
-            checkRefusedModelTypes(runtimeResult);
+            checkImportableModelTypes(runtimeResult);
 
         var resultIds = buildResultLookup(runtimeResult);
 
@@ -630,7 +610,7 @@ public class JobProcessorHelpers {
         return resultLookup;
     }
 
-    private void checkRefusedModelTypes(JobResult runtimeResult) {
+    private void checkImportableModelTypes(JobResult runtimeResult) {
 
         for (var resultObject : runtimeResult.getObjectsMap().values()) {
 
@@ -639,11 +619,11 @@ public class JobProcessorHelpers {
 
             var modelType = resultObject.getModel().getModelType();
 
-            if (refusedModelTypes.contains(modelType)) {
+            if (!IMPORTABLE_MODEL_TYPES.contains(modelType)) {
 
                 var message = String.format(
-                        "Model type [%s] cannot be imported on this platform (refused by [%s] in the platform config)",
-                        modelType, ConfigKeys.MODEL_IMPORT_REFUSED_TYPES);
+                        "Model type [%s] cannot be imported on the platform (allowed types are %s)",
+                        modelType, IMPORTABLE_MODEL_TYPES);
 
                 throw new EJobResult(message);
             }
