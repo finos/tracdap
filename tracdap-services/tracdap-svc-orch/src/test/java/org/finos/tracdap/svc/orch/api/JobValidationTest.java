@@ -1072,293 +1072,6 @@ public class JobValidationTest {
         expectCaptureInvalid(importData, Status.Code.INVALID_ARGUMENT, "requires at least one capture");
     }
 
-    @Test
-    public void exportData_validateOk() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_validate_ok"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var response = orchClient.validateJob(request);
-
-        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
-    }
-
-    @Test
-    public void exportData_badInput() {
-
-        // Model is required and is missing entirely
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_outputsMustBeEmpty() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_outputs_must_be_empty"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .putOutputs("unexpected_output", basicDataSelector));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_wrongResourceType() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_wrong_resource_type"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_REPO"));  // MODEL_REPOSITORY, not EXTERNAL_STORAGE
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_wrongModelType() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_wrong_model_type"))
-                .build());
-
-        // A data import model, not a data export model
-        var modelSelector = createDataImportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_missingResources() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_missing_resources"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("STORAGE_THAT_IS_NOT_CONFIGURED"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_missingParameter() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_missing_parameter"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags, Map.of("storage_key", BasicType.STRING));
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_wrongParameterType() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_wrong_parameter_type"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags, Map.of("storage_key", BasicType.STRING));
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .putParameters("storage_key", MetadataCodec.encodeValue(123))  // Wrong type, model expects a string
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_wrongInputSchema() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_wrong_input_schema"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", altDataSelector)  // Wrong schema, model expects basic data
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE"));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_reservedOutputAttr() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_reserved_output_attr"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .addOutputAttrs(TagUpdate.newBuilder()
-                                .setAttrName("trac_job_output")
-                                .setValue(MetadataCodec.encodeValue("spoofed"))));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
-    @Test
-    public void exportData_exportsMustBeEmpty() {
-
-        var modelTags = List.of(TagUpdate.newBuilder()
-                .setAttrName("model_key")
-                .setValue(MetadataCodec.encodeValue("export_data_exports_must_be_empty"))
-                .build());
-
-        var modelSelector = createDataExportModel(modelTags);
-
-        var job = JobDefinition.newBuilder()
-                .setJobType(JobType.EXPORT_DATA)
-                .setExportData(ExportDataJob.newBuilder()
-                        .setModel(modelSelector)
-                        .putInputs("input_data", basicDataSelector)
-                        .addStorageAccess("UNIT_TEST_EXTERNAL_STORAGE")
-                        .putExports("export_one", basicDataSelector));
-
-        var request = JobRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setJob(job)
-                .build();
-
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
-        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
-    }
-
     private static FlowEdge.Builder flowEdge(String sourceNode, String sourceSocket, String targetNode, String targetSocket) {
 
         var source = FlowSocket.newBuilder().setNode(sourceNode);
@@ -1672,11 +1385,23 @@ public class JobValidationTest {
 
     private JobStatus validateCaptureJob(ImportDataJob.Builder importData) {
 
+        return validateJob(JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_DATA)
+                .setImportData(importData));
+    }
+
+    private JobStatus validatePlacementJob(ExportDataJob.Builder exportData) {
+
+        return validateJob(JobDefinition.newBuilder()
+                .setJobType(JobType.EXPORT_DATA)
+                .setExportData(exportData));
+    }
+
+    private JobStatus validateJob(JobDefinition.Builder job) {
+
         var request = JobRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.IMPORT_DATA)
-                        .setImportData(importData))
+                .setJob(job)
                 .build();
 
         return orchClient.validateJob(request);
@@ -1684,7 +1409,17 @@ public class JobValidationTest {
 
     private void expectCaptureInvalid(ImportDataJob.Builder importData, Status.Code expectedCode, String expectedMessage) {
 
-        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validateCaptureJob(importData));
+        expectInvalid(() -> validateCaptureJob(importData), expectedCode, expectedMessage);
+    }
+
+    private void expectPlacementInvalid(ExportDataJob.Builder exportData, Status.Code expectedCode, String expectedMessage) {
+
+        expectInvalid(() -> validatePlacementJob(exportData), expectedCode, expectedMessage);
+    }
+
+    private void expectInvalid(org.junit.jupiter.api.function.Executable validation, Status.Code expectedCode, String expectedMessage) {
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, validation);
         Assertions.assertEquals(expectedCode, e.getStatus().getCode());
 
         var trailers = e.getTrailers();
@@ -1941,4 +1676,161 @@ public class JobValidationTest {
 
         expectCaptureInvalid(withStorageAccess, Status.Code.INVALID_ARGUMENT, "storageAccess field is not used with captures");
     }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // PLACEMENTS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private PlacementTarget.Builder placement(String storagePath) {
+
+        return PlacementTarget.newBuilder()
+                .setDataId(basicDataSelector)
+                .setLocation(ExternalLocation.newBuilder()
+                        .setStorageKey(CAPTURE_STORAGE)
+                        .setStoragePath(storagePath));
+    }
+
+    @Test
+    public void placementData_validateOk() {
+
+        var exportData = ExportDataJob.newBuilder()
+                .putPlacements("loans_csv", placement("2026-09/loans.csv").build())
+                .putPlacements("loans_parquet", placement("loans.PARQUET").build())
+                .putPlacements("loans_arrow", placement("loans.arrow").build())
+                .setPlacementConflict(PlacementConflict.PLACEMENT_FAIL);
+
+        var response = validatePlacementJob(exportData);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+    }
+
+    @Test
+    public void placementData_modelRejected() {
+
+        var exportData = ExportDataJob.newBuilder()
+                .setModel(createDataExportModel(List.of()))
+                .putPlacements("loans", placement("loans.csv").build());
+
+        expectPlacementInvalid(exportData, Status.Code.INVALID_ARGUMENT, "An export job takes no model");
+    }
+
+    @Test
+    public void placementData_placementsRequired() {
+
+        expectPlacementInvalid(ExportDataJob.newBuilder(), Status.Code.INVALID_ARGUMENT, "requires at least one placement");
+    }
+
+    @Test
+    public void placementData_badPlacement() {
+
+        var noDataset = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").clearDataId().build());
+
+        expectPlacementInvalid(noDataset, Status.Code.INVALID_ARGUMENT, "source");
+
+        var wrongDatasetType = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").setDataId(createCaptureSchema()).build());
+
+        expectPlacementInvalid(wrongDatasetType, Status.Code.INVALID_ARGUMENT, "dataId");
+
+        var noLocation = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").clearLocation().build());
+
+        expectPlacementInvalid(noLocation, Status.Code.INVALID_ARGUMENT, "location");
+
+        var escapingPath = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("../loans.csv").build());
+
+        expectPlacementInvalid(escapingPath, Status.Code.INVALID_ARGUMENT, "storagePath");
+
+        for (var path : List.of("loans", "loans.xlsx")) {
+
+            var badExtension = ExportDataJob.newBuilder()
+                    .putPlacements("loans", placement(path).build());
+
+            expectPlacementInvalid(badExtension, Status.Code.INVALID_ARGUMENT, "is not a supported data file");
+        }
+
+        var badName = ExportDataJob.newBuilder()
+                .putPlacements("trac_loans", placement("loans.csv").build());
+
+        expectPlacementInvalid(badName, Status.Code.INVALID_ARGUMENT, "is a TRAC reserved identifier");
+    }
+
+    @Test
+    public void placementData_samePath() {
+
+        var exportData = ExportDataJob.newBuilder()
+                .putPlacements("a", placement("out/Loans.csv").build())
+                .putPlacements("b", placement("out/loans.csv").build());
+
+        expectPlacementInvalid(exportData, Status.Code.INVALID_ARGUMENT, "write to the same path");
+    }
+
+    @Test
+    public void placementData_unusedFields() {
+
+        var storageAccess = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").build())
+                .addStorageAccess(CAPTURE_STORAGE);
+
+        expectPlacementInvalid(storageAccess, Status.Code.INVALID_ARGUMENT, "storageAccess field is not used by export jobs");
+
+        var outputAttrs = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").build())
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName("business_segments")
+                        .setValue(MetadataCodec.encodeValue("retail")));
+
+        expectPlacementInvalid(outputAttrs, Status.Code.INVALID_ARGUMENT, "outputAttrs field is not used by export jobs");
+
+        var exports = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").build())
+                .putExports("loans", basicDataSelector);
+
+        expectPlacementInvalid(exports, Status.Code.INVALID_ARGUMENT, "exports field is not used by export jobs");
+    }
+
+    @Test
+    public void placementData_clientLocationDetails() {
+
+        var exportData = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder()
+                                .setStorageKey(CAPTURE_STORAGE)
+                                .setStoragePath("loans.csv")
+                                .setProtocol("LOCAL"))
+                        .build());
+
+        expectPlacementInvalid(exportData, Status.Code.INVALID_ARGUMENT, "protocol of an external location is set by the platform");
+    }
+
+    @Test
+    public void placementData_datasetNotAvailable() {
+
+        var missingData = MetadataUtil.selectorFor(TagHeader.newBuilder()
+                .setObjectType(ObjectType.DATA)
+                .setObjectId(UuidFactory.DEFAULT.allocate().toString())
+                .setObjectVersion(1)
+                .setTagVersion(1)
+                .build());
+
+        var exportData = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv").setDataId(missingData).build());
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validatePlacementJob(exportData));
+        Assertions.assertNotEquals(Status.Code.OK, e.getStatus().getCode());
+    }
+
+    @Test
+    public void placementData_storageNotExternal() {
+
+        var exportData = ExportDataJob.newBuilder()
+                .putPlacements("loans", placement("loans.csv")
+                        .setLocation(ExternalLocation.newBuilder().setStorageKey("UNIT_TEST_STORAGE").setStoragePath("loans.csv"))
+                        .build());
+
+        expectPlacementInvalid(exportData, Status.Code.FAILED_PRECONDITION, "is the wrong type");
+    }
+
 }

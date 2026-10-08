@@ -24,6 +24,7 @@ import org.finos.tracdap.metadata.*;
 
 import com.google.protobuf.Descriptors;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -99,6 +100,11 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor EDJ_STORAGE_ACCESS;
     private static final Descriptors.FieldDescriptor EDJ_EXPORTS;
     private static final Descriptors.FieldDescriptor EDJ_OUTPUT_ATTRS;
+    private static final Descriptors.FieldDescriptor EDJ_PLACEMENTS;
+    private static final Descriptors.FieldDescriptor EDJ_PLACEMENT_CONFLICT;
+
+    private static final Descriptors.Descriptor PLACEMENT_TARGET;
+    private static final Descriptors.FieldDescriptor PT_LOCATION;
 
     static {
 
@@ -159,6 +165,11 @@ public class JobValidator {
         EDJ_STORAGE_ACCESS = field(EXPORT_DATA_JOB, ExportDataJob.STORAGEACCESS_FIELD_NUMBER);
         EDJ_EXPORTS = field(EXPORT_DATA_JOB, ExportDataJob.EXPORTS_FIELD_NUMBER);
         EDJ_OUTPUT_ATTRS = field(EXPORT_DATA_JOB, ExportDataJob.OUTPUTATTRS_FIELD_NUMBER);
+        EDJ_PLACEMENTS = field(EXPORT_DATA_JOB, ExportDataJob.PLACEMENTS_FIELD_NUMBER);
+        EDJ_PLACEMENT_CONFLICT = field(EXPORT_DATA_JOB, ExportDataJob.PLACEMENTCONFLICT_FIELD_NUMBER);
+
+        PLACEMENT_TARGET = PlacementTarget.getDescriptor();
+        PT_LOCATION = field(PLACEMENT_TARGET, PlacementTarget.LOCATION_FIELD_NUMBER);
     }
 
     @Validator
@@ -365,69 +376,68 @@ public class JobValidator {
     @Validator
     public static ValidationContext exportDataJob(ExportDataJob msg, ValidationContext ctx) {
 
-        ctx = ctx.push(EDJ_MODEL)
-                .apply(CommonValidators::required)
-                .apply(ObjectIdValidator::tagSelector, TagSelector.class)
-                .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.MODEL)
+        // Export models run only as export nodes in a flow, an export job places datasets and takes no model
+
+        if (msg.hasModel()) {
+            ctx = ctx.push(EDJ_MODEL)
+                    .error("An export job takes no model, export models run as export nodes in a flow")
+                    .pop();
+        }
+
+        if (msg.getPlacementsCount() == 0) {
+            return ctx.pushMap(EDJ_PLACEMENTS)
+                    .error("An export job requires at least one placement")
+                    .pop();
+        }
+
+        ctx = ctx.pushMap(EDJ_PLACEMENTS)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(PlacementValidator::placementTarget, PlacementTarget.class)
                 .pop();
 
-        ctx = importOrExportJob(ctx, EDJ_PARAMETERS, EDJ_INPUTS, EDJ_OUTPUTS, EDJ_PRIOR_OUTPUTS, EDJ_STORAGE_ACCESS);
+        ctx = placementPathsUnique(msg.getPlacementsMap(), ctx.pushMap(EDJ_PLACEMENTS)).pop();
 
-        ctx = outputAttrs(ctx, EDJ_OUTPUT_ATTRS);
+        ctx = ctx.push(EDJ_PLACEMENT_CONFLICT)
+                .apply(CommonValidators::recognizedEnum, PlacementConflict.class)
+                .pop();
 
-        if (msg.getExportsCount() > 0) {
-            ctx = ctx.pushMap(EDJ_EXPORTS)
-                    .error("The exports field is not currently supported and must be empty")
-                    .pop();
+        var notUsed = List.of(
+                Map.entry(EDJ_PARAMETERS, msg.getParametersCount()),
+                Map.entry(EDJ_INPUTS, msg.getInputsCount()),
+                Map.entry(EDJ_PRIOR_OUTPUTS, msg.getPriorOutputsCount()),
+                Map.entry(EDJ_STORAGE_ACCESS, msg.getStorageAccessCount()),
+                Map.entry(EDJ_EXPORTS, msg.getExportsCount()),
+                Map.entry(EDJ_OUTPUT_ATTRS, msg.getOutputAttrsCount()));
+
+        for (var field : notUsed) {
+            if (field.getValue() > 0) {
+                var err = String.format("The %s field is not used by export jobs and must be empty", field.getKey().getName());
+                ctx = field.getKey().isMapField()
+                        ? ctx.pushMap(field.getKey()).error(err).pop()
+                        : ctx.pushRepeated(field.getKey()).error(err).pop();
+            }
         }
 
         return ctx;
     }
 
-    // Duplicates runModelOrFlow's parameters/inputs/outputs/priorOutputs validation blocks
-    // (not shared with RunModelJob/RunFlowJob)
-    private static ValidationContext importOrExportJob(
-            ValidationContext ctx,
-            Descriptors.FieldDescriptor parameters,
-            Descriptors.FieldDescriptor inputs,
-            Descriptors.FieldDescriptor outputs,
-            Descriptors.FieldDescriptor priorOutputs,
-            Descriptors.FieldDescriptor storageAccess) {
+    private static ValidationContext placementPathsUnique(Map<String, PlacementTarget> placements, ValidationContext ctx) {
 
-        ctx = ctx.pushMap(parameters)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .applyMapValues(TypeSystemValidator::value, Value.class)
-                .pop();
+        var targetPaths = new HashMap<String, String>();
 
-        ctx = ctx.pushMap(inputs)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
-                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
-                .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
-                .pop();
+        for (var placement : placements.entrySet()) {
 
-        ctx = ctx.pushMap(outputs)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
-                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
-                .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
-                .pop();
+            var location = placement.getValue().getLocation();
+            var targetKey = location.getStorageKey() + "/" + location.getStoragePath().toLowerCase();
+            var priorPlacement = targetPaths.putIfAbsent(targetKey, placement.getKey());
 
-        ctx = ctx.pushMap(priorOutputs)
-                .applyMapKeys(CommonValidators::identifier)
-                .applyMapKeys(CommonValidators::notTracReserved)
-                .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
-                .applyMapValues(ObjectIdValidator::selectorType, TagSelector.class, ALLOWED_IO_TYPES)
-                .applyMapValues(ObjectIdValidator::fixedObjectVersion, TagSelector.class)
-                .pop();
-
-        ctx = ctx.pushRepeated(storageAccess)
-                .applyRepeated(CommonValidators::identifier)
-                .applyRepeated(CommonValidators::notTracReserved)
-                .pop();
+            if (priorPlacement != null) {
+                ctx = ctx.error(String.format(
+                        "Placements [%s] and [%s] write to the same path [%s] in [%s]",
+                        priorPlacement, placement.getKey(), location.getStoragePath(), location.getStorageKey()));
+            }
+        }
 
         return ctx;
     }
@@ -505,11 +515,35 @@ public class JobValidator {
 
     public static ValidationContext locationDetailsMustBeEmpty(JobDefinition msg, ValidationContext ctx) {
 
-        if (msg.getJobType() != JobType.IMPORT_DATA)
+        if (msg.getJobType() == JobType.IMPORT_DATA) {
+            return ctx.pushOneOf(JD_JOB_DETAILS)
+                    .apply(JobValidator::locationDetailsMustBeEmpty, ImportDataJob.class)
+                    .pop();
+        }
+
+        if (msg.getJobType() == JobType.EXPORT_DATA) {
+            return ctx.pushOneOf(JD_JOB_DETAILS)
+                    .apply(JobValidator::locationDetailsMustBeEmpty, ExportDataJob.class)
+                    .pop();
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext locationDetailsMustBeEmpty(ExportDataJob msg, ValidationContext ctx) {
+
+        return ctx.pushMap(EDJ_PLACEMENTS)
+                .applyMapValues(JobValidator::locationDetailsMustBeEmpty, PlacementTarget.class)
+                .pop();
+    }
+
+    private static ValidationContext locationDetailsMustBeEmpty(PlacementTarget msg, ValidationContext ctx) {
+
+        if (!msg.hasLocation())
             return ctx;
 
-        return ctx.pushOneOf(JD_JOB_DETAILS)
-                .apply(JobValidator::locationDetailsMustBeEmpty, ImportDataJob.class)
+        return ctx.push(PT_LOCATION)
+                .apply(ExternalLocationValidator::locationDetailsMustBeEmpty, ExternalLocation.class)
                 .pop();
     }
 

@@ -71,11 +71,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor IDJ_CAPTURES;
 
     private static final Descriptors.Descriptor EXPORT_DATA_JOB;
-    private static final Descriptors.FieldDescriptor EDJ_MODEL;
-    private static final Descriptors.FieldDescriptor EDJ_PARAMETERS;
-    private static final Descriptors.FieldDescriptor EDJ_INPUTS;
-    private static final Descriptors.FieldDescriptor EDJ_PRIOR_OUTPUTS;
-    private static final Descriptors.FieldDescriptor EDJ_STORAGE_ACCESS;
+    private static final Descriptors.FieldDescriptor EDJ_PLACEMENTS;
 
     static {
 
@@ -108,11 +104,7 @@ public class JobConsistencyValidator {
         IDJ_CAPTURES = field(IMPORT_DATA_JOB, ImportDataJob.CAPTURES_FIELD_NUMBER);
 
         EXPORT_DATA_JOB = ExportDataJob.getDescriptor();
-        EDJ_MODEL = field(EXPORT_DATA_JOB, ExportDataJob.MODEL_FIELD_NUMBER);
-        EDJ_PARAMETERS = field(EXPORT_DATA_JOB, ExportDataJob.PARAMETERS_FIELD_NUMBER);
-        EDJ_INPUTS = field(EXPORT_DATA_JOB, ExportDataJob.INPUTS_FIELD_NUMBER);
-        EDJ_PRIOR_OUTPUTS = field(EXPORT_DATA_JOB, ExportDataJob.PRIOROUTPUTS_FIELD_NUMBER);
-        EDJ_STORAGE_ACCESS = field(EXPORT_DATA_JOB, ExportDataJob.STORAGEACCESS_FIELD_NUMBER);
+        EDJ_PLACEMENTS = field(EXPORT_DATA_JOB, ExportDataJob.PLACEMENTS_FIELD_NUMBER);
     }
 
     @Validator
@@ -262,41 +254,39 @@ public class JobConsistencyValidator {
     @SuppressWarnings("unchecked")
     public static ValidationContext exportDataJob(ExportDataJob job, ValidationContext ctx) {
 
-        var metadata = ctx.getMetadataBundle();
-        var modelObj = metadata.getObject(job.getModel());
+        return ctx.pushMap(EDJ_PLACEMENTS, ExportDataJob::getPlacementsMap)
+                .apply(JobConsistencyValidator::placementTargets, Map.class)
+                .pop();
+    }
 
-        if (modelObj == null) {
-            var message = "Required metadata is not available for [" + MetadataUtil.objectKey(job.getModel()) + "]";
-            return ctx.push(EDJ_MODEL).error(message).pop();
+    private static ValidationContext placementTargets(Map<String, PlacementTarget> placements, ValidationContext ctx) {
+
+        for (var placement : placements.entrySet())
+            ctx = placementTarget(placement.getKey(), placement.getValue(), ctx);
+
+        return ctx;
+    }
+
+    private static ValidationContext placementTarget(String placementName, PlacementTarget placement, ValidationContext ctx) {
+
+        if (placement.hasDataId()) {
+
+            var dataObj = ctx.getMetadataBundle().getObject(placement.getDataId());
+
+            if (dataObj == null) {
+                ctx = ctx.error(String.format(
+                        "Metadata is not available for the dataset of placement [%s] (%s)",
+                        placementName, MetadataUtil.objectKey(placement.getDataId())));
+            }
+            else if (dataObj.getObjectType() != ObjectType.DATA) {
+                ctx = ctx.error(String.format(
+                        "The dataset of placement [%s] is not a DATA object (got %s)",
+                        placementName, dataObj.getObjectType()));
+            }
         }
 
-        var modelDef = modelObj.getModel();
-
-        if (modelDef.getModelType() != ModelType.DATA_EXPORT_MODEL) {
-
-            var message = String.format(
-                    "Model [%s] is not a data export model (expected %s, got %s)",
-                    MetadataUtil.objectKey(job.getModel()), ModelType.DATA_EXPORT_MODEL, modelDef.getModelType());
-
-            ctx = ctx.push(EDJ_MODEL).error(message).pop();
-        }
-
-        ctx.pushMap(EDJ_PARAMETERS, ExportDataJob::getParametersMap)
-                .apply(JobConsistencyValidator::runModelParameters, Map.class, modelDef.getParametersMap())
-                .pop();
-
-        ctx.pushMap(EDJ_INPUTS, ExportDataJob::getInputsMap)
-                .apply(JobConsistencyValidator::runModelInputs, Map.class, modelDef.getInputsMap())
-                .pop();
-
-        // Prior outputs are optional, however any provided must be valid
-        ctx.pushMap(EDJ_PRIOR_OUTPUTS, ExportDataJob::getPriorOutputsMap)
-                .apply(JobConsistencyValidator::runModelPriorOutputs, Map.class, modelDef.getOutputsMap())
-                .pop();
-
-        ctx = ctx.pushRepeated(EDJ_STORAGE_ACCESS)
-                .applyRepeated(JobConsistencyValidator::storageAccessIsExternalStorage)
-                .pop();
+        if (placement.hasLocation())
+            ctx = storageAccessIsExternalStorage(placement.getLocation().getStorageKey(), ctx);
 
         return ctx;
     }
