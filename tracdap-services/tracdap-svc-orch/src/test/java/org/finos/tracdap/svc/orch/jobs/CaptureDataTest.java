@@ -32,12 +32,12 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -425,6 +425,6 @@ public class CaptureDataTest {
 
     private static String sha256(Path path) throws Exception {
         var digest = MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(path));
-        return HexFormat.of().formatHex(digest);
+        return String.format("%064x", new BigInteger(1, digest));
     }
 }

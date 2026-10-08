@@ -26,6 +26,7 @@ import org.finos.tracdap.metadata.ExternalLocation;
 import com.google.protobuf.Descriptors;
 
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
@@ -101,7 +102,7 @@ public class ExternalLocationValidator {
 
             var err = String.format(
                     "File [%s] is not a supported data file, the file name must end in one of %s",
-                    fileName, ValidationConstants.EXTERNAL_FILE_FORMATS.keySet().stream().sorted().map(e -> "." + e).toList());
+                    fileName, ValidationConstants.EXTERNAL_FILE_FORMATS.keySet().stream().sorted().map(e -> "." + e).collect(Collectors.toList()));
 
             return ctx.error(err);
         }
