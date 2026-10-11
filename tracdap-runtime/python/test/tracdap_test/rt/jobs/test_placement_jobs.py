@@ -200,12 +200,8 @@ class PlacementGraphTest(unittest.TestCase):
     def test_rejected(self):
 
         data_selector, objects, mapping = self._dataset()
-        model_selector = util.selector_for(util.new_object_id(meta.ObjectType.MODEL))
 
         cases = [
-            ("model", meta.ExportDataJob(model=model_selector, placements={"a": _placement(data_selector, "a.csv")}), "takes no model"),
-            ("storage access", meta.ExportDataJob(storageAccess=["outbound"], placements={"a": _placement(data_selector, "a.csv")}), "does not use [storageAccess]"),
-            ("output attrs", meta.ExportDataJob(outputAttrs=[meta.TagUpdate(attrName="x")], placements={"a": _placement(data_selector, "a.csv")}), "does not use [outputAttrs]"),
             ("no placements", meta.ExportDataJob(), "requires at least one placement"),
             ("no dataset", meta.ExportDataJob(placements={"a": meta.PlacementTarget(location=meta.ExternalLocation("outbound", "a.csv"))}), "requires a dataset"),
             ("no location", meta.ExportDataJob(placements={"a": meta.PlacementTarget(dataId=data_selector)}), "requires a storage location"),

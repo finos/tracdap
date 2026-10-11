@@ -1010,44 +1010,6 @@ public class JobValidationTest {
         return MetadataUtil.selectorFor(modelId);
     }
 
-    private TagSelector createDataExportModel(List<TagUpdate> tags) {
-        return createDataExportModel(tags, Map.of());
-    }
-
-    private TagSelector createDataExportModel(List<TagUpdate> tags, Map<String, BasicType> paramTypes) {
-
-        var modelDef = ModelDefinition.newBuilder()
-                .setLanguage("python")
-                .setRepository("UNIT_TEST_REPO")
-                .setVersion("v1.0.0")
-                .setPath("src/")
-                .setEntryPoint("acme.models.test_model.BasicDataExportModel")
-                .setModelType(ModelType.DATA_EXPORT_MODEL)
-                .putInputs("input_data", ModelInputSchema.newBuilder()
-                        .setObjectType(ObjectType.DATA)
-                        .setSchema(SampleData.BASIC_TABLE_SCHEMA)
-                        .build());
-
-        for (var param : paramTypes.entrySet()) {
-            modelDef.putParameters(param.getKey(), ModelParameter.newBuilder()
-                    .setParamType(TypeSystem.descriptor(param.getValue()))
-                    .build());
-        }
-
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(TEST_TENANT)
-                .setObjectType(ObjectType.MODEL)
-                .setDefinition(ObjectDefinition.newBuilder()
-                        .setObjectType(ObjectType.MODEL)
-                        .setModel(modelDef))
-                .addAllTagUpdates(tags)
-                .build();
-
-        var modelId = metaClient.createObject(writeRequest);
-
-        return MetadataUtil.selectorFor(modelId);
-    }
-
     @Test
     public void importData_importModelRejected() {
 
@@ -1705,16 +1667,6 @@ public class JobValidationTest {
     }
 
     @Test
-    public void placementData_modelRejected() {
-
-        var exportData = ExportDataJob.newBuilder()
-                .setModel(createDataExportModel(List.of()))
-                .putPlacements("loans", placement("loans.csv").build());
-
-        expectPlacementInvalid(exportData, Status.Code.INVALID_ARGUMENT, "An export job takes no model");
-    }
-
-    @Test
     public void placementData_placementsRequired() {
 
         expectPlacementInvalid(ExportDataJob.newBuilder(), Status.Code.INVALID_ARGUMENT, "requires at least one placement");
@@ -1765,30 +1717,6 @@ public class JobValidationTest {
                 .putPlacements("b", placement("out/loans.csv").build());
 
         expectPlacementInvalid(exportData, Status.Code.INVALID_ARGUMENT, "write to the same path");
-    }
-
-    @Test
-    public void placementData_unusedFields() {
-
-        var storageAccess = ExportDataJob.newBuilder()
-                .putPlacements("loans", placement("loans.csv").build())
-                .addStorageAccess(CAPTURE_STORAGE);
-
-        expectPlacementInvalid(storageAccess, Status.Code.INVALID_ARGUMENT, "storageAccess field is not used by export jobs");
-
-        var outputAttrs = ExportDataJob.newBuilder()
-                .putPlacements("loans", placement("loans.csv").build())
-                .addOutputAttrs(TagUpdate.newBuilder()
-                        .setAttrName("business_segments")
-                        .setValue(MetadataCodec.encodeValue("retail")));
-
-        expectPlacementInvalid(outputAttrs, Status.Code.INVALID_ARGUMENT, "outputAttrs field is not used by export jobs");
-
-        var exports = ExportDataJob.newBuilder()
-                .putPlacements("loans", placement("loans.csv").build())
-                .putExports("loans", basicDataSelector);
-
-        expectPlacementInvalid(exports, Status.Code.INVALID_ARGUMENT, "exports field is not used by export jobs");
     }
 
     @Test

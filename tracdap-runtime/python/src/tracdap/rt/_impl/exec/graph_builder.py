@@ -206,6 +206,10 @@ class GraphBuilder:
 
         job_details = job_def.importData
 
+        if job_details.model is None or job_details.model.objectType == _meta.ObjectType.OBJECT_TYPE_NOT_SET:
+            self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] requires either captures or a model"))
+            return GraphSection(dict())
+
         target_selector = job_details.model
         target_obj = _util.get_job_metadata(target_selector, self._job_config)
         target_def = target_obj.model
@@ -365,8 +369,6 @@ class GraphBuilder:
 
         job_details = job_def.exportData
 
-        self._check_placement_job_fields(job_def.jobType, job_details)
-
         if not job_details.placements:
             self._error(_ex.EJobValidation(f"Job type [{job_def.jobType.name}] requires at least one placement"))
 
@@ -405,23 +407,6 @@ class GraphBuilder:
             explicit_deps=[job_push_id, *main_section.must_run])
 
         return self._join_sections(main_section, result_section)
-
-    def _check_placement_job_fields(self, job_type: _meta.JobType, job_details: _meta.ExportDataJob):
-
-        if job_details.model is not None and job_details.model.objectType != _meta.ObjectType.OBJECT_TYPE_NOT_SET:
-            self._error(_ex.EJobValidation(
-                f"Job type [{job_type.name}] takes no model, export models run as export nodes in a flow"))
-
-        unused_fields = {
-            "parameters": job_details.parameters, "inputs": job_details.inputs,
-            "outputs": job_details.outputs, "priorOutputs": job_details.priorOutputs,
-            "storageAccess": job_details.storageAccess, "exports": job_details.exports,
-            "outputAttrs": job_details.outputAttrs}
-
-        for field_name, field_value in unused_fields.items():
-            if field_value:
-                self._error(_ex.EJobValidation(
-                    f"Job type [{job_type.name}] does not use [{field_name}], it must be empty"))
 
     def _build_placement_prepare(
             self, placement_name: str, placement: _meta.PlacementTarget,

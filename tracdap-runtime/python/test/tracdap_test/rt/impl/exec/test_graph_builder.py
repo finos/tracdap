@@ -258,6 +258,25 @@ class GraphBuilderOutputsTest(unittest.TestCase):
         self.assertIsNone(spec.definition.schemaId)
         self.assertEqual(1, spec.primary_id.objectVersion)
 
+    def test_run_model_job_result(self):
+
+        outputs = {"sample_data": meta.ModelOutputSchema(objectType=meta.ObjectType.DATA, schema=_SCHEMA)}
+
+        job_graph = self._build_run_model_job(_sys_config(meta.StorageLayout.OBJECT_ID_LAYOUT), outputs)
+
+        result_nodes = [node for node in job_graph.nodes.values() if isinstance(node, graph.JobResultNode)]
+        self.assertEqual(1, len(result_nodes))
+
+        result_node = result_nodes[0]
+        self.assertEqual({"sample_data"}, set(result_node.named_outputs.keys()))
+        self.assertEqual([], result_node.unnamed_outputs)
+        self.assertEqual({}, result_node.placements)
+        self.assertEqual(set(result_node.named_outputs.values()), set(result_node._node_dependencies().keys()))  # noqa
+
+        model_nodes = [node for node in job_graph.nodes.values() if isinstance(node, graph.RunModelNode)]
+        self.assertEqual(1, len(model_nodes))
+        self.assertIsNone(model_nodes[0].storage_access)
+
 
 class GraphBuilderImportExportTest(unittest.TestCase):
 
@@ -266,7 +285,7 @@ class GraphBuilderImportExportTest(unittest.TestCase):
         log.configure_logging()
 
     @staticmethod
-    def _build_job(job_type: meta.JobType, model_type: meta.ModelType = None):
+    def _build_job(model_type: meta.ModelType = None, storage_access: list = None):
 
         outputs = {"sample_data": meta.ModelOutputSchema(objectType=meta.ObjectType.DATA, schema=_SCHEMA)}
         objects = {}
@@ -274,15 +293,13 @@ class GraphBuilderImportExportTest(unittest.TestCase):
         if model_type is not None:
             model_id = util.new_object_id(meta.ObjectType.MODEL)
             model_selector = util.selector_for(model_id)
-            model_def = _model_def(model_type, outputs if job_type == meta.JobType.IMPORT_DATA else {})
+            model_def = _model_def(model_type, outputs)
             objects[util.object_key(model_id)] = meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
         else:
             model_selector = meta.TagSelector()
 
-        if job_type == meta.JobType.IMPORT_DATA:
-            job_def = meta.JobDefinition(jobType=job_type, importData=meta.ImportDataJob(model=model_selector))
-        else:
-            job_def = meta.JobDefinition(jobType=job_type, exportData=meta.ExportDataJob(model=model_selector))
+        job_def = meta.JobDefinition(jobType=meta.JobType.IMPORT_DATA, importData=meta.ImportDataJob(
+            model=model_selector, storageAccess=storage_access or []))
 
         job_config = cfg.JobConfig(
             jobId=util.new_object_id(meta.ObjectType.JOB), job=job_def, objects=objects)
@@ -297,27 +314,39 @@ class GraphBuilderImportExportTest(unittest.TestCase):
 
     def test_import_model_job(self):
 
-        job_graph = self._build_job(meta.JobType.IMPORT_DATA, meta.ModelType.DATA_IMPORT_MODEL)
+        job_graph = self._build_job(meta.ModelType.DATA_IMPORT_MODEL)
 
         self.assertEqual({"sample_data:SAVE"}, self._node_names(job_graph, graph.SaveDataNode))
         self.assertEqual(1, len(self._node_names(job_graph, graph.RunModelNode)))
 
+    def test_import_model_job_storage_access(self):
+
+        job_graph = self._build_job(meta.ModelType.DATA_IMPORT_MODEL, storage_access=["external_storage"])
+
+        model_nodes = [node for node in job_graph.nodes.values() if isinstance(node, graph.RunModelNode)]
+
+        self.assertEqual(1, len(model_nodes))
+        self.assertEqual(["external_storage"], model_nodes[0].storage_access)
+
     def test_import_job_standard_model(self):
 
         with self.assertRaisesRegex(ex.EJobValidation, re.escape("Job type [IMPORT_DATA] cannot use model type [STANDARD_MODEL]")):
-            self._build_job(meta.JobType.IMPORT_DATA, meta.ModelType.STANDARD_MODEL)
-
-    def test_export_job_model_rejected(self):
-
-        for model_type in [meta.ModelType.DATA_EXPORT_MODEL, meta.ModelType.DATA_IMPORT_MODEL]:
-            with self.subTest(model_type=model_type.name):
-                with self.assertRaisesRegex(ex.EJobValidation, re.escape("Job type [EXPORT_DATA] takes no model")):
-                    self._build_job(meta.JobType.EXPORT_DATA, model_type)
+            self._build_job(meta.ModelType.STANDARD_MODEL)
 
     def test_import_job_no_model(self):
 
-        with self.assertRaisesRegex(ex.ETracInternal, re.escape("Unexpected error preparing the job execution graph")):
-            self._build_job(meta.JobType.IMPORT_DATA)
+        with self.assertRaisesRegex(ex.EJobValidation, re.escape("Job type [IMPORT_DATA] requires either captures or a model")):
+            self._build_job()
+
+    def test_export_job_model_not_parsed(self):
+
+        for field_name in ["model", "parameters", "inputs", "storageAccess", "exports", "outputAttrs"]:
+            with self.subTest(field_name=field_name):
+
+                job_config = {"job": {"exportData": {field_name: "x", "placements": {}}}}
+
+                with self.assertRaisesRegex(ex.EConfigParse, re.escape(f"Unrecognised config parameter '{field_name}' (in job.exportData)")):
+                    cfg_p.ConfigParser(cfg.JobConfig).parse(job_config)
 
 
 class DevModeImportJobTest(unittest.TestCase):
