@@ -19,7 +19,6 @@ package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
-import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
@@ -36,37 +35,43 @@ public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
         if (job.getJobType() != JobType.IMPORT_DATA)
             throw new EUnexpected();
 
-        var importData = job.getImportData();
+        var schemas = new ArrayList<TagSelector>();
 
-        var resources = new ArrayList<TagSelector>(importData.getInputsCount() + 1);
-        resources.add(importData.getModel());
-        resources.addAll(importData.getInputsMap().values());
-        resources.addAll(importData.getPriorOutputsMap().values());
+        for (var capture : job.getImportData().getCapturesMap().values()) {
+            if (capture.hasSchemaId())
+                schemas.add(capture.getSchemaId());
+        }
 
-        return resources;
+        return schemas;
     }
 
     @Override
     public List<String> requiredResources(JobDefinition job, MetadataBundle metadata) {
 
-        var resources = new HashSet<String>();
+        var storageKeys = new HashSet<String>();
 
-        addRequiredStorage(metadata, resources);
+        for (var capture : job.getImportData().getCapturesMap().values())
+            storageKeys.add(capture.getLocation().getStorageKey());
 
-        var modelObj = metadata.getObject(job.getImportData().getModel());
-        var modelRepo = modelObj.getModel().getRepository();
-        resources.add(modelRepo);
-
-        resources.addAll(job.getImportData().getStorageAccessList());
-
-        return new ArrayList<>(resources);
+        return new ArrayList<>(storageKeys);
     }
 
     @Override
     public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
-        // No transformations currently required
-        return job;
+        var importData = job.getImportData().toBuilder();
+
+        for (var capture : job.getImportData().getCapturesMap().entrySet()) {
+
+            var location = ExternalLocationDetails.recordLocationDetails(capture.getValue().getLocation(), resources);
+            var recorded = capture.getValue().toBuilder().setLocation(location).build();
+
+            importData.putCaptures(capture.getKey(), recorded);
+        }
+
+        return job.toBuilder()
+                .setImportData(importData)
+                .build();
     }
 
     @Override
@@ -78,27 +83,42 @@ public class ImportDataJob extends RunModelOrFlow implements IJobLogic {
     @Override
     public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
-        var importDataJob = job.getImportData();
-
-        var modelObj = metadata.getObject(importDataJob.getModel());
-        var model = modelObj.getModel();
-
-        return expectedOutputs(model.getOutputsMap(), importDataJob.getPriorOutputsMap());
+        return expectedOutputs(captureOutputs(job.getImportData()), Map.of());
     }
 
     @Override
     public JobResult processResult(JobConfig jobConfig, JobResult jobResult, Map<String, TagHeader> resultIds) {
 
         var importData = jobConfig.getJob().getImportData();
+        var perCaptureAttrs = new HashMap<String, List<TagUpdate>>();
 
-        var modelKey = MetadataUtil.objectKey(importData.getModel());
-        var modelId = jobConfig.getObjectMappingMap().get(modelKey);
-        var modelDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(modelId)).getModel();
+        for (var capture : importData.getCapturesMap().entrySet()) {
+            perCaptureAttrs.put(capture.getKey(), capture.getValue().getDataAttrsList());
+            perCaptureAttrs.put(fileOutputName(capture.getKey()), capture.getValue().getFileAttrsList());
+        }
 
         return processResult(
-                jobResult,
-                modelDef.getOutputsMap(),
+                jobResult, captureOutputs(importData),
                 importData.getOutputAttrsList(),
-                Map.of(), resultIds);
+                perCaptureAttrs, resultIds);
+    }
+
+    private static Map<String, ModelOutputSchema> captureOutputs(org.finos.tracdap.metadata.ImportDataJob importData) {
+
+        var dataOutput = ModelOutputSchema.newBuilder().setObjectType(ObjectType.DATA).setDynamic(true).build();
+        var fileOutput = ModelOutputSchema.newBuilder().setObjectType(ObjectType.FILE).build();
+
+        var outputs = new HashMap<String, ModelOutputSchema>();
+
+        for (var captureName : importData.getCapturesMap().keySet()) {
+            outputs.put(captureName, dataOutput);
+            outputs.put(fileOutputName(captureName), fileOutput);
+        }
+
+        return outputs;
+    }
+
+    private static String fileOutputName(String captureName) {
+        return captureName + "_file";
     }
 }

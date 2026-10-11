@@ -43,6 +43,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 
@@ -642,6 +643,8 @@ public class RunModelTest {
         Assertions.assertEquals(1, dataDef.getPartsCount());
         Assertions.assertEquals(JobType.RUN_MODEL.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
 
+        Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, dataTag, "profit_by_region", Set.of("e2e_test_data"));
+
         outputDataId = dataTag.getHeader();
     }
 
@@ -793,6 +796,8 @@ public class RunModelTest {
         Assertions.assertEquals("run_model:dynamic_io_data_output", MetadataCodec.decodeStringValue(outputAttr));
         Assertions.assertEquals(1, dataDef.getPartsCount());
 
+        Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, dataTag, "filtered_data", Set.of("e2e_test_data"));
+
         dynamicIoOutputDataId = dataTag.getHeader();
     }
 
@@ -883,6 +888,8 @@ public class RunModelTest {
 
         Assertions.assertEquals("run_model:file_io_data_output", MetadataCodec.decodeStringValue(outputAttr));
         Assertions.assertEquals(inputFileSize * 3, fileDef.getSize());
+
+        Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, fileTag, "file_output", Set.of("e2e_test_data"));
 
         if (useStreams)
             outputFileIdStream = fileTag.getHeader();

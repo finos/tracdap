@@ -24,6 +24,7 @@ import org.finos.tracdap.common.cache.CacheEntry;
 import org.finos.tracdap.common.config.ConfigFormat;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.config.ConfigParser;
 import org.finos.tracdap.common.exception.*;
 import org.finos.tracdap.common.grpc.RequestMetadata;
@@ -36,6 +37,7 @@ import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.JobResult;
+import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagUpdate;
@@ -82,7 +84,9 @@ public class JobProcessor {
         this.storageClient = registry.getSingleton(TracStorageApiGrpc.TracStorageApiBlockingStub.class);
         this.executor = registry.getSingleton(JobExecutor.class);
 
-        this.lifecycle = new JobProcessorHelpers(tenantState, commonConcerns, registry);
+        var platformConfig = registry.getSingleton(ConfigManager.class).loadRootConfigObject(PlatformConfig.class);
+
+        this.lifecycle = new JobProcessorHelpers(platformConfig.getExecutor(), tenantState, commonConcerns, registry);
     }
 
     public JobState newJob(JobRequest request, GrpcClientState clientState) {

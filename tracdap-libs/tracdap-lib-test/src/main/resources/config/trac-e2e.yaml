@@ -57,6 +57,7 @@ executor:
   properties:
     venvPath: ${TRAC_EXEC_DIR}/venv
     pollInterval: 1
+    captureMaxSize: 1
 
 
 gateway:

@@ -35,6 +35,7 @@ public class ResultValidator {
     private static final Descriptors.FieldDescriptor RD_STATUS_MESSAGE;
     private static final Descriptors.FieldDescriptor RD_LOG_FILE_ID;
     private static final Descriptors.FieldDescriptor RD_OUTPUTS;
+    private static final Descriptors.FieldDescriptor RD_PLACEMENTS;
 
     static {
 
@@ -44,6 +45,7 @@ public class ResultValidator {
         RD_STATUS_MESSAGE = field(RESULT_DEFINITION, ResultDefinition.STATUSMESSAGE_FIELD_NUMBER);
         RD_LOG_FILE_ID = field(RESULT_DEFINITION, ResultDefinition.LOGFILEID_FIELD_NUMBER);
         RD_OUTPUTS = field(RESULT_DEFINITION, ResultDefinition.OUTPUTS_FIELD_NUMBER);
+        RD_PLACEMENTS = field(RESULT_DEFINITION, ResultDefinition.PLACEMENTS_FIELD_NUMBER);
     }
 
     @Validator
@@ -74,6 +76,11 @@ public class ResultValidator {
 
         ctx = ctx.pushMap(RD_OUTPUTS)
                 .applyMapValues(ObjectIdValidator::tagSelector, TagSelector.class)
+                .pop();
+
+        ctx = ctx.pushMap(RD_PLACEMENTS)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapValues(PlacementValidator::placementRecord, PlacementRecord.class)
                 .pop();
 
         return ctx;

@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import pathlib
 import typing as _tp
 
 import tracdap.rt.metadata as _meta
@@ -37,13 +38,15 @@ class ResourceManager:
             self, sys_config: _config.RuntimeConfig,
             storage_manager: _storage.StorageManager,
             repository_manager: _repos.RepositoryManager,
-            model_loader: _models.ModelLoader):
+            model_loader: _models.ModelLoader,
+            scratch_dir: _tp.Optional[pathlib.Path] = None):
 
         self.__log = _log.logger_for_object(self)
         self.__sys_config = sys_config
         self.__storage = storage_manager
         self.__repositories = repository_manager
         self.__models = model_loader
+        self.__scratch_dir = scratch_dir
         self.__external_systems = self._load_external_systems(sys_config)
 
     @classmethod
@@ -77,6 +80,13 @@ class ResourceManager:
 
     def get_models(self):
         return self.__models
+
+    def get_scratch_dir(self) -> pathlib.Path:
+
+        if self.__scratch_dir is None:
+            raise _ex.ETracInternal("Scratch directory is not available")
+
+        return self.__scratch_dir
 
     def get_external_system(self, system_name: str) -> _external.IExternalSystem:
 

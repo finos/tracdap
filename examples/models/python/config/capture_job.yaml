@@ -1,0 +1,20 @@
+
+job:
+  importData:
+
+    captures:
+
+      currency_data:
+        location: { storageKey: capture_data, storagePath: currency_data_2026-09-30.csv }
+        schemaSource: CAPTURE_SCHEMA_DECLARED
+        schema: schemas/currency_data.csv
+
+      sample_data:
+        location: { storageKey: staging_data, storagePath: sample_data.parquet }
+        schemaSource: CAPTURE_SCHEMA_FILE
+
+    outputs:
+      currency_data: outputs/capture_job/currency_data.csv
+      currency_data_file: outputs/capture_job/currency_data_file.csv
+      sample_data: outputs/capture_job/sample_data.csv
+      sample_data_file: outputs/capture_job/sample_data_file.parquet

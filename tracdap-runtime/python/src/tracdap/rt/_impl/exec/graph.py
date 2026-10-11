@@ -17,6 +17,8 @@ import typing as _tp
 import dataclasses as _dc
 
 import tracdap.rt._impl.core.data as _data
+import tracdap.rt._impl.core.file_formats as _file_formats
+import tracdap.rt._impl.core.placement as _placement
 import tracdap.rt._impl.core.resources as _resources
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
@@ -357,6 +359,70 @@ class LoadDataNode(Node[_data.DataItem]):
 
 
 @_node_type
+class CaptureFileNode(Node[_data.DataItem]):
+
+    """
+    Read a single file from external storage, as an unchanged copy of the source
+    """
+
+    capture_name: str
+    location: _meta.ExternalLocation
+    size_limit: int
+
+
+@_node_type
+class DecodeTableNode(Node[_data.DataItem]):
+
+    """
+    Decode a captured file into a table, conformed to its declared schema or the file's own schema
+    """
+
+    capture_name: str
+    file_item_id: NodeId[_data.DataItem]
+    storage_key: str
+    format_code: str
+    schema_source: _meta.CaptureSchemaSource
+    schema: _tp.Optional[_meta.SchemaDefinition]
+    file_id: _meta.TagHeader
+
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
+        return {self.file_item_id: DependencyType.HARD}
+
+
+@_node_type
+class PreparePlacementNode(Node[_placement.PreparedPlacement]):
+
+    """
+    Encode a dataset for placement in external storage, as a file in the job's scratch directory
+    """
+
+    placement_name: str
+    data_view_id: NodeId[_data.DataView]
+    data_id: _meta.TagHeader
+    location: _meta.ExternalLocation
+    file_format: _file_formats.ExternalFileFormat
+    conflict: _meta.PlacementConflict
+
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
+        return {self.data_view_id: DependencyType.HARD}
+
+
+@_node_type
+class PlaceFileNode(Node[_meta.PlacementRecord]):
+
+    """
+    Write an encoded file to its external storage location
+    """
+
+    placement_name: str
+    prepared_id: NodeId[_placement.PreparedPlacement]
+    conflict: _meta.PlacementConflict
+
+    def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
+        return {self.prepared_id: DependencyType.HARD}
+
+
+@_node_type
 class SaveDataNode(Node[_data.DataSpec]):
 
     """
@@ -415,9 +481,10 @@ class JobResultNode(Node[_cfg.JobResult]):
 
     named_outputs: _tp.Dict[str, JOB_OUTPUT_TYPE] = _dc.field(default_factory=dict)
     unnamed_outputs: _tp.List[NodeId[JOB_OUTPUT_TYPE]] = _dc.field(default_factory=list)
+    placements: _tp.Dict[str, NodeId[_meta.PlacementRecord]] = _dc.field(default_factory=dict)
 
     def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
-        dep_ids = [*self.named_outputs.values(), *self.unnamed_outputs]
+        dep_ids = [*self.named_outputs.values(), *self.unnamed_outputs, *self.placements.values()]
         return {node_id: DependencyType.HARD for node_id in dep_ids}
 
 

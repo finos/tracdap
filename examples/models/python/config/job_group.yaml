@@ -36,14 +36,7 @@ job:
 
         - exportData:
 
-            model: tutorial.data_export.DataExportExample
-
-            parameters:
-              storage_key: exported_data
-              export_comment: "Exporting some example data"
-
-            inputs:
-              profit_by_region: generated/using_data/profit_by_region.csv
-
-            storageAccess:
-              - exported_data
+            placements:
+              profit_by_region:
+                dataId: { path: generated/using_data/profit_by_region.csv, schema: schemas/profit_by_region.csv }
+                location: { storageKey: exported_data, storagePath: job_group/profit_by_region.csv }

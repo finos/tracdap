@@ -306,6 +306,7 @@ class DataMapping:
         pa.float64(): _meta.BasicType.FLOAT,
         pa.string(): _meta.BasicType.STRING,
         pa.utf8(): _meta.BasicType.STRING,
+        pa.large_string(): _meta.BasicType.STRING,
         pa.date32(): _meta.BasicType.DATE,
         pa.date64(): _meta.BasicType.DATE
     }

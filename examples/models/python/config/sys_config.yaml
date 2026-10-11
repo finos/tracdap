@@ -25,3 +25,9 @@ resources:
     protocol: LOCAL
     properties:
       rootPath: ../data/exports
+
+  capture_data:
+    resourceType: EXTERNAL_STORAGE
+    protocol: LOCAL
+    properties:
+      rootPath: ../data/inputs/capture

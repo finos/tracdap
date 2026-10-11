@@ -211,7 +211,9 @@ class TracRuntime:
             self._repos = _repos.RepositoryManager(self._sys_config)
             self._models = _models.ModelLoader(self._repos, self._scratch_dir)
             self._storage = _storage.StorageManager(self._sys_config)
-            self._resources = _resources.ResourceManager(self._sys_config, self._storage, self._repos, self._models)
+            self._resources = _resources.ResourceManager(
+                self._sys_config, self._storage, self._repos, self._models,
+                self._scratch_dir)
 
             if self._dev_mode:
 

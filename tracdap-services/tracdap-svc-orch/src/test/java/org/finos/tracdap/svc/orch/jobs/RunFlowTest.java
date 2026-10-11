@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -764,6 +765,8 @@ public class RunFlowTest {
         Assertions.assertEquals(1, dataDef.getPartsCount());
         Assertions.assertEquals(JobType.RUN_FLOW.name(), MetadataCodec.decodeStringValue(jobTypeAttr));
 
+        Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, dataTag, "profit_by_region", Set.of("e2e_test_data", ANALYSIS_TYPE));
+
         outputDataId = dataTag.getHeader();
     }
 
@@ -858,6 +861,9 @@ public class RunFlowTest {
 
         Assertions.assertEquals("run_flow:data_output_2", MetadataCodec.decodeStringValue(outputAttr2));
         Assertions.assertEquals(1, dataDef2.getPartsCount());
+
+        Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, dataTag, "profit_by_region", Set.of("e2e_test_data"));
+        Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, dataTag2, "exclusions", Set.of("e2e_test_data"));
 
         exclusionsDataId = dataTag2.getHeader();
     }

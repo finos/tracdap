@@ -17,9 +17,9 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
+import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.metadata.MetadataBundle;
-import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
@@ -36,14 +36,12 @@ public class ExportDataJob extends RunModelOrFlow implements IJobLogic {
         if (job.getJobType() != JobType.EXPORT_DATA)
             throw new EUnexpected();
 
-        var exportData = job.getExportData();
+        var datasets = new ArrayList<TagSelector>();
 
-        var resources = new ArrayList<TagSelector>(exportData.getInputsCount() + 1);
-        resources.add(exportData.getModel());
-        resources.addAll(exportData.getInputsMap().values());
-        resources.addAll(exportData.getPriorOutputsMap().values());
+        for (var placement : job.getExportData().getPlacementsMap().values())
+            datasets.add(placement.getDataId());
 
-        return resources;
+        return datasets;
     }
 
     @Override
@@ -53,11 +51,8 @@ public class ExportDataJob extends RunModelOrFlow implements IJobLogic {
 
         addRequiredStorage(metadata, resources);
 
-        var modelObj = metadata.getObject(job.getExportData().getModel());
-        var modelRepo = modelObj.getModel().getRepository();
-        resources.add(modelRepo);
-
-        resources.addAll(job.getExportData().getStorageAccessList());
+        for (var placement : job.getExportData().getPlacementsMap().values())
+            resources.add(placement.getLocation().getStorageKey());
 
         return new ArrayList<>(resources);
     }
@@ -65,8 +60,19 @@ public class ExportDataJob extends RunModelOrFlow implements IJobLogic {
     @Override
     public JobDefinition applyJobTransform(JobDefinition job, MetadataBundle metadata, ResourceBundle resources) {
 
-        // No transformations currently required
-        return job;
+        var exportData = job.getExportData().toBuilder();
+
+        for (var placement : job.getExportData().getPlacementsMap().entrySet()) {
+
+            var location = ExternalLocationDetails.recordLocationDetails(placement.getValue().getLocation(), resources);
+            var recorded = placement.getValue().toBuilder().setLocation(location).build();
+
+            exportData.putPlacements(placement.getKey(), recorded);
+        }
+
+        return job.toBuilder()
+                .setExportData(exportData)
+                .build();
     }
 
     @Override
@@ -78,27 +84,19 @@ public class ExportDataJob extends RunModelOrFlow implements IJobLogic {
     @Override
     public Map<ObjectType, Integer> expectedOutputs(JobDefinition job, MetadataBundle metadata) {
 
-        var exportDataJob = job.getExportData();
-
-        var modelObj = metadata.getObject(exportDataJob.getModel());
-        var model = modelObj.getModel();
-
-        return expectedOutputs(model.getOutputsMap(), exportDataJob.getPriorOutputsMap());
+        return Map.of();
     }
 
     @Override
     public JobResult processResult(JobConfig jobConfig, JobResult jobResult, Map<String, TagHeader> resultIds) {
 
-        var exportData = jobConfig.getJob().getExportData();
+        var placementRecords = jobResult.getResult().getPlacementsMap();
 
-        var modelKey = MetadataUtil.objectKey(exportData.getModel());
-        var modelId = jobConfig.getObjectMappingMap().get(modelKey);
-        var modelDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(modelId)).getModel();
+        for (var placementName : jobConfig.getJob().getExportData().getPlacementsMap().keySet()) {
+            if (!placementRecords.containsKey(placementName))
+                throw new EJobResult(String.format("Missing record for placement [%s]", placementName));
+        }
 
-        return processResult(
-                jobResult,
-                modelDef.getOutputsMap(),
-                exportData.getOutputAttrsList(),
-                Map.of(), resultIds);
+        return JobResult.newBuilder().build();
     }
 }
