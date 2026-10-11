@@ -27,7 +27,10 @@ import org.junit.jupiter.api.Assertions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.LockSupport;
 
@@ -99,6 +102,49 @@ public class Helpers {
         }
 
         return jobStatus;
+    }
+
+    // Attributes on every object a job creates, from the metadata service and the orchestrator
+    private static final Set<String> JOB_OUTPUT_COMMON_ATTRS = Set.of(
+            "trac_create_time", "trac_create_user_id", "trac_create_user_name",
+            "trac_update_time", "trac_update_user_id", "trac_update_user_name",
+            "trac_create_job", "trac_update_job", "trac_job_type");
+
+    private static final Map<ObjectType, Set<String>> STRUCTURED_ATTRS = Map.of(
+            ObjectType.DATA, Set.of("trac_schema_type", "trac_schema_field_count", "trac_data_row_count"),
+            ObjectType.FILE, Set.of("trac_file_name", "trac_file_extension", "trac_file_mime_type", "trac_file_size"));
+
+    public static void checkJobOutputAttrs(
+            TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClient,
+            String tenant, Tag outputTag, String outputName,
+            Set<String> outputAttrs) {
+
+        var outputDef = outputTag.getDefinition();
+
+        var expectedOutputAttrs = new HashSet<>(JOB_OUTPUT_COMMON_ATTRS);
+        expectedOutputAttrs.addAll(STRUCTURED_ATTRS.get(outputDef.getObjectType()));
+        expectedOutputAttrs.add("trac_job_output");
+        expectedOutputAttrs.addAll(outputAttrs);
+
+        Assertions.assertEquals(expectedOutputAttrs, outputTag.getAttrsMap().keySet());
+        Assertions.assertEquals(outputName, MetadataCodec.decodeStringValue(outputTag.getAttrsOrThrow("trac_job_output")));
+
+        var storageId = outputDef.getObjectType() == ObjectType.DATA
+                ? outputDef.getData().getStorageId()
+                : outputDef.getFile().getStorageId();
+
+        var storageTag = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(storageId)
+                .build());
+
+        var expectedStorageAttrs = new HashSet<>(JOB_OUTPUT_COMMON_ATTRS);
+        expectedStorageAttrs.add("trac_storage_object");
+
+        Assertions.assertEquals(expectedStorageAttrs, storageTag.getAttrsMap().keySet());
+        Assertions.assertEquals(
+                MetadataUtil.objectKey(outputTag.getHeader()),
+                MetadataCodec.decodeStringValue(storageTag.getAttrsOrThrow("trac_storage_object")));
     }
 
     public static Tag doModelImport(
