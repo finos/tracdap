@@ -449,7 +449,7 @@ class JobProcessor(_actors.Actor):
         self._log.info(f"New job created for [{self.job_key}]")
 
         self._resolver = _func.FunctionResolver(self._resources, self._log_provider)
-        self._preallocated_ids: tp.Dict[_meta.ObjectType, tp.List[_meta.TagHeader]] = dict()
+        self._preallocated_ids: tp.Optional[tp.Dict[_meta.ObjectType, tp.List[_meta.TagHeader]]] = None
 
     def on_start(self):
 
@@ -561,6 +561,16 @@ class JobProcessor(_actors.Actor):
             self._log.warning(f"Job log not available for [{self.job_key}]")
             return
 
+        # Do not fail the job if the log cannot be saved, report the job's own outcome without a log
+        # Errors go to the system log only, the job log is the content being saved
+        try:
+            self._write_job_log_file(job_result)
+        except Exception as e:
+            sys_log = _logging.logger_for_object(self)
+            sys_log.exception(f"Job log could not be saved for [{self.job_key}]: {str(e)}")
+
+    def _write_job_log_file(self, job_result: _cfg.JobResult):
+
         # Saving log files could go into a separate actor
 
         file_id = self._allocate_id(_meta.ObjectType.FILE)
@@ -598,6 +608,13 @@ class JobProcessor(_actors.Actor):
         job_result.objects[_util.object_key(storage_id)] = storage_obj
 
     def _allocate_id(self, object_type: _meta.ObjectType):
+
+        # If the graph was never built, none of the job's preallocated IDs have been used
+        if self._preallocated_ids is None:
+            self._preallocated_ids = dict()
+            if self.job_config is not None:
+                for object_id in self.job_config.preallocatedIds:
+                    self._preallocated_ids.setdefault(object_id.objectType, []).append(object_id)
 
         preallocated_ids = self._preallocated_ids.get(object_type)
 

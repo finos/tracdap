@@ -401,12 +401,12 @@ public class JobManager {
 
             case CacheStatus.EXECUTOR_COMPLETE:
             case CacheStatus.EXECUTOR_SUCCEEDED:
+            case CacheStatus.EXECUTOR_FAILED:
                 operation.operationName = "fetch_job_result";
                 operation.operation = processor::fetchJobResult;
                 operation.timeout = executorTicketDuration;
                 break;
 
-            case CacheStatus.EXECUTOR_FAILED:
             case CacheStatus.RESULTS_RECEIVED:
             case CacheStatus.RESULTS_INVALID:
                 operation.operationName = "save_result_metadata";

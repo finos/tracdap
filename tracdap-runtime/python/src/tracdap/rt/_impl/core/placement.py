@@ -48,10 +48,16 @@ class PlacementWriter:
 
     __COPY_CHUNK_SIZE = 1024 * 1024
 
-    def __init__(self, storage: _storage.StorageManager, scratch_dir: pathlib.Path):
+    def __init__(
+            self, storage: _storage.StorageManager, scratch_dir: pathlib.Path,
+            log_provider: _logging.LogProvider = None):
+
+        if log_provider is None:
+            log_provider = _logging.LogProvider()
+
         self.__storage = storage
         self.__scratch_dir = scratch_dir.joinpath("placements")
-        self.__log = _logging.logger_for_object(self)
+        self.__log = log_provider.logger_for_object(self)
 
     def prepare(
             self, placement_name: str, data_view: _data.DataView, data_id: _meta.TagHeader,

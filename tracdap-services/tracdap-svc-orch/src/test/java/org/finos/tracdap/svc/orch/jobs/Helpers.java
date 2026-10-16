@@ -221,4 +221,56 @@ public class Helpers {
 
         return metaClient.readObject(modelReq);
     }
+
+    // A failed job registers its RESULT and its job log, which is readable and created by the job
+    public static ResultDefinition checkFailedJobResult(PlatformTest platform, String tenant, TagHeader jobId) {
+
+        var metaClient = platform.metaClientBlocking();
+        var dataClient = platform.dataClientBlocking();
+        var jobKey = MetadataUtil.objectKey(jobId);
+
+        var jobTag = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(MetadataUtil.selectorForLatest(jobId))
+                .build());
+
+        var resultTag = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(jobTag.getDefinition().getJob().getResultId())
+                .build());
+
+        var result = resultTag.getDefinition().getResult();
+
+        Assertions.assertEquals(JobStatusCode.FAILED, result.getStatusCode());
+        Assertions.assertTrue(result.hasLogFileId(), "Failed job has no log file");
+
+        var logFileTag = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(result.getLogFileId())
+                .build());
+
+        Assertions.assertEquals(jobKey, MetadataCodec.decodeStringValue(logFileTag.getAttrsOrThrow("trac_create_job")));
+        Assertions.assertFalse(logFileTag.containsAttrs("trac_job_output"));
+
+        var logFile = dataClient.readSmallFile(FileReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(result.getLogFileId())
+                .build());
+
+        var logText = logFile.getContent().toStringUtf8();
+
+        Assertions.assertTrue(logText.contains("Job failed"), logText);
+
+        return result;
+    }
+
+    public static String jobErrorMessage(PlatformTest platform, String tenant, TagHeader jobId) {
+
+        var jobTag = platform.metaClientBlocking().readObject(MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(MetadataUtil.selectorForLatest(jobId))
+                .build());
+
+        return MetadataCodec.decodeStringValue(jobTag.getAttrsOrThrow("trac_job_error_message"));
+    }
 }
