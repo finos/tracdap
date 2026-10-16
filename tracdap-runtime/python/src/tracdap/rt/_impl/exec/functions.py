@@ -554,10 +554,10 @@ class SaveDataFunc(_LoadSaveDataFunc, NodeFunction[_data.DataSpec]):
 
 class CaptureFileFunc(NodeFunction[_data.DataItem]):
 
-    def __init__(self, node: CaptureFileNode, storage: _storage.StorageManager):
+    def __init__(self, node: CaptureFileNode, storage: _storage.StorageManager, log_provider: _logging.LogProvider):
         super().__init__()
         self.node = node
-        self.reader = _capture.CaptureReader(storage)
+        self.reader = _capture.CaptureReader(storage, log_provider)
 
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
 
@@ -566,10 +566,10 @@ class CaptureFileFunc(NodeFunction[_data.DataItem]):
 
 class DecodeTableFunc(NodeFunction[_data.DataItem]):
 
-    def __init__(self, node: DecodeTableNode, storage: _storage.StorageManager):
+    def __init__(self, node: DecodeTableNode, storage: _storage.StorageManager, log_provider: _logging.LogProvider):
         super().__init__()
         self.node = node
-        self.decoder = _capture.CaptureDecoder(storage)
+        self.decoder = _capture.CaptureDecoder(storage, log_provider)
 
     def _execute(self, ctx: NodeContext) -> _data.DataItem:
 
@@ -948,10 +948,10 @@ class FunctionResolver:
         return SaveDataFunc(node, self._resources.get_storage())
 
     def resolve_capture_file(self, node: CaptureFileNode):
-        return CaptureFileFunc(node, self._resources.get_storage())
+        return CaptureFileFunc(node, self._resources.get_storage(), self._log_provider)
 
     def resolve_decode_table(self, node: DecodeTableNode):
-        return DecodeTableFunc(node, self._resources.get_storage())
+        return DecodeTableFunc(node, self._resources.get_storage(), self._log_provider)
 
     def resolve_prepare_placement(self, node: PreparePlacementNode):
         return PreparePlacementFunc(node, self._placement_writer())
@@ -960,7 +960,8 @@ class FunctionResolver:
         return PlaceFileFunc(node, self._placement_writer())
 
     def _placement_writer(self) -> _placement.PlacementWriter:
-        return _placement.PlacementWriter(self._resources.get_storage(), self._resources.get_scratch_dir())
+        return _placement.PlacementWriter(
+            self._resources.get_storage(), self._resources.get_scratch_dir(), self._log_provider)
 
     def resolve_import_model_node(self, node: ImportModelNode):
         return ImportModelFunc(node, self._resources.get_models())

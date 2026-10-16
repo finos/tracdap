@@ -45,9 +45,13 @@ class CaptureReader:
 
     """Read a captured file from external storage, keeping its bytes unchanged and recording where they came from"""
 
-    def __init__(self, storage: _storage.StorageManager):
+    def __init__(self, storage: _storage.StorageManager, log_provider: _logging.LogProvider = None):
+
+        if log_provider is None:
+            log_provider = _logging.LogProvider()
+
         self.__storage = storage
-        self.__log = _logging.logger_for_object(self)
+        self.__log = log_provider.logger_for_object(self)
 
     def read_file(self, capture_name: str, location: _meta.ExternalLocation, size_limit: int) -> _data.DataItem:
 
@@ -106,9 +110,13 @@ class CaptureDecoder:
         _meta.CaptureSchemaSource.CAPTURE_SCHEMA_FILE: "FILE"
     }
 
-    def __init__(self, storage: _storage.StorageManager):
+    def __init__(self, storage: _storage.StorageManager, log_provider: _logging.LogProvider = None):
+
+        if log_provider is None:
+            log_provider = _logging.LogProvider()
+
         self.__storage = storage
-        self.__log = _logging.logger_for_object(self)
+        self.__log = log_provider.logger_for_object(self)
 
     def decode_table(
             self, capture_name: str, file_item: _data.DataItem,

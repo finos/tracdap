@@ -283,6 +283,9 @@ public class CaptureDataTest {
 
         Assertions.assertEquals(0, searchJobOutputs(ObjectType.DATA, jobKey).size());
         Assertions.assertEquals(0, outputsByName(ObjectType.FILE, jobKey).size());
+
+        var result = Helpers.checkFailedJobResult(platform, TEST_TENANT, jobId_missingFile);
+        Assertions.assertEquals(jobStatus.getStatusMessage(), result.getStatusMessage());
     }
 
     @Test @Order(303)
@@ -310,6 +313,8 @@ public class CaptureDataTest {
 
         Assertions.assertEquals(0, searchJobOutputs(ObjectType.DATA, jobKey).size());
         Assertions.assertEquals(0, outputsByName(ObjectType.FILE, jobKey).size());
+
+        Helpers.checkFailedJobResult(platform, TEST_TENANT, jobId_overLimit);
     }
 
     private static SchemaDefinition tableSchema(Map.Entry<String, BasicType>... fields) {

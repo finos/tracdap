@@ -206,6 +206,8 @@ public class ImportExportDataTest {
         Assertions.assertTrue(jobStatus.getStatusMessage().contains("File already exists"), jobStatus.getStatusMessage());
 
         Assertions.assertEquals(filesBefore, listPlacedFiles());
+
+        Helpers.checkFailedJobResult(platform, TEST_TENANT, jobId_placeFail);
     }
 
     @Test @Order(401)

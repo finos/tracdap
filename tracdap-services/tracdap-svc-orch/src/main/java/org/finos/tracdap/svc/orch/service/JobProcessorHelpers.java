@@ -40,6 +40,7 @@ import io.grpc.stub.AbstractStub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
@@ -53,6 +54,9 @@ public class JobProcessorHelpers {
 
     public static final String RESULT_PATH_TEMPLATE = "%d/%s/%s/trac_job_result.json";
     public static final String CAPTURE_MAX_SIZE_CONFIG_KEY = "captureMaxSize";
+
+    static final int ERROR_MESSAGE_MAX_BYTES = 4000;
+    static final String ERROR_MESSAGE_TRUNCATED = "… (truncated)";
 
     // Model types the platform can import, import models run only in local dev mode
     private static final Set<ModelType> IMPORTABLE_MODEL_TYPES = EnumSet.of(
@@ -435,30 +439,109 @@ public class JobProcessorHelpers {
 
     void processJobResult(JobState jobState) {
 
-        if (jobState.tracStatus != JobStatusCode.FINISHING || jobState.runtimeResult == null) {
+        if (jobState.runtimeResult == null) {
+            processMissingResult(jobState);
+            return;
+        }
 
-            var result = ResultDefinition.newBuilder().setJobId(MetadataUtil.selectorFor(jobState.jobId));
+        var runtimeStatus = jobState.runtimeResult.getResult().getStatusCode();
 
-            if (jobState.tracStatus == JobStatusCode.FAILED || jobState.tracStatus == JobStatusCode.CANCELLED)
-                result.setStatusCode(jobState.tracStatus);
-            else
-                result.setStatusCode(JobStatusCode.FAILED);
+        if (runtimeStatus != JobStatusCode.SUCCEEDED || executorFailed(jobState)) {
 
-            if (jobState.statusMessage != null && !jobState.statusMessage.isEmpty())
-                result.setStatusMessage(jobState.statusMessage);
-            else
-                result.setStatusMessage("No details available");
+            try {
+                processFailedResult(jobState);
+            }
+            catch (Exception e) {
 
-            var jobResult = JobResult.newBuilder()
-                    .setJobId(jobState.jobId)
-                    .setResultId(jobState.resultId)
-                    .setResult(result);
+                // The job's own error is more useful than an error processing its result
+                log.error("Failed to process the result of a failed job, the job log will not be available: [{}]", jobState.jobKey, e);
 
-            jobState.jobResult = jobResult.build();
-            jobState.tracStatus = jobResult.getResult().getStatusCode();
+                jobState.statusMessage = failedResultMessage(jobState);
+                processMissingResult(jobState);
+            }
 
             return;
         }
+
+        processSucceededResult(jobState);
+    }
+
+    static boolean executorFailed(JobState jobState) {
+
+        // Any executor status except SUCCEEDED and FINISHING is a failure, including a status that could not be determined
+        if (jobState.runtimeStatus == null)
+            return false;
+
+        var executorStatus = jobState.runtimeStatus.getStatusCode();
+
+        return executorStatus != JobStatusCode.SUCCEEDED && executorStatus != JobStatusCode.FINISHING;
+    }
+
+    private void processMissingResult(JobState jobState) {
+
+        var result = ResultDefinition.newBuilder().setJobId(MetadataUtil.selectorFor(jobState.jobId));
+
+        if (jobState.tracStatus == JobStatusCode.FAILED || jobState.tracStatus == JobStatusCode.CANCELLED)
+            result.setStatusCode(jobState.tracStatus);
+        else
+            result.setStatusCode(JobStatusCode.FAILED);
+
+        if (jobState.statusMessage != null && !jobState.statusMessage.isEmpty())
+            result.setStatusMessage(jobState.statusMessage);
+        else
+            result.setStatusMessage("No details available");
+
+        var jobResult = JobResult.newBuilder()
+                .setJobId(jobState.jobId)
+                .setResultId(jobState.resultId)
+                .setResult(result);
+
+        jobState.jobResult = jobResult.build();
+        jobState.tracStatus = jobResult.getResult().getStatusCode();
+    }
+
+    private void processFailedResult(JobState jobState) {
+
+        var runtimeResult = jobState.runtimeResult;
+
+        validator.validateFixedObject(runtimeResult);
+
+        var resultIds = buildResultLookup(runtimeResult);
+
+        var statusCode = runtimeResult.getResult().getStatusCode() == JobStatusCode.CANCELLED
+                ? JobStatusCode.CANCELLED
+                : JobStatusCode.FAILED;
+
+        var failedResult = runtimeResult.toBuilder();
+        failedResult.getResultBuilder()
+                .setStatusCode(statusCode)
+                .setStatusMessage(failedResultMessage(jobState))
+                .clearOutputs()
+                .clearPlacements();
+
+        // Outputs of a failed job are not registered, only the result and the job log
+        var finalResult = addCommonOutputs(JobResult.newBuilder().build(), failedResult.build(), resultIds, jobState);
+
+        jobState.jobResult = finalResult;
+        jobState.tracStatus = finalResult.getResult().getStatusCode();
+        jobState.statusMessage = finalResult.getResult().getStatusMessage();
+    }
+
+    private String failedResultMessage(JobState jobState) {
+
+        var runtimeResult = jobState.runtimeResult.getResult();
+
+        // A runtime result that reports success with a failed executor has no failure message of its own
+        if (runtimeResult.getStatusCode() != JobStatusCode.SUCCEEDED && !runtimeResult.getStatusMessage().isEmpty())
+            return runtimeResult.getStatusMessage();
+
+        if (jobState.statusMessage != null && !jobState.statusMessage.isEmpty())
+            return jobState.statusMessage;
+
+        return "No details available";
+    }
+
+    private void processSucceededResult(JobState jobState) {
 
         // A result is available and ready to be processed
         var runtimeResult = jobState.runtimeResult;
@@ -739,9 +822,36 @@ public class JobProcessorHelpers {
                             .build(),
                     TagUpdate.newBuilder()
                             .setAttrName(TRAC_JOB_ERROR_MESSAGE_ATTR)
-                            .setValue(encodeValue(result.getStatusMessage()))
+                            .setValue(encodeValue(truncateErrorMessage(result.getStatusMessage())))
                             .build());
         }
+    }
+
+    // The smallest metadata attribute column is varchar2(4000) bytes, on Oracle
+    // The full message is kept in the RESULT object
+
+    static String truncateErrorMessage(String message) {
+
+        if (message.getBytes(StandardCharsets.UTF_8).length <= ERROR_MESSAGE_MAX_BYTES)
+            return message;
+
+        var maxBytes = ERROR_MESSAGE_MAX_BYTES - ERROR_MESSAGE_TRUNCATED.getBytes(StandardCharsets.UTF_8).length;
+        var bytes = 0;
+        var end = 0;
+
+        while (end < message.length()) {
+
+            var codePoint = message.codePointAt(end);
+            var codePointBytes = new String(Character.toChars(codePoint)).getBytes(StandardCharsets.UTF_8).length;
+
+            if (bytes + codePointBytes > maxBytes)
+                break;
+
+            bytes += codePointBytes;
+            end += Character.charCount(codePoint);
+        }
+
+        return message.substring(0, end) + ERROR_MESSAGE_TRUNCATED;
     }
 
     <TStub extends AbstractStub<TStub>>

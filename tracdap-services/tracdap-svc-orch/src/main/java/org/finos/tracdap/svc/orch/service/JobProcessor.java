@@ -375,7 +375,7 @@ public class JobProcessor {
 
             var newState = jobState.clone();
             newState.runtimeResult = jobResult;
-            newState.tracStatus = JobStatusCode.FINISHING;
+            newState.tracStatus = JobProcessorHelpers.executorFailed(jobState) ? JobStatusCode.FAILED : JobStatusCode.FINISHING;
             newState.cacheStatus = CacheStatus.RESULTS_RECEIVED;
 
             return newState;
@@ -391,15 +391,35 @@ public class JobProcessor {
                     ? e.getMessage().lines().findFirst().orElse("No details available")
                     : "No details available";
 
-            var newState = jobState.clone();
-            newState.tracStatus = JobStatusCode.FAILED;
-            newState.cacheStatus = CacheStatus.RESULTS_INVALID;
-            newState.statusMessage = shortMessage;
-
             log.error("Failed to decode job result: [{}] {}", jobState.jobKey, shortMessage, e);
 
-            return newState;
+            return resultsInvalid(jobState, shortMessage);
         }
+        catch (StatusRuntimeException e) {
+
+            // Errors that can be retried are handled by the job manager
+            var code = e.getStatus().getCode();
+
+            if (code == Status.Code.UNAVAILABLE || code == Status.Code.DEADLINE_EXCEEDED)
+                throw e;
+
+            log.error("Failed to read job result: [{}] {}", jobState.jobKey, e.getMessage(), e);
+
+            return resultsInvalid(jobState, "No details available");
+        }
+    }
+
+    private JobState resultsInvalid(JobState jobState, String message) {
+
+        var newState = jobState.clone();
+        newState.tracStatus = JobStatusCode.FAILED;
+        newState.cacheStatus = CacheStatus.RESULTS_INVALID;
+
+        // If the executor reported a failure, its message explains the job failure better than the missing result
+        if (!JobProcessorHelpers.executorFailed(jobState) || jobState.statusMessage == null || jobState.statusMessage.isEmpty())
+            newState.statusMessage = message;
+
+        return newState;
     }
 
     public JobState saveResultMetadata(JobState jobState) {
@@ -455,6 +475,9 @@ public class JobProcessor {
         var newState = jobState.clone();
         newState.tracStatus = JobStatusCode.FAILED;
         newState.statusMessage = errorMessage;
+
+        // Record the processing error without the runtime result, processing that result is what failed
+        newState.runtimeResult = null;
 
         lifecycle.processJobResult(newState);
         lifecycle.saveJobResult(newState);
