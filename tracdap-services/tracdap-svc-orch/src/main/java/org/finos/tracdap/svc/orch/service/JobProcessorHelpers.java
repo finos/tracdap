@@ -515,7 +515,9 @@ public class JobProcessorHelpers {
         var failedResult = runtimeResult.toBuilder();
         failedResult.getResultBuilder()
                 .setStatusCode(statusCode)
-                .setStatusMessage(failedResultMessage(jobState));
+                .setStatusMessage(failedResultMessage(jobState))
+                .clearOutputs()
+                .clearPlacements();
 
         // Outputs of a failed job are not registered, only the result and the job log
         var finalResult = addCommonOutputs(JobResult.newBuilder().build(), failedResult.build(), resultIds, jobState);
