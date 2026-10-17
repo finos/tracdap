@@ -35,8 +35,8 @@ ext {
 
     // Data technologies
     arrow_version = '18.3.0'
-    jackson_version = '2.21.5'
-    jackson_databind_version = '2.21.5'
+    jackson_version = '2.21.7'
+    jackson_databind_version = '2.21.7'
     // jackson-annotations versions independently of core/databind and dropped its
     // patch number from Jackson 2.20 onwards (see jackson-bom), so it is 2.21 not 2.21.4
     jackson_annotations_version = '2.21'
@@ -53,7 +53,7 @@ ext {
     mysql_version = '8.4.0'
     mariadb_version = '3.4.0'
     postgresql_version = '42.7.13'
-    sqlserver_version = '13.2.1.jre8'
+    sqlserver_version = '13.2.1.jre11'
     oracle_version = '19.22.0.0'
 
     // JDBC Connection pool

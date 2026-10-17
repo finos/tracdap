@@ -62,12 +62,6 @@
         <cpe>cpe:/a:apache:commons_net</cpe>
     </suppress>
 
-    <!-- commons-net is detected as part of commons-logging -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/commons\-logging/commons\-logging@.*$</packageUrl>
-        <cpe>cpe:/a:apache:commons_net</cpe>
-    </suppress>
-
     <!-- Flat buffers detected as flat_project, a JavaScript library: https://github.com/hughsk/flat -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/com\.google\.flatbuffers/flatbuffers\-java@.*$</packageUrl>
@@ -168,11 +162,93 @@
         <vulnerabilityName>CVE-2023-36415</vulnerabilityName>
     </suppress>
 
-    <!-- This one is a vulnerability in the Azure CLI using REST commands -->
-    <!-- It should not apply to Java libraries at all -->
+    <!-- CVE-2026-54285 is in the JavaScript OpenTelemetry SDK (npm @opentelemetry/core before 2.8.0) -->
+    <!-- NVD limits it to node.js, but the check matches it against every Java OpenTelemetry jar -->
+    <!-- The Java equivalent is CVE-2026-45292, fixed in OpenTelemetry Java 1.62.0 -->
+    <!-- https://github.com/open-telemetry/opentelemetry-java/security/advisories/GHSA-rcgg-9c38-7xpx -->
+
     <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.azure/azure\-.*@.*$</packageUrl>
-        <cve>CVE-2023-36052</cve>
+        <packageUrl regex="true">^pkg:maven/io\.grpc/grpc-opentelemetry@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-api@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-common@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-context@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-common@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-logs@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-metrics@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-trace@.*$</packageUrl>
+        <cve>CVE-2026-54285</cve>
+    </suppress>
+
+    <!-- More wrong-language detections, these are CVEs in the Go OpenTelemetry SDK -->
+    <!-- The Java opentelemetry-gcp-resources jar is matched because its 1.x-alpha version falls in the Go ranges -->
+    <!-- 1.44.0-alpha is the first version outside all of them -->
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-29181</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-39883</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-24051</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-39882</cve>
+    </suppress>
+
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
+        <cve>CVE-2026-41178</cve>
     </suppress>
 
 
@@ -191,35 +267,6 @@
     Either way, it relies on core devs keeping an eye on outstanding security issues.
     -->
 
-    <!-- Medium level warning in legacy (deprecated) API, Google are not issuing a fix -->
-    <!-- https://github.com/google/guava/issues/4011 -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.google\.guava/guava@.*$</packageUrl>
-        <vulnerabilityName>CVE-2020-8908</vulnerabilityName>
-    </suppress>
-
-
-    <!-- The H2 developers maintain this CVE is not a security vulnerability and have not issued a fix -->
-    <!-- The vulnerability only applies when an H2 web console service is running -->
-    <!-- https://github.com/h2database/h2database/issues/3175 -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.h2database/h2@.*$</packageUrl>
-        <vulnerabilityName>CVE-2018-14335</vulnerabilityName>
-    </suppress>
-
-    <!-- This issue in SnakeYAML has no fix available yet -->
-    <!-- Developers are discussing whether this is a false positive -->
-    <!-- We don't expose YAML in service APIs, it is only used for config parsing and offline runs -->
-    <!-- https://bitbucket.org/snakeyaml/snakeyaml/issues/546/false-positive-mend-vulnerability-for -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.yaml/snakeyaml@.*$</packageUrl>
-        <vulnerabilityName>CVE-2022-38752</vulnerabilityName>
-        <vulnerabilityName>CVE-2022-38751</vulnerabilityName>
-        <vulnerabilityName>CVE-2022-41854</vulnerabilityName>
-        <vulnerabilityName>CVE-2022-1471</vulnerabilityName>
-    </suppress>
-
     <!-- More spurious errors being reported in SonaType -->
     <!-- This is not a real vulnerability, it should be contested / closed -->
     <!-- https://nvd.nist.gov/vuln/detail/CVE-2022-45868 -->
@@ -229,67 +276,18 @@
         <cve>CVE-2022-45868</cve>
     </suppress>
 
-    <!-- Another over-zealous report on Sonatype -->
-    <!-- Jackson are considering a fix for 2.16 series, although there is no way to exploit this issue -->
-    <!-- https://github.com/FasterXML/jackson-databind/issues/3972 -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.fasterxml\.jackson\.core/jackson\-databind@.*$</packageUrl>
-        <vulnerabilityName>CVE-2023-35116</vulnerabilityName>
-    </suppress>
-
-    <!-- More NVD Noise - this is a vulnerability in Postgres itself, not the JDBC driver -->
-    <!-- CVE itself is very weak, assumes attacker is on the server console and can send signals to the DB process -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.postgresql/postgresql@.*$</packageUrl>
-        <vulnerabilityName>CVE-2020-21469</vulnerabilityName>
-    </suppress>
-
-    <!-- Netty does not do host name verification for SSL by default, it has to be enabled in code -->
-    <!-- There is a discussion whether to change the default before Netty 5 -->
-    <!-- https://github.com/netty/netty/issues/8537 -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.netty/netty\-.*@.*$</packageUrl>
-        <vulnerabilityName>CVE-2023-4586</vulnerabilityName>
-    </suppress>
-
-    <!-- reactor-netty-core / reactor-netty-http are pulled in by the Azure SDK (azure-core-http-netty),
+    <!-- CVE-2026-47874 is a memory exhaustion in the reactor-netty HTTP server (pipelined HTTP/1.1 requests).
+         TRAC only uses reactor-netty as the Azure SDK's HTTP client and never runs a reactor-netty server.
+         reactor-netty-core / reactor-netty-http are pulled in by the Azure SDK (azure-core-http-netty),
          which pins its own build to exactly reactor-netty 1.2.18 (enforced via a Maven banned-dependency
-         rule in azure-core-http-netty's own pom). No release in the 1.2.x line fixes CVE-2026-47874, and
-         forcing a newer line (1.3.x, where the fix landed) broke Azure BLOB storage round trips on
-         multi-chunk uploads - see tracdap-libs/tracdap-lib-common and tracdap-lib-data build.gradle.
-         Revisit once Azure SDK moves to a reactor-netty line that includes the fix. -->
+         rule in azure-core-http-netty's own pom). The 1.2.x fix (1.2.19) is only available with commercial
+         Spring support, and forcing a newer line (1.3.x, fixed in 1.3.7) broke Azure BLOB storage round trips
+         on multi-chunk uploads - see tracdap-libs/tracdap-lib-common and tracdap-lib-data build.gradle.
+         Revisit when an azure-core-http-netty release moves to reactor-netty 1.3.7 or later (as of Oct 2026
+         only the unreleased 1.17.0 beta does, along with Netty 4.2 and Reactor 3.8). -->
     <suppress>
         <packageUrl regex="true">^pkg:maven/io\.projectreactor\.netty/reactor\-netty\-.*@.*$</packageUrl>
         <vulnerabilityName>CVE-2026-47874</vulnerabilityName>
-    </suppress>
-
-    <!-- This is a vulnerability that has been discovered in the SSH protocol and affects many SSH implementations -->
-    <!-- It only applies when certain extensions are enabled, for TRAC this applies to the execution node config -->
-    <!-- Currently there is no fix available, I have raised a ticket with Apache SSHD -->
-    <!-- https://github.com/apache/mina-sshd/issues/453 -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.apache\.sshd/sshd\-.*@.*$</packageUrl>
-        <cve>CVE-2023-48795</cve>
-    </suppress>
-
-    <!--
-
-    This package is a backport of JSR-310 date/time functionality to Java 6 & 7
-    It is pulled in by the GCP SDK, which supports very old versions of Java
-    Whether it is actually used when running on Java 8+ is a question
-    The package authors do not believe these are real vulnerabilities
-
-    https://github.com/ThreeTen/threetenbp/blob/main/src/site/markdown/security.md
-
-    -->
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/org\.threeten/threetenbp@.*$</packageUrl>
-        <vulnerabilityName>CVE-2024-23082</vulnerabilityName>
-        <vulnerabilityName>CVE-2024-23081</vulnerabilityName>
     </suppress>
 
 
@@ -304,11 +302,6 @@
 
     <suppress>
         <packageUrl regex="true">^pkg:maven/com\.microsoft\.azure/msal4j@.*$</packageUrl>
-        <cve>CVE-2024-35255</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/com\.microsoft\.azure/msal4j\-persistence\-extension@.*$</packageUrl>
         <cve>CVE-2024-35255</cve>
     </suppress>
 
@@ -347,90 +340,6 @@
     <suppress>
         <packageUrl regex="true">^pkg:npm/extract\-zip@.*$</packageUrl>
         <cve>CVE-2026-56876</cve>
-    </suppress>
-
-
-    <!-- OpenTelemetry: pulled in by Google Cloud libs (no update yet available) and io.grpc/grpc-bom -->
-    <!-- (update has breaking API changes) -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.grpc/grpc-opentelemetry@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <!-- OpenTelemetry: pulled in by Google Cloud libs (no update yet available) -->
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-api@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-common@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-context@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
-        <cve>CVE-2026-29181</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
-        <cve>CVE-2026-39883</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
-        <cve>CVE-2026-24051</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
-        <cve>CVE-2026-39882</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
-        <cve>CVE-2026-41178</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry\.contrib/opentelemetry-gcp-resources@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-common@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-extension-autoconfigure-spi@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-logs@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-metrics@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
-    </suppress>
-
-    <suppress>
-        <packageUrl regex="true">^pkg:maven/io\.opentelemetry/opentelemetry-sdk-trace@.*$</packageUrl>
-        <cve>CVE-2026-54285</cve>
     </suppress>
 
 </suppressions>

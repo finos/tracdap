@@ -172,6 +172,9 @@ jobs:
       # template fields from Kerchunk reference JSON in an unsandboxed Jinja2 environment. The runtime never opens a
       # reference filesystem: it only constructs GCSFileSystem and AzureBlobFileSystem directly, and never resolves fsspec
       # URLs or protocol strings, so the vulnerable code path is not used.
+      # PYSEC-2026-3740 is the nltk path traversal (CVE-2026-81726), also ignored in the safety check above.
+      # nltk is only pulled in as a dependency of safety itself, it is not a dependency of the dist wheels.
+      # No nltk release after 3.10.3 exists, and advisories disagree on whether 3.10.3 is fixed.
       - name: Pip-audit Dependency Check
         env:
           PIP_AUDIT_PROGRESS_SPINNER: "off"
