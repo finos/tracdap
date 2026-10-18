@@ -20,5 +20,5 @@ job:
       account_filter: "inputs/account_filter.csv"
 
     outputs:
-      profit_by_region: "outputs/chaining_2/profit_by_region.csv"
-      exclusions: "outputs/chaining_2/exclusions.csv"
+      profit_by_region: "outputs/dynamic_chaining/profit_by_region.csv"
+      exclusions: "outputs/dynamic_chaining/exclusions.csv"

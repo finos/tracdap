@@ -9,4 +9,4 @@ job:
       original_data: "inputs/loan_final313_100.parquet"
 
     outputs:
-      filtered_data: "outputs/dynamic_io/filtered_data.csv"
+      filtered_data: "outputs/dynamic_io_3/filtered_data.csv"

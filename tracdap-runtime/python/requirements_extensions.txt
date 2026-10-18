@@ -8,3 +8,8 @@ dulwich == 1.2.12
 
 # tracdap-ext-openai
 openai ~= 1.0
+
+# Tutorial example models (file IO and model resources)
+# Matplotlib needs a newer NumPy than the oldest Pandas versions tested in CI
+matplotlib; python_version >= "3.11"
+python-pptx

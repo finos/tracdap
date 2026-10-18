@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import {tracdap} from 'tracdap-web-api';
+import {tracdap} from '@finos/tracdap-web-api';
 
 // Use tracdap.setup to create an RPC transport pointed at your TRAC server
 // For code that will run in the browser, use transportForBrowser to direct requests to the origin server
@@ -44,6 +44,7 @@ async function createDirectory(storageDir) {
 async function addStorage(storageDir) {
 
     // Use the admin API to create a storage resource
+    // Creating a config entry fails if the key already exists, so this example runs once per tenant
 
     const request = tracdap.api.ConfigWriteRequest.create({
 

@@ -18,14 +18,16 @@
     "url": "https://github.com/finos/tracdap/issues"
   },
   "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
   "dependencies": {
-    "apache-arrow": "^16.0.0",
-    "node-fetch": "^3.3.0",
-    "tracdap-web-api": "file:../../../tracdap-api/packages/web",
+    "@finos/tracdap-web-api": "file:../../../tracdap-api/packages/web",
+    "apache-arrow": "^21.0.0",
     "ws": "^8.21.0",
     "xhr2": "^0.2.1"
   },
   "scripts": {
-    "examples": "node --experimental-specifier-resolution=node run_examples.js"
+    "examples": "node run_examples.js"
   }
 }

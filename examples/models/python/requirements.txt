@@ -1,0 +1,7 @@
+# Requirements for running the tutorial example models
+
+tracdap-runtime[pandas,polars]
+
+# The file IO and model resources examples produce charts and reports
+matplotlib
+python-pptx

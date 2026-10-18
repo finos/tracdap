@@ -52,7 +52,7 @@ def calculate_profit_by_region_polars(
 
 class PnlAggregationPolars(trac.TracModel):
 
-    def define_attributes(self) -> tp.List[trac.TagUpdate]:
+    def define_attributes(self) -> tp.Dict[str, trac.Value]:
 
         return trac.define_attributes(
             trac.A("model_description", "A example model, for testing purposes"),
@@ -78,13 +78,13 @@ class PnlAggregationPolars(trac.TracModel):
 
         customer_loans = trac.load_schema(schemas, "customer_loans.csv")
 
-        return {"customer_loans": trac.ModelInputSchema(customer_loans)}
+        return {"customer_loans": trac.define_input(customer_loans, label="Customer loans data")}
 
     def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
 
         profit_by_region = trac.load_schema(schemas, "profit_by_region.csv")
 
-        return {"profit_by_region": trac.ModelOutputSchema(profit_by_region)}
+        return {"profit_by_region": trac.define_output(profit_by_region, label="Profit by region")}
 
     def run_model(self, ctx: trac.TracContext):
 

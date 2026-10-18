@@ -55,8 +55,7 @@ class StructModel(trac.TracModel):
 
     def define_inputs(self) -> _tp.Dict[str, trac.ModelInputSchema]:
 
-        run_config_struct = trac.define_struct(RunConfig)
-        run_config = trac.define_input(run_config_struct, label="Run configuration")
+        run_config = trac.define_input_struct(RunConfig, label="Run configuration")
 
         return {"run_config": run_config}
 

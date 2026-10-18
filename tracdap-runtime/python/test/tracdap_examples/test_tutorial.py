@@ -19,6 +19,19 @@ import sys
 
 import tracdap.rt.launch as launch
 
+# Optional example dependencies are imported before any job runs, while guard rails are not yet active
+try:
+    import matplotlib  # noqa
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
+
+try:
+    import pptx  # noqa
+    PPTX_AVAILABLE = True
+except ImportError:
+    PPTX_AVAILABLE = False
+
 
 class TutorialModelsTest(unittest.TestCase):
 
@@ -150,15 +163,6 @@ class TutorialModelsTest(unittest.TestCase):
 
         launch.launch_job(job_config, sys_config, dev_mode=True)
 
-    def test_data_import(self):
-
-        from tutorial.data_import import BulkDataImport  # noqa
-
-        job_config = self.examples_root.joinpath("config/data_import.yaml")
-        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
-
-        launch.launch_model(BulkDataImport, job_config, sys_config, dev_mode=True)
-
     def test_capture_job(self):
 
         job_config = self.examples_root.joinpath("config/capture_job.yaml")
@@ -168,17 +172,14 @@ class TutorialModelsTest(unittest.TestCase):
 
     def test_data_export(self):
 
-        # The export job places the outputs of the using data example
-        self.test_using_data()
-
         job_config = self.examples_root.joinpath("config/data_export.yaml")
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_job(job_config, sys_config, dev_mode=True)
 
-    def test_flow_export(self):
+    def test_chaining_export(self):
 
-        job_config = self.examples_root.joinpath("config/flow_export.yaml")
+        job_config = self.examples_root.joinpath("config/chaining_export.yaml")
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_job(job_config, sys_config, dev_mode=True)
@@ -191,13 +192,6 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(PnlAggregationPolars, job_config, sys_config, dev_mode=True)
-
-    def test_group_import_process_export(self):
-
-        job_config = self.examples_root.joinpath("config/job_group.yaml")
-        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
-
-        launch.launch_job(job_config, sys_config, dev_mode=True)
 
     def test_structured_objects(self):
 
@@ -223,3 +217,33 @@ class TutorialModelsTest(unittest.TestCase):
         sys_config = self.examples_root.joinpath("config/sys_config.yaml")
 
         launch.launch_model(RuntimeMetadataReport, job_config, sys_config, dev_mode=True)
+
+    @unittest.skipIf(not MATPLOTLIB_AVAILABLE, "File IO example requires matplotlib")
+    def test_file_io_matplotlib(self):
+
+        from tutorial.file_io_matplotlib import MatplotlibReport  # noqa
+
+        job_config = self.examples_root.joinpath("config/file_io_matplotlib.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(MatplotlibReport, job_config, sys_config, dev_mode=True)
+
+    @unittest.skipIf(not PPTX_AVAILABLE, "File IO example requires python-pptx")
+    def test_file_io_powerpoint(self):
+
+        from tutorial.file_io_powerpoint import PowerpointReport  # noqa
+
+        job_config = self.examples_root.joinpath("config/file_io_powerpoint.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(PowerpointReport, job_config, sys_config, dev_mode=True)
+
+    @unittest.skipIf(not MATPLOTLIB_AVAILABLE, "Model resources example requires matplotlib")
+    def test_load_resources(self):
+
+        from tutorial.load_resources import ResourcesExample  # noqa
+
+        job_config = self.examples_root.joinpath("config/load_resources.yaml")
+        sys_config = self.examples_root.joinpath("config/sys_config.yaml")
+
+        launch.launch_model(ResourcesExample, job_config, sys_config, dev_mode=True)

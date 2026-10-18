@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import {tracdap} from 'tracdap-web-api';
+import {tracdap} from '@finos/tracdap-web-api';
 import fs from 'fs';
 
 // Create the Data API
