@@ -62,7 +62,7 @@ runtime.
 There are two useful features of :py:class:`TracContext <tracdap.rt.api.TracContext>`
 that can be seen in this example:
 
-    *   The :py:meth:`log() <tracdap.rt.api.TracContext.log>` method returns a standard Python logger
+    *   The :py:attr:`log <tracdap.rt.api.TracContext.log>` property returns a standard Python logger
         that can be used for writing model logs. When models run on the platform, it will capture
         any logs written to this logger and make them available with the job outputs as searchable
         datasets. Log outputs are available even if a job fails so they can be used for debugging.
@@ -84,7 +84,7 @@ To run the model, we need to supply two configuration files:
     *   **System config**, which includes everything related to storage locations, repositories,
         execution environment and other system settings.
 
-When models are deployed to run on the platform, the runtime generates the job configuration according to scheduled
+When models are deployed to run on the platform, the platform generates the job configuration according to scheduled
 instructions and/or user input. A full set of metadata is assembled for every object and setting that goes
 into a job, so that execution can be strictly controlled and validated.
 
@@ -145,10 +145,10 @@ Now you should be able to run your model script and see the model output in the 
     :name: hello_world_log_output
     :class: container
 
-    2022-05-31 12:19:36,104 [engine] INFO tracdap.rt.exec.engine.NodeProcessor - START RunModel [HelloWorldModel] / JOB-92df0bd5-50bd-4885-bc7a-3d4d95029360-v1
-    2022-05-31 12:19:36,104 [engine] INFO __main__.HelloWorldModel - Hello world model is running
-    2022-05-31 12:19:36,104 [engine] INFO __main__.HelloWorldModel - The input number is 42
-    2022-05-31 12:19:36,104 [engine] INFO tracdap.rt.exec.engine.NodeProcessor - DONE RunModel [HelloWorldModel] / JOB-92df0bd5-50bd-4885-bc7a-3d4d95029360-v1
+    2026-10-18 17:31:17,849 [model-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START RunModel [HelloWorldModel] / JOB-01a14fda-6f52-7167-b64d-d9f90d6f552e-v1
+    2026-10-18 17:31:17,849 [model-0] INFO __main__.HelloWorldModel - Hello world model is running
+    2026-10-18 17:31:17,849 [model-0] INFO __main__.HelloWorldModel - The input number is 42
+    2026-10-18 17:31:17,849 [model-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE RunModel [HelloWorldModel] / JOB-01a14fda-6f52-7167-b64d-d9f90d6f552e-v1
 
 
 .. seealso::

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import {tracdap} from 'tracdap-web-api';
+import {tracdap} from '@finos/tracdap-web-api';
 
 import {searchForSchema} from './metadata_mojo.js';
 import {loadFromDisk} from './util.js';

@@ -13,13 +13,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import fileinput
+import datetime
 import pathlib
+import re
 import subprocess as sp
 import os
 
 import importlib.util
-import sys
 
 docgen_spec = importlib.util.spec_from_file_location("docgen", "../dev/docgen/docgen-ctrl.py")
 docgen_module = importlib.util.module_from_spec(docgen_spec)
@@ -75,7 +75,7 @@ def skip_fattened_modules(app, what, name, obj, skip, options):
 # -- Project information -----------------------------------------------------
 
 project = 'TRAC D.A.P.'
-copyright = '2024, finTRAC Limited'  # noqa
+copyright = f'{datetime.date.today().year}, finTRAC Limited'  # noqa
 author = 'finTRAC Limited'
 
 # ReadTheDocs does not fetch tags by default and we need them to get version information
@@ -90,6 +90,9 @@ release = r_
 
 # This gets displayed as the root of the navigation path in the header / footer
 short_title = f"{project} {release}"
+
+# Source links point at the release tag for tagged releases, otherwise at main
+source_ref = f"v{release}" if re.fullmatch(r"\d+\.\d+\.\d+(-[a-z]+\.\d+)?", release) else "main"
 
 
 # -- General configuration ---------------------------------------------------
@@ -162,7 +165,7 @@ rst_epilog = """
 """
 
 extlinks = {
-    "example": ("https://github.com/finos/tracdap/tree/main/examples/models/python/%s", "example at %s")
+    "example": (f"https://github.com/finos/tracdap/tree/{source_ref}/examples/models/python/%s", "example at %s")
 }
 
 

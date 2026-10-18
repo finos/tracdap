@@ -15,10 +15,11 @@
  * limitations under the License.
  */
 
-import {tracdap} from 'tracdap-web-api';
+import {tracdap} from '@finos/tracdap-web-api';
 
 // Use tracdap.setup to create an RPC transport pointed at your TRAC server
 // For code that will run in the browser, use transportForBrowser to direct requests to the origin server
+// These examples send requests without authentication, for a local sandbox with no login configured
 const metaTransport = tracdap.setup.transportForTarget(tracdap.api.TracMetadataApi, "http", "localhost", 8080);
 
 // Create a TRAC API instance for the Metadata API

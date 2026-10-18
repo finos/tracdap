@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import {tracdap} from 'tracdap-web-api';
+import {tracdap} from '@finos/tracdap-web-api';
 
 import {loadTag} from "./hello_world.js";
 

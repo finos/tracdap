@@ -27,10 +27,11 @@ to its TRAC object ID and any metadata attributes that were recorded when the da
     :lineno-start: 45
 
 .. note::
-    Metadata is only available for inputs that come from real TRAC objects. Calling
-    :py:meth:`get_metadata() <tracdap.rt.api.TracContext.get_metadata>` for a model parameter, an
-    output before the job completes, or an input supplied as an intermediate result from another
-    model in a flow, will return ``None`` rather than raising an error.
+    Metadata is only available for inputs that come from real TRAC objects. For an input that has
+    no metadata attached, such as an intermediate result from another model in a flow,
+    :py:meth:`get_metadata() <tracdap.rt.api.TracContext.get_metadata>` returns ``None``.
+    Calling it for a name that is not a model input or output (including a model parameter),
+    or for an output the model has not yet saved, is an error.
 
 
 Building a report

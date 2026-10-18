@@ -110,6 +110,15 @@ the model will tell you about its schema.
     :language: yaml
     :linenos:
 
+To run the model locally, pass the model class to
+:py:func:`launch_model() <tracdap.rt.launch.launch_model>`, as in the earlier tutorials:
+
+.. code-block:: python
+
+    if __name__ == "__main__":
+        import tracdap.rt.launch as launch
+        launch.launch_model(DynamicSchemaInspection, "config/dynamic_io.yaml", "config/sys_config.yaml")
+
 .. note::
     The runtime does not currently allow using CSV files as dynamic inputs when running locally. This is
     because of the need to do schema inference, which is not reliable for CSV files. You can create
@@ -143,14 +152,14 @@ Now let's look at the model code:
     :name: dynamic_io_data_generation_2
     :language: python
     :class: container
-    :lines: 83 - 101
+    :lines: 83 - 103
     :linenos:
     :lineno-start: 83
 
 The model creates a :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>` and adds a
 :py:class:`FieldSchema <tracdap.rt.metadata.FieldSchema>` for each column. The same helper functions
 that are available for defining static schemas can be used to build dynamic schemas, in this example
-we use :py:func:`trac.F() <tracdap.rt.api.F>` to define each field. You can also load schemas from
+we use :py:func:`define_field() <tracdap.rt.api.define_field>` to define each field. You can also load schemas from
 schema files using :py:func:`load_schema() <tracdap.rt.api.load_schema>`, then make changes to those
 schemas in code and use the result as your dynamic output schema.
 
@@ -184,9 +193,9 @@ Let's see an example model definition that can help us do that:
     :name: dynamic_io_dynamic_filtering_1
     :language: python
     :class: container
-    :lines: 104 - 118
+    :lines: 106 - 120
     :linenos:
-    :lineno-start: 104
+    :lineno-start: 106
 
 Here both the input and the output are dynamic, and the model is controlled only by the two filter
 parameters. Now let's see the implementation:
@@ -195,9 +204,9 @@ parameters. Now let's see the implementation:
     :name: dynamic_io_dynamic_filtering_2
     :language: python
     :class: container
-    :lines: 120 - 131
+    :lines: 122 - 133
     :linenos:
-    :lineno-start: 120
+    :lineno-start: 122
 
 The original input schema is used directly as the output schema, so the schema of the input
 and output will be the same.

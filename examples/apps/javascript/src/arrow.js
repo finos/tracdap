@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import {tracdap} from 'tracdap-web-api';
+import {tracdap} from '@finos/tracdap-web-api';
 
 import {searchForSchema} from './metadata_mojo.js';
 import {saveDataToTrac, renderTable} from './using_data.js';
@@ -42,7 +42,7 @@ function loadArrowData(dataId) {
     return dataApi.readSmallDataset(request).then(response => {
 
         // Create an Arrow table directly from the binary content of the response
-        const table = new arrow.tableFromIPC(response.content);
+        const table = arrow.tableFromIPC(response.content);
         table.length = table.numRows;
 
         return {schema: response.schema, data: table};

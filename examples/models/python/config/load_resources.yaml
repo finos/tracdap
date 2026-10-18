@@ -3,7 +3,7 @@ job:
   runModel:
 
     inputs:
-      quarterly_sales: "outputs/using_data/profit_by_region.csv"
+      quarterly_sales: "inputs/profit_by_region.csv"
 
     outputs:
-      sales_report: "outputs/file_io/sales_report.svg"
+      sales_report: "outputs/load_resources/sales_report.svg"

@@ -39,11 +39,11 @@ so we can use the same syntax. We'll define the three parameters needed by the m
     :lineno-start: 52
 
 The example model function has one data input, which is a table called *customer_loans*.
-The function :py:func:`define_output_table() <tracdap.rt.api.define_output_table>` in the
+The function :py:func:`define_input_table() <tracdap.rt.api.define_input_table>` in the
 runtime's API allows us to define a tabular dataset for use as a model input, which is exactly
 what is needed. Each field is defined using the shorthand function :py:func:`trac.F() <tracdap.rt.api.F>`.
-This approach works well for small models with simple schemas (the next tutorial discusses
-managing more complex models using schema files).
+This approach works well for small models with simple schemas (see `Schema files`_ below for
+managing more complex models).
 
 Every field must have a name, type and label. Only scalar types are allowed for fields in table
 schemas - it is not possible define a field which has a compound type such as
@@ -60,9 +60,8 @@ where they are a natural expression of the data.
 
 When the *customer_loans* dataset is accessed, the runtime will guarantee the dataset is supplied
 with exactly this arrangement of columns: the order, case and data types will be exactly as defined.
-Order and case are treated leniently - if the incoming dataset has a different field order or casing,
-the fields will be reordered and renamed. Any extra fields will be dropped. Data types are also guaranteed
-to match what is in the schema.
+The incoming dataset does not have to match exactly - if it has a different field order or casing,
+the fields will be reordered and renamed to match the schema, and any extra fields will be dropped.
 
 For models running locally, the *--dev-mode* option will enable a more lenient handling of data types.
 In this mode, the runtime will attempt to convert data to use the specified field types, for example by parsing
@@ -170,14 +169,17 @@ to define a storage location. For development this can be a local folder, althou
 deployments storage locations can be cloud buckets or use other protocols such as network storage
 or HDFS, so long as the right storage plugins are available.
 
-This example sets up one storage location called *example_data*. Since we are going to use a local disk,
+This example sets up one storage location called *example_data*. Its *resourceType* is *INTERNAL_STORAGE*,
+which is storage that TRAC manages for its own datasets. Since we are going to use a local disk,
 the storage protocol is *LOCAL*. The *rootPath* property says where this storage bucket will be on disk -
 a relative path is taken relative to the *sys_config* file by default, or you can specify an absolute path
 here to avoid confusion.
 
 The example config also sets the default storage location and format, which controls where
-output data will be saved. In this example we have only one storage
+output data will be saved. In this example we have only one internal storage
 location configured, which is used for both inputs and outputs, so we mark that as the default.
+The other resources in the example *sys_config* file are external storage locations, which are used in
+:doc:`importing_data`, :doc:`exporting_data` and :doc:`export_models`.
 
 .. literalinclude:: ../../../examples/models/python/config/sys_config.yaml
     :caption: config/sys_config.yaml
@@ -239,8 +241,8 @@ must be in the source tree with your Python code, in a package with an *__init__
 building your model packages as Python Wheels or Conda packages the schema files must be included as
 part of the build.
 
-To add the schema files into the example project we can create a sub-package called "tutorial.schemas",
-which would look like this:
+To add the schema files into the example project we can create a sub-package called "tutorial.schemas".
+A project laid out this way might look like this:
 
 .. code-block::
     :class: container
@@ -288,7 +290,7 @@ Then we can load schemas from the schemas package in the model's
     :lineno-start: 39
 
 Notice that the :py:func:`load_schema() <tracdap.rt.api.load_schema>` method only creates
-the `SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`, to use this schema for
+the :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`, to use this schema for
 model inputs and outputs we need to call
 :py:func:`define_input() <tracdap.rt.api.define_input>` and
 :py:func:`define_output() <tracdap.rt.api.define_output>` explicitly.

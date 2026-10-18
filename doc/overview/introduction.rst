@@ -1,13 +1,13 @@
 Introduction
 ============
 
-TRAC D.A.P. is an open-source model orchestration toolkit, maintained by Fintrac Limited in
+TRAC D.A.P. is an open-source model orchestration toolkit, maintained by finTRAC Limited in
 association with `FINOS <https://www.finos.org/>`_. Designed to work alongside any modern analytics
 stack, TRAC D.A.P. creates a highly controlled environment for running analytics.
 
 This project contains:
 
-* The TRAC platform services (metadata, data, orchestrator and gateway)
+* The TRAC platform services (metadata, data, orchestrator, admin and gateway)
 * The Python model runtime, also available to download and install from `pypi.org <https://pypi.org/>`_.
 
 See `CONTRIBUTING.md <https://github.com/finos/tracdap/blob/main/CONTRIBUTING.md>`_ for the
@@ -38,7 +38,7 @@ For more on writing and running models, see :doc:`/modelling/tutorial/index`.
 Immutability and repeatability
 -------------------------------
 
-Model code stays in an external repository and is only fetched when a job runs. TRAC D.A.P. data service also
+Model code stays in an external repository and is only fetched when a model is imported or a job runs. TRAC D.A.P. data service also
 enforces an append-only data model.
 
 Because the underlying objects (models and data) are immutable resubmitting a job will always produce the

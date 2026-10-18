@@ -1013,6 +1013,6 @@ def declare_output_table(
     :display: False
     """
 
-    print("TRAC Warning: declare_output_table() is deprecated, please use define_output_table()", file==sys.stderr)
+    print("TRAC Warning: declare_output_table() is deprecated, please use define_output_table()", file=sys.stderr)
 
     return define_output_table(*fields)

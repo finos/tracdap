@@ -8,4 +8,4 @@ job:
       sample_columns: "inputs/sample_columns.csv"
 
     outputs:
-      dynamic_data_sample: "outputs/dynamic_io/dynamic_data_sample.csv"
+      dynamic_data_sample: "outputs/dynamic_io_2/dynamic_data_sample.csv"

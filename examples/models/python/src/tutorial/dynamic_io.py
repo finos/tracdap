@@ -108,7 +108,7 @@ class DynamicDataFilter(trac.TracModel):
     def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
 
         return trac.define_parameters(
-            trac.P("filter_column", trac.STRING, label="Filter colum"),
+            trac.P("filter_column", trac.STRING, label="Filter column"),
             trac.P("filter_value", trac.STRING, label="Filter value"))
 
     def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:

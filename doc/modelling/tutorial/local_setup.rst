@@ -106,7 +106,7 @@ everything else) do not get muddled into the Python package tree. If you see cod
 "import src.xxx" or "from src.xxx import yyy" then something has gone wrong!
 
 The test folder contains our test code which is also arranged as a package. Notice that the package
-name is not the same (tutorial_test instead of tutorial) - Python will not allow the same package
+name is not the same (tutorial_tests instead of tutorial) - Python will not allow the same package
 to be defined in two places. Putting the test code in a separate test folder stops it getting mixed
 in with the code in src/, which is important when it comes to releasing code to production.
 
@@ -150,6 +150,14 @@ optional extras, so install whichever your model needs:
 
 The *pandas* extra also pulls in NumPy automatically - there is no separate extra to install for it.
 
+Other extras add support for particular platforms and protocols. Most models will not need them
+for local development:
+
+* *pyspark* - PySpark support
+* *sql* - SQL storage, for import and export
+* *aws*, *gcp*, *azure* - storage on the corresponding cloud platform
+* *grpc* - the runtime's gRPC API server
+
 If you want to target a particular version of Pandas, pin it alongside the extra:
 
 .. code-block::
@@ -182,3 +190,62 @@ A model is free to use any other third-party package for its own logic - for exa
 have nothing to do with the runtime's extras mechanism; install them the same way you would for
 any Python project, and record them in your own project's *requirements.txt* alongside the
 runtime itself.
+
+
+Running the tutorial examples
+-----------------------------
+
+The examples for these tutorials are in the |examples_repo|.
+They are laid out in the same way as the project above, with config files in *config/*, source code in
+*src/* and data files in *data/*. To install everything the examples need, including the packages
+used by the file IO and model resources examples, run this from the examples folder:
+
+.. code-block::
+    :class: container
+
+    pip install -r requirements.txt
+
+The example models import each other using the *tutorial* package, so the *src* folder needs to be
+on the Python path. In PyCharm, mark *src* as a sources root. From the command line, set the
+*PYTHONPATH* environment variable before running an example:
+
+.. tab-set::
+
+    .. tab-item:: Windows
+        :sync: platform_windows
+
+        .. code-block:: batch
+            :class: container
+
+            set PYTHONPATH=src
+            python src\tutorial\hello_world.py
+
+    .. tab-item:: macOS / Linux
+        :sync: platform_linux
+
+        .. code-block:: shell
+            :class: container
+
+            export PYTHONPATH=src
+            python src/tutorial/hello_world.py
+
+
+Launching models and jobs
+-------------------------
+
+The runtime offers three ways to launch a model or job locally:
+
+* :py:func:`launch_model() <tracdap.rt.launch.launch_model>` runs a single model class, with the
+  job config supplying the parameters, inputs and outputs. This is used in most of the tutorials.
+* :py:func:`launch_job() <tracdap.rt.launch.launch_job>` runs a job config on its own. Use this for
+  jobs that name their models in the config, such as flows, or that have no model, such as import
+  and export jobs.
+* The command line launcher, ``python -m tracdap.rt.launch``, runs a job config from the command line
+  or an IDE run configuration (see :doc:`chaining`).
+
+:py:func:`launch_model() <tracdap.rt.launch.launch_model>` and
+:py:func:`launch_job() <tracdap.rt.launch.launch_job>` run in dev mode by default. In dev mode, relative
+config paths are resolved against the current working directory and then its parent directories,
+and :py:func:`launch_model() <tracdap.rt.launch.launch_model>` also searches from the directory
+containing the model. The command line launcher does not search: relative paths are resolved
+against the current working directory only, and dev mode must be turned on with ``--dev-mode``.

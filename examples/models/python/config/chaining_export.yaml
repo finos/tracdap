@@ -1,22 +1,25 @@
+
 job:
   runFlow:
 
-    flow: ./flow_export_flow.yaml
+    flow: ./chaining_export_flow.yaml
 
     parameters:
       eur_usd_rate: 1.2071
       default_weighting: 1.5
       filter_defaults: false
+      filter_region: munster
       storage_key: exported_data
-      export_comment: "Exporting some example data from a flow"
+      export_comment: "Profit by region, exported from the chaining flow"
 
     inputs:
       customer_loans: "inputs/loan_final313_100.csv"
 
     outputs:
-      profit_by_region: "outputs/flow_export/profit_by_region.csv"
+      profit_by_region: "outputs/chaining_export/profit_by_region.csv"
 
     models:
+      customer_data_filter: tutorial.chaining.CustomerDataFilter
       pnl_aggregation: tutorial.using_data.PnlAggregation
       data_export: tutorial.data_export.DataExportExample
 

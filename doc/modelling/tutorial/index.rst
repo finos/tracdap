@@ -16,9 +16,13 @@ Modelling Tutorial
     ./hello_world
     ./using_data
     ./file_io
+    ./model_resources
     ./structured_objects
     ./using_polars
     ./optional_io
     ./dynamic_io
     ./chaining
     ./runtime_metadata
+    ./importing_data
+    ./exporting_data
+    ./export_models

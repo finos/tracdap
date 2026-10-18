@@ -13,7 +13,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import typing as tp
 import tracdap.rt.api.experimental as trac
 
 import tutorial.schemas as schemas
@@ -32,7 +31,7 @@ class DataExportExample(trac.TracDataExport):
 
         profit_by_region = trac.load_schema(schemas, "profit_by_region.csv")
 
-        return {"profit_by_region": trac.ModelInputSchema(profit_by_region)}
+        return {"profit_by_region": trac.define_input(profit_by_region, label="Profit by region")}
 
     def run_model(self, ctx: trac.TracDataContext):
 
@@ -71,32 +70,6 @@ class DataExportExample(trac.TracDataExport):
             comments=export_comment)
 
 
-class SimpleCsvExport(trac.TracDataExport):
-
-    def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
-
-        return trac.define_parameters(
-            trac.P("storage_key", trac.STRING, "TRAC external storage key"),
-            trac.P("export_file", trac.STRING, "Path of the exported CSV file, relative to the storage location"))
-
-    def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
-
-        dataset_schema = trac.load_schema(schemas, "profit_by_region.csv")
-
-        return {"dataset": trac.ModelInputSchema(dataset_schema)}
-
-    def run_model(self, ctx: trac.TracDataContext):
-
-        dataset = ctx.get_pandas_table("dataset")
-
-        storage_key = ctx.get_parameter("storage_key")
-        storage = ctx.get_file_storage(storage_key)
-        export_file = ctx.get_parameter("export_file")
-
-        with storage.write_byte_stream(export_file) as stream:
-            dataset.to_csv(stream, index=False)
-
-
 if __name__ == "__main__":
     import tracdap.rt.launch as launch
-    launch.launch_model(DataExportExample, "config/data_export.yaml", "config/sys_config.yaml")
+    launch.launch_job("config/chaining_export.yaml", "config/sys_config.yaml", dev_mode=True)

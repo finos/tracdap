@@ -24,11 +24,11 @@ First, here is a new model that we can use to build the chain:
     :linenos:
     :lineno-start: 22
 
-The model takes a single parameter, ``filter_region``, and filers out any records in the
+The model takes a single parameter, ``filter_region``, and filters out any records in the
 dataset that match that region. The schema of the input and output datasets are the same.
 
 Notice that that input dataset key, ``customer_loans``, is the same key we used in the
-``PnLAggregation`` model. Since this input is expected to refer to the same dataset, it
+``PnlAggregation`` model. Since this input is expected to refer to the same dataset, it
 makes sense to give it the same key. The output key, ``filtered_loans``, is different so
 we will have to tell the runtime how to connect these models together.
 
@@ -55,7 +55,7 @@ to connect the ``filtered_loans`` output of the filter model to the ``customer_l
 the aggregation model.
 
 In this example the input and output nodes will be connected automatically, because their names
-mach the appropriate model inputs and outputs. If we wanted to define those extra two edges
+match the appropriate model inputs and outputs. If we wanted to define those extra two edges
 explicitly, it would look like this:
 
 .. code-block:: yaml

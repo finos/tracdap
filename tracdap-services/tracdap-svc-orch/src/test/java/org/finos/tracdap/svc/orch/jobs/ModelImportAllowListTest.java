@@ -46,6 +46,8 @@ public class ModelImportAllowListTest {
     private static final String TEST_TENANT = "ACME_CORP";
     private static final String E2E_CONFIG = "config/trac-e2e.yaml";
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
+    private static final String EXAMPLE_MODELS_PATH = "examples/models/python/src";
+    private static final String RUNTIME_TEST_MODELS_PATH = "tracdap-runtime/python/test";
 
     private static final Set<JobStatusCode> COMPLETED_STATES = Set.of(
             JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
@@ -68,7 +70,7 @@ public class ModelImportAllowListTest {
     @Test @Order(101)
     void importModel_refused() {
 
-        var importModel = modelStub("tutorial.data_import.SimpleDataImport");
+        var importModel = modelStub(RUNTIME_TEST_MODELS_PATH, "tracdap_test.resources.test_models.TestImportModel");
 
         jobId_importModel = Helpers.startModelImport(platform, TEST_TENANT, importModel, List.of(), List.of());
     }
@@ -88,7 +90,7 @@ public class ModelImportAllowListTest {
     @Test @Order(201)
     void standardModel_accepted() {
 
-        var standardModel = modelStub("tutorial.using_data.PnlAggregation");
+        var standardModel = modelStub(EXAMPLE_MODELS_PATH, "tutorial.using_data.PnlAggregation");
 
         jobId_standardModel = Helpers.startModelImport(platform, TEST_TENANT, standardModel, List.of(), List.of());
     }
@@ -101,14 +103,14 @@ public class ModelImportAllowListTest {
         Assertions.assertEquals(ModelType.STANDARD_MODEL, modelTag.getDefinition().getModel().getModelType());
     }
 
-    private static ModelDefinition modelStub(String entryPoint) {
+    private static ModelDefinition modelStub(String path, String entryPoint) {
 
         try {
 
             return ModelDefinition.newBuilder()
                     .setLanguage("python")
                     .setRepository("TRAC_LOCAL_REPO")
-                    .setPath("examples/models/python/src")
+                    .setPath(path)
                     .setEntryPoint(entryPoint)
                     .setVersion(GitHelpers.getCurrentCommit())
                     .build();

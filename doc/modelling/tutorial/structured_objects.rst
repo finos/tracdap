@@ -28,15 +28,17 @@ another and can contain enums, dictionaries and other common Python types.
 To turn a dataclass into a schema, use :py:func:`define_struct() <tracdap.rt.api.define_struct>`.
 The runtime validates the supplied type and builds a matching
 :py:class:`SchemaDefinition <tracdap.rt.metadata.SchemaDefinition>`, which can be used with
-:py:func:`define_input() <tracdap.rt.api.define_input>` in the usual way. For outputs, the
-shorthand :py:func:`define_output_struct() <tracdap.rt.api.define_output_struct>` combines both
-steps.
+:py:func:`define_input() <tracdap.rt.api.define_input>` and
+:py:func:`define_output() <tracdap.rt.api.define_output>` in the usual way. The shorthands
+:py:func:`define_input_struct() <tracdap.rt.api.define_input_struct>` and
+:py:func:`define_output_struct() <tracdap.rt.api.define_output_struct>` combine both steps,
+and are used in this example.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/structured_objects.py
     :name: structured_objects_py_io
     :language: python
     :class: container
-    :lines: 56 - 67
+    :lines: 56 - 66
     :linenos:
     :lineno-start: 56
 
@@ -46,17 +48,17 @@ Reading and writing structured data
 
 Structured inputs and outputs are read and written with
 :py:meth:`get_struct() <tracdap.rt.api.TracContext.get_struct>` and
-:py:meth:`put_struct() <tracdap.rt.api.TracContext.put_struct>`, passing the dataclass type to use for
-the result. The runtime returns (and validates) an instance of that type, so the rest of the model
+:py:meth:`put_struct() <tracdap.rt.api.TracContext.put_struct>`. When reading, pass the dataclass type
+to use for the result. The runtime returns (and validates) an instance of that type, so the rest of the model
 code can work with ordinary Python objects and attribute access, rather than looking up fields by name.
 
 .. literalinclude:: ../../../examples/models/python/src/tutorial/structured_objects.py
     :name: structured_objects_py_run_model
     :language: python
     :class: container
-    :lines: 69 - 81
+    :lines: 68 - 80
     :linenos:
-    :lineno-start: 69
+    :lineno-start: 68
 
 .. note::
     The type passed to :py:meth:`get_struct() <tracdap.rt.api.TracContext.get_struct>` does not have
