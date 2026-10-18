@@ -74,8 +74,8 @@ class _StaticApiHook(_abc.ABC):
 
     @_abc.abstractmethod
     def define_attributes(
-            self, *attrs: _tp.Union[_meta.TagUpdate, _tp.List[_meta.TagUpdate]]) \
-            -> _tp.List[_meta.TagUpdate]:
+            self, *attrs: _tp.Union[_Named[_meta.Value], _tp.List[_Named[_meta.Value]]]) \
+            -> _tp.Dict[str, _meta.Value]:
 
         pass
 
@@ -84,7 +84,7 @@ class _StaticApiHook(_abc.ABC):
             self, attr_name: str, attr_value: _tp.Any,
             attr_type: _tp.Optional[_meta.BasicType] = None,
             categorical: bool = False) \
-            -> _meta.TagUpdate:
+            -> _Named[_meta.Value]:
 
         pass
 

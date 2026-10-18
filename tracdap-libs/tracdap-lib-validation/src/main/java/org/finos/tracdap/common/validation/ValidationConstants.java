@@ -57,8 +57,8 @@ public class ValidationConstants {
     // Anything starting with a slash is absolute
     // UNC-style paths and empty path segments are picked up by the double slash
     public static final Pattern RELATIVE_PATH_ILLEGAL_CHARS = Pattern.compile(".*[:].*");
-    public static final Pattern RELATIVE_PATH_IS_ABSOLUTE = Pattern.compile("\\A[/\\\\]");
-    public static final Pattern RELATIVE_PATH_DOUBLE_SLASH = Pattern.compile("[/\\\\]{2}");
+    public static final Pattern RELATIVE_PATH_IS_ABSOLUTE = Pattern.compile("\\A[/\\\\].*");
+    public static final Pattern RELATIVE_PATH_DOUBLE_SLASH = Pattern.compile(".*[/\\\\]{2}.*");
 
     // Data item key is a logical key not a path
     // But a path-like structure is used to create unique, deterministic keys

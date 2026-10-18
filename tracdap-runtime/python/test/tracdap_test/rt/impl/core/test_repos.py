@@ -20,6 +20,7 @@ import subprocess as sp
 
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
+import tracdap.rt.exceptions as ex
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa
@@ -99,6 +100,34 @@ class ModelRepositoriesTest(unittest.TestCase):
         safe_package_dir = util.windows_unc_path(package_dir)
 
         self.assertTrue(safe_package_dir.joinpath("tutorial/hello_world.py").exists())
+
+    def test_checkout_local_path_outside_repo(self):
+
+        local_repo_url = pathlib.Path(__file__) \
+            .parent \
+            .joinpath("../../../../../../..") \
+            .resolve()
+
+        sys_config = config.RuntimeConfig()
+        sys_config.resources["local_test"] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.MODEL_REPOSITORY,
+            protocol="local",
+            properties={"repoUrl": str(local_repo_url)})
+
+        repo_mgr = repos.RepositoryManager(sys_config)
+        repo = repo_mgr.get_repository("local_test")
+
+        for model_path in [str(self.scratch_dir), "../outside_repo", "examples/../../outside_repo"]:
+
+            model_def = meta.ModelDefinition(
+                language="python",
+                repository="local_test",
+                entryPoint="tutorial.hello_world.HelloWorldModel",
+                path=model_path)
+
+            package = self._package_for_model_def(model_def)
+
+            self.assertRaises(ex.EModelRepoRequest, lambda: repo.checkout(package, self.scratch_dir))
 
     @staticmethod
     def _package_for_model_def(model_def: meta.ModelDefinition) -> repos.ModelPackage:

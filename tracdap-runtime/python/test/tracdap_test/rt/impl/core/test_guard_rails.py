@@ -68,3 +68,17 @@ class PythonGuardRailsTest(unittest.TestCase):
         test_model = test_model_class()
 
         self.assertRaises(ex.EModelValidation, lambda: test_model.run_model(None))  # noqa
+
+    def test_memoryview_type_inside_model(self):
+
+        results = []
+
+        def use_memoryview_type():
+            results.append(isinstance(memoryview(b"abc"), memoryview))
+            results.append(isinstance(b"abc", bytes | bytearray | memoryview))
+
+        test_model_class = create_model(use_memoryview_type)
+        test_model = test_model_class()
+        test_model.run_model(None)  # noqa
+
+        self.assertEqual([True, True], results)

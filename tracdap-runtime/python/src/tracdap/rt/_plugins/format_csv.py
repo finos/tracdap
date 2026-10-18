@@ -47,8 +47,8 @@ class CsvStorageFormat(IDataFormat):
     __DATE_FORMAT = "date_format"
     __DATETIME_FORMAT = "datetime_format"
 
-    __TRUE_VALUES = ['true', 't', 'yes' 'y', '1']
-    __FALSE_VALUES = ['false', 'f', 'no' 'n', '0']
+    __TRUE_VALUES = ['true', 't', 'yes', 'y', '1']
+    __FALSE_VALUES = ['false', 'f', 'no', 'n', '0']
 
     def __init__(self, properties: tp.Dict[str, tp.Any] = None):
 

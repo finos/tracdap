@@ -21,6 +21,7 @@ import unittest
 import tracdap.rt.api as api
 import tracdap.rt.metadata as meta
 import tracdap.rt.config as config
+import tracdap.rt.exceptions as ex
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa
@@ -59,6 +60,16 @@ class SampleModel(api.TracModel):
 
     def run_model(self, ctx: api.TracContext):
         pass
+
+
+def sample_model_with_attrs(*attrs):
+
+    class SampleModelWithAttrs(SampleModel):
+
+        def define_attributes(self) -> tp.Dict[str, meta.Value]:
+            return api.define_attributes(*attrs)
+
+    return SampleModelWithAttrs
 
 
 class ImportModelTest(unittest.TestCase):
@@ -198,3 +209,45 @@ class ImportModelTest(unittest.TestCase):
         self.assertEqual(meta.BasicType.FLOAT, output_table_schema.fields[2].fieldType)
         self.assertEqual("Output field 3", output_table_schema.fields[2].label)
         self.assertEqual(True, output_table_schema.fields[0].businessKey)
+
+    def test_scan_model_attrs(self):
+
+        sys_config = config.RuntimeConfig()
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
+
+        model_class = sample_model_with_attrs(
+            api.A("model_family", "pnl_aggregation"),
+            api.A("classifiers", ["loans", "uk"], attr_type=api.STRING))
+
+        model_attrs = loader.scan_model_attrs(model_class)
+
+        self.assertIsInstance(model_attrs, dict)
+        self.assertEqual({"model_family", "classifiers"}, set(model_attrs.keys()))
+        self.assertIsInstance(model_attrs["model_family"], meta.Value)
+
+        model_def = loader.scan_model(meta.ModelDefinition(), model_class)
+        self.assertIsInstance(model_def, meta.ModelDefinition)
+
+    def test_scan_model_attrs_reserved(self):
+
+        sys_config = config.RuntimeConfig()
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
+
+        for attr_name in ["trac_model_entry_point", "_hidden_attr"]:
+
+            model_class = sample_model_with_attrs(api.A(attr_name, "value"))
+
+            self.assertRaises(ex.EModelValidation, lambda: loader.scan_model_attrs(model_class))
+            self.assertRaises(ex.EModelValidation, lambda: loader.scan_model(meta.ModelDefinition(), model_class))
+
+    def test_scan_model_attrs_duplicate(self):
+
+        sys_config = config.RuntimeConfig()
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
+
+        model_class = sample_model_with_attrs(api.A("model_family", "a"), api.A("Model_Family", "b"))
+
+        self.assertRaises(ex.EModelValidation, lambda: loader.scan_model_attrs(model_class))
