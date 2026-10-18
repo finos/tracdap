@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.orch.jobs;
 import org.finos.tracdap.common.exception.EExecutorValidation;
 import org.finos.tracdap.common.exception.EJobResult;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.config.JobConfig;
@@ -130,6 +131,12 @@ public class ImportModelJob implements IJobLogic {
 
         var modelObj = jobResult.getObjectsOrThrow(modelKey);
         var modelAttrs = jobResult.getAttrsOrDefault(modelKey, JobResultAttrs.getDefaultInstance()).toBuilder();
+
+        // Attrs in the job result are defined in model code, they cannot set controlled attrs
+        for (var attr : modelAttrs.getAttrsList()) {
+            if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(attr.getAttrName()).matches())
+                throw new EJobResult(String.format("Model attribute [%s] is a reserved identifier", attr.getAttrName()));
+        }
 
         // Add attrs defined in the job
         var suppliedAttrs = jobConfig.getJob().getImportModel().getModelAttrsList();

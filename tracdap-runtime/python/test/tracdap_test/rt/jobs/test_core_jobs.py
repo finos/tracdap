@@ -86,6 +86,40 @@ class CoreJobsTest(unittest.TestCase):
                 rt.submit_job(job_config)
                 rt.wait_for_job(job_id)
 
+    def test_import_model_job_with_attrs(self):
+
+        job_id = util.new_object_id(meta.ObjectType.JOB)
+
+        job_def = meta.JobDefinition(
+            jobType=meta.JobType.IMPORT_MODEL,
+            importModel=meta.ImportModelJob(
+                language="python",
+                repository="unit_test_repo",
+                package="trac-example-models",
+                version=self.commit_hash,
+                entryPoint="tutorial.using_polars.PnlAggregationPolars",
+                path="examples/models/python/src"))
+
+        job_config = cfg.JobConfig(job_id, job_def)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+
+            trac_runtime = runtime.TracRuntime(self.sys_config, scratch_dir=tmpdir)
+            trac_runtime.pre_start()
+
+            with trac_runtime as rt:
+                rt.submit_job(job_config)
+                job_result = rt.wait_for_job(job_id)
+
+        self.assertEqual(1, len(job_result.attrs))
+
+        model_attrs = next(iter(job_result.attrs.values())).attrs
+        attr_values = {attr.attrName: types.MetadataCodec.decode_value(attr.value) for attr in model_attrs}
+
+        self.assertEqual("retail_products", attr_values["business_segment"])
+        self.assertEqual(["loans", "uk", "examples"], attr_values["classifiers"])
+        self.assertTrue(all(attr.operation == meta.TagOperation.CREATE_OR_REPLACE_ATTR for attr in model_attrs))
+
     def test_import_model_job_new_version(self):
 
         prior_model_id = util.new_object_id(meta.ObjectType.MODEL)

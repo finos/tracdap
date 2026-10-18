@@ -27,7 +27,7 @@ from .hook import _Named
 from tracdap.rt.metadata import *  # DOCGEN_REMOVE
 
 
-def define_attributes(*attributes: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) -> _tp.List[TagUpdate]:
+def define_attributes(*attributes: _tp.Union[_Named[Value], _tp.List[_Named[Value]]]) -> _tp.Dict[str, Value]:
 
     """
     Define a set of attributes to catalogue and describe a model
@@ -44,9 +44,9 @@ def define_attributes(*attributes: _tp.Union[TagUpdate, _tp.List[TagUpdate]]) ->
     :return: A set of model attributes, in the correct format to return from
              :py:meth:`TracModel.define_attributes() <tracdap.rt.api.TracModel.define_attributes>`
 
-    :type attributes: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>` |
-                  List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
-    :rtype: List[:py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`]
+    :type attributes: _Named[:py:class:`Value <tracdap.rt.metadata.Value>`] |
+                  List[_Named[:py:class:`Value <tracdap.rt.metadata.Value>`]]
+    :rtype: Dict[str, :py:class:`Value <tracdap.rt.metadata.Value>`]
     """
 
     sa = _StaticApiHook.get_instance()
@@ -57,7 +57,7 @@ def define_attribute(
         attr_name: str, attr_value: _tp.Any,
         attr_type: _tp.Optional[BasicType] = None,
         categorical: bool = False) \
-        -> TagUpdate:
+        -> _Named[Value]:
 
     """
     Define an individual model attribute
@@ -83,7 +83,7 @@ def define_attribute(
     :type attr_value: Any
     :type attr_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` | None
     :type categorical: bool
-    :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
+    :rtype: _Named[:py:class:`Value <tracdap.rt.metadata.Value>`]
     """
 
     sa = _StaticApiHook.get_instance()
@@ -94,7 +94,7 @@ def A(  # noqa
         attr_name: str, attr_value: _tp.Any,
         attr_type: _tp.Optional[BasicType] = None,
         categorical: bool = False) \
-        -> TagUpdate:
+        -> _Named[Value]:
 
     """
     Shorthand alias for :py:func:`define_attribute`
@@ -106,7 +106,7 @@ def A(  # noqa
     :type attr_value: Any
     :type attr_type: :py:class:`BasicType <tracdap.rt.metadata.BasicType>` | None
     :type categorical: bool
-    :rtype: :py:class:`TagUpdate <tracdap.rt.metadata.TagUpdate>`
+    :rtype: _Named[:py:class:`Value <tracdap.rt.metadata.Value>`]
     """
 
     return define_attribute(attr_name, attr_value, attr_type, categorical)

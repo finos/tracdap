@@ -223,6 +223,7 @@ class ModelLoader:
                 model_def.modelType = _meta.ModelType.STANDARD_MODEL
 
             _val.quick_validate_model_def(model_def)
+            _val.quick_validate_model_attrs(attributes)
 
             for attr_name, attr_value in attributes.items():
                 self.__log.info(f"Attribute [{attr_name}] - {_types.MetadataCodec.decode_value(attr_value)}")
@@ -262,7 +263,11 @@ class ModelLoader:
             model: _api.TracModel = _api.TracModel.__new__(model_class)
             model_class.__init__(model)
 
-            return model.define_attributes() or dict()
+            attributes = model.define_attributes() or dict()
+
+            _val.quick_validate_model_attrs(attributes)
+
+            return attributes
 
         except Exception as e:
 

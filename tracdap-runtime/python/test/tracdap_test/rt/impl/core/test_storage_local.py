@@ -253,6 +253,25 @@ class LocalCsvFormatStorageTest(unittest.TestCase, LocalStorageTest):
                 f"csv_garbled_data_2.{self.storage_format}",
                 self.storage_format, schema, storage_options))
 
+    def test_lenient_boolean_values(self):
+
+        storage_options = {"lenient_csv_parser": True}
+
+        true_values = ["true", "t", "yes", "y", "1", "TRUE", "Yes"]
+        false_values = ["false", "f", "no", "n", "0", "FALSE", "No"]
+
+        csv_text = "bool_field\n" + "\n".join(true_values + false_values) + "\n"
+        schema = pa.schema([("bool_field", pa.bool_())])
+
+        self.file_storage.write_bytes(f"csv_boolean_values.{self.storage_format}", csv_text.encode("utf-8"))
+
+        table = self.storage.read_table(
+            f"csv_boolean_values.{self.storage_format}",
+            self.storage_format, schema, storage_options)
+
+        expected = [True] * len(true_values) + [False] * len(false_values)
+        self.assertEqual(expected, table.column(0).to_pylist())
+
     def test_csv_nan(self):
 
         # Test reading in CSV NaN with the strict (Apache Arrow) CSV parser

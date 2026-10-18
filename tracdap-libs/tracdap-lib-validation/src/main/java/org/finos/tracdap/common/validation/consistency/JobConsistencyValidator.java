@@ -610,9 +610,8 @@ public class JobConsistencyValidator {
     private static ValidationContext inputMatchesSchema(String inputName, TagSelector inputSelector, Node<NodeMetadata> inputNode, ValidationContext ctx) {
 
         if (inputNode.payload().modelInputSchema() == null)
-            ctx.error("Type inference failed for input [" + inputName + "]");
+            return ctx.error("Type inference failed for input [" + inputName + "]");
 
-        // Inference failed, we can still check that the metadata is available
         return inputMatchesSchema(inputName, inputSelector, inputNode.payload().modelInputSchema(), ctx);
     }
 
@@ -638,7 +637,6 @@ public class JobConsistencyValidator {
                     inputName, inputDef.getObjectType(), inputObject.getObjectType()));
         }
 
-        // In case inference failed, inputDef == null so stop here
         if (ctx.failed())
             return ctx;
 
