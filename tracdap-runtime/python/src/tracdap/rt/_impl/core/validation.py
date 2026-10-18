@@ -62,6 +62,10 @@ def quick_validate_model_def(model_def: meta.ModelDefinition):
     StaticValidator.quick_validate_model_def(model_def)
 
 
+def quick_validate_model_attrs(model_attrs: tp.Dict[str, meta.Value]):
+    StaticValidator.quick_validate_model_attrs(model_attrs)
+
+
 def is_primitive_type(basic_type: meta.BasicType) -> bool:
     return StaticValidator.is_primitive_type(basic_type)
 
@@ -513,14 +517,11 @@ class StaticValidator:
         # This will be important when comprehensive metadata validation is added to the runtime
         # If the standard static validator is used, validation errors must be caught and re-raised as EModelValidation
 
-        attrs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.Value], model_def.staticAttributes)
         params_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelParameter], model_def.parameters)
         inputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelInputSchema], model_def.inputs)
         outputs_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelOutputSchema], model_def.outputs)
         resources_type_check = _TypeValidator.check_type(tp.Dict[str, meta.ModelResource], model_def.resources)
 
-        if not attrs_type_check:
-            cls._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
         if not params_type_check:
             cls._fail(f"Invalid model parameters: define_parameters() returned the wrong type")
         if not inputs_type_check:
@@ -530,20 +531,16 @@ class StaticValidator:
         if not resources_type_check:
             cls._fail(f"Invalid model resources: define_resources() returned the wrong type")
 
-        cls._valid_identifiers(model_def.staticAttributes.keys(), "model attribute")
         cls._valid_identifiers(model_def.parameters.keys(), "model parameter")
         cls._valid_identifiers(model_def.inputs.keys(), "model input")
         cls._valid_identifiers(model_def.outputs.keys(), "model output")
         cls._valid_identifiers(model_def.resources.keys(), "model resource")
 
-        cls._case_insensitive_duplicates(model_def.staticAttributes.keys(), "model attribute")
         cls._case_insensitive_duplicates(model_def.parameters.keys(), "model parameter")
         cls._case_insensitive_duplicates(model_def.inputs.keys(), "model input")
         cls._case_insensitive_duplicates(model_def.outputs.keys(), "model output")
         cls._case_insensitive_duplicates(model_def.resources.keys(), "model resource")
 
-        # Note unique context does not include static attributes
-        # They are not part of the runtime context, so there is no need to constrain them
         unique_ctx = {}
         cls._unique_context_check(unique_ctx, model_def.parameters.keys(), "model parameter")
         cls._unique_context_check(unique_ctx, model_def.inputs.keys(), "model input")
@@ -554,6 +551,17 @@ class StaticValidator:
         cls._check_inputs_or_outputs(model_def.inputs)
         cls._check_inputs_or_outputs(model_def.outputs)
         cls._check_resources(model_def.resources)
+
+    @classmethod
+    def quick_validate_model_attrs(cls, model_attrs: tp.Dict[str, meta.Value]):
+
+        # Model attributes are applied to the model tag, they are not part of the runtime context
+
+        if not _TypeValidator.check_type(tp.Dict[str, meta.Value], model_attrs):
+            cls._fail(f"Invalid model attributes: define_attributes() returned the wrong type")
+
+        cls._valid_identifiers(model_attrs.keys(), "model attribute")
+        cls._case_insensitive_duplicates(model_attrs.keys(), "model attribute")
 
     @classmethod
     def quick_validate_schema(cls, schema: meta.SchemaDefinition):

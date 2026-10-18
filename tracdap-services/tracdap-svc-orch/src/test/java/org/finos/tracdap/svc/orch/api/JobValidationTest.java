@@ -1220,6 +1220,71 @@ public class JobValidationTest {
     }
 
     @Test
+    public void runFlow_inputSchemaNotInferred_unused() {
+
+        // The model bound to model_1 does not declare the input the flow connects to it
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1NoInput",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("other_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var runFlow = exportFlowJob()
+                .putModels("model_1", model1);
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Type inference failed for input [basic_data_input]");
+    }
+
+    @Test
+    public void runFlow_inputSchemaNotInferred_ambiguous() {
+
+        // One flow input feeds two models that declare incompatible schemas for it
+
+        var flow = FlowDefinition.newBuilder()
+                .putNodes("shared_input", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_a", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("shared_input").addOutputs("output_a").build())
+                .putNodes("model_b", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("shared_input").addOutputs("output_b").build())
+                .putNodes("output_a", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .putNodes("output_b", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(flowEdge("shared_input", null, "model_a", "shared_input"))
+                .addEdges(flowEdge("shared_input", null, "model_b", "shared_input"))
+                .addEdges(flowEdge("model_a", "output_a", "output_a", null))
+                .addEdges(flowEdge("model_b", "output_b", "output_b", null));
+
+        var flowId = metaClient.createObject(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(flow))
+                .build());
+
+        var modelA = createFlowModel(
+                "acme.models.test_model.ModelA", Map.of(),
+                Map.of("shared_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("output_a", SampleData.BASIC_TABLE_SCHEMA),
+                List.of());
+
+        var modelB = createFlowModel(
+                "acme.models.test_model.ModelB", Map.of(),
+                Map.of("shared_input", SampleData.BASIC_STRUCT_SCHEMA),
+                Map.of("output_b", SampleData.BASIC_TABLE_SCHEMA),
+                List.of());
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(MetadataUtil.selectorFor(flowId))
+                .putModels("model_a", modelA)
+                .putModels("model_b", modelB)
+                .putInputs("shared_input", basicDataSelector);
+
+        expectRunFlowInvalid(runFlow, Status.Code.FAILED_PRECONDITION, "Type inference failed for input [shared_input]");
+    }
+
+    @Test
     public void runFlow_exportNode_missingExportStorage() {
 
         var runFlow = exportFlowJob()
@@ -1442,7 +1507,9 @@ public class JobValidationTest {
 
         expectCaptureInvalid(badKey, Status.Code.INVALID_ARGUMENT, "storageKey");
 
-        for (var path : List.of("../loans.csv", "data/../../loans.csv", "C:\\loans.csv")) {
+        for (var path : List.of(
+                "../loans.csv", "data/../../loans.csv", "C:\\loans.csv",
+                "/data/loans.csv", "data//loans.csv", "\\data\\loans.csv")) {
 
             var badPath = ImportDataJob.newBuilder()
                     .putCaptures("loans", declaredCapture(path).build());

@@ -65,7 +65,11 @@ class LocalRepository(IModelRepository):
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> pathlib.Path:
 
-        checkout_path = pathlib.Path(self._repo_url).joinpath(model_def.path)
+        repo_path = pathlib.Path(self._repo_url)
+        checkout_path = repo_path.joinpath(model_def.path)
+
+        if not checkout_path.resolve().is_relative_to(repo_path.resolve()):
+            raise ex.EModelRepoRequest(f"Model path [{model_def.path}] is outside the repository")
 
         return checkout_path
 

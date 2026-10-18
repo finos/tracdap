@@ -74,7 +74,7 @@ def run_model_guard(operation: str = None, allow_callback: bool =False):
 
 class PythonGuardRails:
 
-    DANGEROUS_BUILTIN_FUNCTIONS = ["exec", "eval", "compile", "open", "input", "memoryview"]
+    DANGEROUS_BUILTIN_FUNCTIONS = ["exec", "eval", "compile", "open", "input"]
 
     DANGEROUS_STDLIB_FUNCTIONS = [
         ("sys", "exit")
@@ -94,8 +94,7 @@ class PythonGuardRails:
     REQUIRED_IMPORT_FUNCTIONS = {
         "exec": exec,
         "eval": eval,
-        "compile": compile,
-        "memoryview": memoryview
+        "compile": compile
     }
 
     @classmethod

@@ -74,7 +74,12 @@ class GitRepository(IModelRepository):
             self, model_def: meta.ModelDefinition,
             checkout_dir: pathlib.Path) -> pathlib.Path:
 
-        return checkout_dir.joinpath(model_def.path)
+        checkout_path = checkout_dir.joinpath(model_def.path)
+
+        if not checkout_path.resolve().is_relative_to(checkout_dir.resolve()):
+            raise ex.EModelRepoRequest(f"Model path [{model_def.path}] is outside the repository")
+
+        return checkout_path
 
     def checkout(self, model_def: meta.ModelDefinition, checkout_dir: pathlib.Path) -> pathlib.Path:
 

@@ -455,7 +455,7 @@ public class CommonValidators {
         var segments = path.split(ValidationConstants.PATH_SEPARATORS.pattern());
 
         var singleDotPredicate = ValidationConstants.PATH_SINGLE_DOT.asPredicate();
-        var doubleDotPredicate = ValidationConstants.PATH_SINGLE_DOT.asPredicate();
+        var doubleDotPredicate = ValidationConstants.PATH_DOUBLE_DOT.asPredicate();
 
         for (var segment : segments) {
 
