@@ -24,11 +24,15 @@ import org.finos.tracdap.svc.data.service.TenantStorageManager;
 
 import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ExecutorService;
 
 
 public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessagingApiImplBase {
+
+    private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
     private final TenantStorageManager tenantState;
     private final ExecutorService offloadExecutor;
@@ -55,10 +59,18 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
 
     public void configUpdateOffloaded(ConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        var status = tenantState.applyConfigUpdate(request);
+        try {
 
-        response.onNext(status);
-        response.onCompleted();
+            var status = tenantState.applyConfigUpdate(request);
+
+            response.onNext(status);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+
+            log.error("Config update failed: tenant = {}, {}", request.getTenant(), e.getMessage(), e);
+            response.onError(e);
+        }
     }
 
     @Override

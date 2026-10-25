@@ -199,4 +199,7 @@ service InternalMetadataApi {
 
   /// List available platform config entries, with optional filter criteria
   rpc listPlatformConfigEntries (PlatformConfigListRequest) returns (PlatformConfigListResponse);
+
+  /// Create a new tenant, with its storage and tenant config from the tenant template, in one transaction
+  rpc createTenant (CreateTenantRequest) returns (CreateTenantResponse);
 };

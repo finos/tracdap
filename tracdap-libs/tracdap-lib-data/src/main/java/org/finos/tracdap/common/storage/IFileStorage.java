@@ -33,6 +33,13 @@ public interface IFileStorage extends AutoCloseable {
 
     void start(EventLoopGroup eventLoopGroup);
 
+    /**
+     * Start the storage, creating its root first if the root is missing and the storage supports it.
+     */
+    default void start(EventLoopGroup eventLoopGroup, boolean createRoot) {
+        start(eventLoopGroup);
+    }
+
     void stop();
 
     @Override

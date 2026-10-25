@@ -125,7 +125,7 @@ class JdbcTenantImpl {
         }
     }
 
-    void activateTenant(Connection conn, String tenantCode, String description) throws SQLException {
+    short activateTenant(Connection conn, String tenantCode, String description) throws SQLException {
 
         var findNextId = "select max(tenant_id) from tenant";
         short nextId;
@@ -167,6 +167,8 @@ class JdbcTenantImpl {
 
             stmt.executeUpdate();
         }
+
+        return nextId;
     }
 
     void updateTenant(Connection conn, short tenantId, String description) throws SQLException {

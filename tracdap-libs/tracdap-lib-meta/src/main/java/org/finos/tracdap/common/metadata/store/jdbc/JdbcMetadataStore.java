@@ -134,6 +134,38 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
     }
 
     @Override
+    public void createTenant(TenantInfo tenantInfo, MetadataBatchUpdate batchUpdate) {
+
+        // The tenant map only holds committed tenants, so it is not loaded inside this transaction
+
+        wrapTransaction(conn -> {
+
+            prepareMappingTable(conn);
+
+            var tenantId = createTenant(conn, tenantInfo);
+
+            if (batchUpdate.getNewObjects() != null && !batchUpdate.getNewObjects().isEmpty())
+                saveNewObjects(conn, tenantId, batchUpdate.getNewObjects());
+
+            if (batchUpdate.getConfigEntries() != null && !batchUpdate.getConfigEntries().isEmpty())
+                saveConfigEntries(conn, tenantId, batchUpdate.getConfigEntries());
+        });
+    }
+
+    private short createTenant(Connection conn, TenantInfo tenantInfo) {
+
+        try {
+            return tenants.activateTenant(conn, tenantInfo.getTenantCode(), tenantInfo.getDescription());
+        }
+        catch (SQLException error) {
+
+            MetadataErrors.duplicateTenant(error, dialect, tenantInfo.getTenantCode());
+
+            throw MetadataErrors.catchAll(error, dialect);
+        }
+    }
+
+    @Override
     public void updateTenant(TenantInfo tenantInfo) {
 
         wrapTransaction(conn -> {
@@ -266,13 +298,18 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
         }
     }
 
-    private void saveNewObjects(Connection conn, String tenant, List<Tag> tags) {
+    private void saveNewObjects(Connection conn, String tenant, List<Tag> tags) throws SQLException {
+
+        var tenantId = tenants.getTenantId(conn, tenant);
+
+        saveNewObjects(conn, tenantId, tags);
+    }
+
+    private void saveNewObjects(Connection conn, short tenantId, List<Tag> tags) {
 
         var parts = separateParts(tags);
 
         try {
-
-            var tenantId = tenants.getTenantId(conn, tenant);
 
             long[] objectPk = writeBatch.writeObjectId(conn, tenantId, parts);
             long[] defPk = writeBatch.writeObjectDefinition(conn, tenantId, objectPk, parts);
@@ -519,13 +556,18 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
         });
     }
 
-    private void saveConfigEntries(Connection conn, String tenant, List<ConfigEntry> configEntries) {
+    private void saveConfigEntries(Connection conn, String tenant, List<ConfigEntry> configEntries) throws SQLException {
+
+        var tenantId = tenants.getTenantId(conn, tenant);
+
+        saveConfigEntries(conn, tenantId, configEntries);
+    }
+
+    private void saveConfigEntries(Connection conn, short tenantId, List<ConfigEntry> configEntries) {
 
         var parts = configParts(configEntries);
 
         try {
-
-            var tenantId = tenants.getTenantId(conn, tenant);
 
             // Find prior versions for entries with version > 1
             var priorVersions = configPriorVersions(parts.configEntry);

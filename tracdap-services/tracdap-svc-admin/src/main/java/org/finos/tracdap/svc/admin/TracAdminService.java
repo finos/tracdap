@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.admin;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.finos.tracdap.api.AdminServiceProto;
+import org.finos.tracdap.api.TracStorageApiGrpc;
 import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
@@ -42,6 +43,7 @@ import io.grpc.ServerBuilder;
 import org.finos.tracdap.svc.admin.services.ConfigService;
 import org.finos.tracdap.svc.admin.services.NotifierService;
 import org.finos.tracdap.svc.admin.services.PlatformConfigService;
+import org.finos.tracdap.svc.admin.services.TenantService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -61,6 +63,7 @@ public class TracAdminService extends TracServiceBase {
 
     private ExecutorService executor;
     private ManagedChannel clientChannel;
+    private ManagedChannel storageChannel;
     private NotifierService notifier;
     private Server server;
 
@@ -93,12 +96,16 @@ public class TracAdminService extends TracServiceBase {
             var clientChannel = prepareClientChannel(platformConfig);
             var metadataClient = prepareMetadataClient(commonConcerns, clientChannel);
 
+            var storageChannel = prepareStorageChannel(platformConfig);
+            var storageClient = prepareStorageClient(commonConcerns, storageChannel);
+
             var secretService = configManager.getSecrets();
             var notifierService = new NotifierService(platformConfig, commonConcerns);
             var configService = new ConfigService(metadataClient, commonConcerns, secretService, notifierService);
             var platformConfigService = new PlatformConfigService(metadataClient, commonConcerns, secretService, notifierService);
+            var tenantService = new TenantService(metadataClient, storageClient, commonConcerns, notifierService);
 
-            var adminApi = new TracAdminApi(configService, platformConfigService);
+            var adminApi = new TracAdminApi(configService, platformConfigService, tenantService);
 
             var serverBuilder = ServerBuilder
                     .forPort(servicePort)
@@ -113,6 +120,7 @@ public class TracAdminService extends TracServiceBase {
                     .build();
 
             this.clientChannel = clientChannel;
+            this.storageChannel = storageChannel;
             this.notifier = notifierService;
 
             // Good to go, let's start!
@@ -142,6 +150,12 @@ public class TracAdminService extends TracServiceBase {
             return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
+        var storageClientDown = shutdownResource("Storage client", deadline, remaining -> {
+
+            storageChannel.shutdown();
+            return storageChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
         var notifierDown = shutdownResource("Notifier service", deadline, remainingTime -> {
 
             notifier.shutdown();
@@ -154,7 +168,7 @@ public class TracAdminService extends TracServiceBase {
             return executor.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && clientDown && notifierDown && executorDown)
+        if (serverDown && clientDown && storageClientDown && notifierDown && executorDown)
             return 0;
 
         if (!serverDown)
@@ -200,6 +214,27 @@ public class TracAdminService extends TracServiceBase {
     prepareMetadataClient(GrpcConcern commonConcerns, ManagedChannel separateChannel) {
 
         var client = InternalMetadataApiGrpc.newBlockingStub(separateChannel);
+        return commonConcerns.configureClient(client);
+    }
+
+    private ManagedChannel
+    prepareStorageChannel(PlatformConfig platformConfig) {
+
+        var storageTarget = RoutingUtils.serviceTarget(platformConfig, ConfigKeys.DATA_SERVICE_KEY);
+
+        log.info("Using (blocking) storage service at [{}:{}]",
+                storageTarget.getHost(), storageTarget.getPort());
+
+        return ManagedChannelBuilder
+                .forAddress(storageTarget.getHost(), storageTarget.getPort())
+                .usePlaintext()
+                .build();
+    }
+
+    private TracStorageApiGrpc.TracStorageApiBlockingStub
+    prepareStorageClient(GrpcConcern commonConcerns, ManagedChannel separateChannel) {
+
+        var client = TracStorageApiGrpc.newBlockingStub(separateChannel);
         return commonConcerns.configureClient(client);
     }
 }

@@ -121,6 +121,7 @@ public class TracMetadataService extends TracServiceBase {
             // Load top level config files
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
             var tenantConfigMap = ConfigHelpers.loadTenantConfigMap(configManager, platformConfig);
+            var tenantTemplate = ConfigHelpers.loadTenantTemplate(configManager, platformConfig);
 
             // Load the DAL service using the plugin loader mechanism
             var metadataStoreConfig = platformConfig.getMetadataStore();
@@ -140,7 +141,8 @@ public class TracMetadataService extends TracServiceBase {
             var writeService = new MetadataWriteService(metadataStore);
             var searchService = new MetadataSearchService(metadataStore);
             var configReader = new MetadataConfigReader(metadataStore);
-            var configService = new ConfigService(metadataStore, registry, configReader);
+            var configService = new ConfigService(metadataStore, registry, configReader, tenantTemplate);
+            configService.checkTenantTemplate();
             var platformConfigService = new PlatformConfigService(metadataStore, registry, configReader);
 
             var publicApi = new TracMetadataApi(readService, writeService, searchService, configService);

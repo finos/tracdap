@@ -45,6 +45,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.finos.tracdap.common.validation.ValidationConstants.LABEL_LENGTH_LIMIT;
+import static org.finos.tracdap.common.validation.ValidationConstants.TENANT_CODE_LENGTH_LIMIT;
 
 public class CommonValidators {
 
@@ -318,6 +319,21 @@ public class CommonValidators {
         return regexMatch(
                 MetadataConstants.VALID_IDENTIFIER, true,
                 "is not a valid identifier", value, ctx);
+    }
+
+    public static ValidationContext tenantCode(String value, ValidationContext ctx) {
+
+        ctx = identifier(value, ctx);
+
+        if (!ctx.failed() && value.length() > TENANT_CODE_LENGTH_LIMIT) {
+
+            var err = String.format("Value of [%s] exceeds the maximum length for a tenant code (%d characters)",
+                    ctx.fieldName(), TENANT_CODE_LENGTH_LIMIT);
+
+            return ctx.error(err);
+        }
+
+        return ctx;
     }
 
     public static ValidationContext qualifiedIdentifier(String value, ValidationContext ctx) {
