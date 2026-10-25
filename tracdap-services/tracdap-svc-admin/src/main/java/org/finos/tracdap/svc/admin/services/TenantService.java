@@ -22,6 +22,7 @@ import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.ConfigUpdateType;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.metadata.ResourceType;
 
@@ -75,6 +76,9 @@ public class TenantService {
     }
 
     public CheckTenantStorageResponse checkTenantStorage(CheckTenantStorageRequest request) {
+
+        if (storageClient == null)
+            throw new EConsistencyValidation("No data service is configured");
 
         var client = commonConcerns
                 .prepareClientCall(Context.current())

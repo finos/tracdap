@@ -96,8 +96,11 @@ public class TracAdminService extends TracServiceBase {
             var clientChannel = prepareClientChannel(platformConfig);
             var metadataClient = prepareMetadataClient(commonConcerns, clientChannel);
 
-            var storageChannel = prepareStorageChannel(platformConfig);
-            var storageClient = prepareStorageClient(commonConcerns, storageChannel);
+            // The admin service can run without a data service, only checkTenantStorage needs one
+            var storageChannel = platformConfig.containsServices(ConfigKeys.DATA_SERVICE_KEY)
+                    ? prepareStorageChannel(platformConfig) : null;
+            var storageClient = storageChannel != null
+                    ? prepareStorageClient(commonConcerns, storageChannel) : null;
 
             var secretService = configManager.getSecrets();
             var notifierService = new NotifierService(platformConfig, commonConcerns);
@@ -150,7 +153,7 @@ public class TracAdminService extends TracServiceBase {
             return clientChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        var storageClientDown = shutdownResource("Storage client", deadline, remaining -> {
+        var storageClientDown = storageChannel == null || shutdownResource("Storage client", deadline, remaining -> {
 
             storageChannel.shutdown();
             return storageChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
