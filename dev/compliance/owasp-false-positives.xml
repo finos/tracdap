@@ -342,4 +342,21 @@
         <cve>CVE-2026-56876</cve>
     </suppress>
 
+    <!-- undici (npm): CVE-2026-109932, CVE-2026-109383, CVE-2026-87018, CVE-2026-87029, CVE-2026-109869, -->
+    <!-- CVE-2026-109924, CVE-2026-109829 and CVE-2026-109841, reported against 7.29.1. -->
+    <!-- It is a build-only transitive dependency of owasp-dependency-check (the compliance tool -->
+    <!-- itself), used to download the dependency-check CLI and its data. -->
+    <!-- It is not part of the shipped web API package, so the issues are not reachable in our usage. -->
+    <suppress>
+        <packageUrl regex="true">^pkg:npm/undici@.*$</packageUrl>
+        <cve>CVE-2026-109932</cve>
+        <cve>CVE-2026-109383</cve>
+        <cve>CVE-2026-87018</cve>
+        <cve>CVE-2026-87029</cve>
+        <cve>CVE-2026-109869</cve>
+        <cve>CVE-2026-109924</cve>
+        <cve>CVE-2026-109829</cve>
+        <cve>CVE-2026-109841</cve>
+    </suppress>
+
 </suppressions>

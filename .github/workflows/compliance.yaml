@@ -175,12 +175,14 @@ jobs:
       # PYSEC-2026-3740 is the nltk path traversal (CVE-2026-81726), also ignored in the safety check above.
       # nltk is only pulled in as a dependency of safety itself, it is not a dependency of the dist wheels.
       # No nltk release after 3.10.3 exists, and advisories disagree on whether 3.10.3 is fixed.
+      # CVE-2026-112940, CVE-2026-112913 and CVE-2026-112907 are in filelock, fixed in 4.2.1. filelock is only pulled in
+      # as a dependency of safety itself, which requires filelock < 4.0, it is not a dependency of the dist wheels.
       - name: Pip-audit Dependency Check
         env:
           PIP_AUDIT_PROGRESS_SPINNER: "off"
         run: |
           pip install --quiet pip-audit
-          pip-audit --ignore-vuln PYSEC-2026-3740 --ignore-vuln CVE-2026-104851
+          pip-audit --ignore-vuln PYSEC-2026-3740 --ignore-vuln CVE-2026-104851 --ignore-vuln CVE-2026-112940 --ignore-vuln CVE-2026-112913 --ignore-vuln CVE-2026-112907
 
   web_api_compliance:
 
