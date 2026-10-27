@@ -32,6 +32,7 @@ import org.finos.tracdap.metadata.PlatformConfigEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -94,6 +95,10 @@ public class PlatformStateManager implements IPlatformConfigListener {
 
     public ObjectDefinition getConfig(String configKey) {
         return liveConfig.get(configKey);
+    }
+
+    public Map<String, ObjectDefinition> getAllConfig() {
+        return Map.copyOf(liveConfig);
     }
 
     @Override
