@@ -342,6 +342,13 @@ class MetadataErrors {
         throw new EMetadataNotFound(message, error);
     }
 
+    static EMetadataDuplicate duplicateTenant(String tenantCode) {
+
+        var message = MessageFormat.format(DUPLICATE_TENANT, tenantCode);
+
+        return new EMetadataDuplicate(message);
+    }
+
     static void duplicateTenant(SQLException error, IDialect dialect, String tenantCode) {
 
         var code = dialect.mapErrorCode(error);

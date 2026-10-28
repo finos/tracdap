@@ -30,8 +30,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.finos.tracdap.test.meta.SampleMetadata.*;
@@ -95,6 +101,107 @@ abstract class MetadataDalCreateTenantTest implements IMetadataStoreTest {
 
         Assertions.assertThrows(EMetadataDuplicate.class, () -> store.createTenant(tenantInfo(tenantCode), emptyBatch));
         Assertions.assertThrows(EMetadataDuplicate.class, () -> store.createTenant(tenantInfo(TEST_TENANT), emptyBatch));
+    }
+
+    @Test
+    void createTenant_concurrent() throws Exception {
+
+        // As the setup wizard does: five new tenants, each with its own name and config, created at the same time
+
+        var tenantCount = 5;
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(tenantCount);
+
+        try {
+
+            var tenantInfos = new ArrayList<TenantInfo>();
+            var configEntries = new ArrayList<ConfigEntry>();
+            var creates = new ArrayList<Future<?>>();
+
+            for (var i = 0; i < tenantCount; i++) {
+
+                var tenantInfo = tenantInfo(newTenantCode());
+                var config = dummyTag(dummyConfigDef(), true);
+                var entry = configEntry("trac_config", "trac_tenant_config", config);
+                var batch = new MetadataBatchUpdate(null, null, List.of(config), null, null, List.of(entry));
+
+                tenantInfos.add(tenantInfo);
+                configEntries.add(entry);
+
+                creates.add(executor.submit(() -> {
+                    start.await();
+                    store.createTenant(tenantInfo, batch);
+                    return null;
+                }));
+            }
+
+            start.countDown();
+
+            for (var create : creates)
+                create.get(30, TimeUnit.SECONDS);
+
+            var tenants = store.listTenants();
+
+            for (var i = 0; i < tenantCount; i++) {
+
+                // Each tenant keeps its own code, description and config, whichever internal ID it was given
+                var tenantCode = tenantInfos.get(i).getTenantCode();
+
+                Assertions.assertTrue(tenants.contains(tenantInfos.get(i)));
+                Assertions.assertEquals(List.of(configEntries.get(i)), store.listConfigEntries(tenantCode, "trac_config", false));
+            }
+        }
+        finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void createTenant_concurrentDuplicate() throws Exception {
+
+        // The same code created three times at once: one succeeds, the others are duplicates
+
+        var tenantCode = newTenantCode();
+        var start = new CountDownLatch(1);
+        var executor = Executors.newFixedThreadPool(3);
+
+        try {
+
+            var creates = new ArrayList<Future<?>>();
+
+            for (var i = 0; i < 3; i++) {
+                creates.add(executor.submit(() -> {
+                    start.await();
+                    store.createTenant(tenantInfo(tenantCode), new MetadataBatchUpdate(null, null, List.of(), null, null, List.of()));
+                    return null;
+                }));
+            }
+
+            start.countDown();
+
+            var created = 0;
+            var duplicates = 0;
+
+            for (var create : creates) {
+                try {
+                    create.get(30, TimeUnit.SECONDS);
+                    created++;
+                }
+                catch (ExecutionException e) {
+                    Assertions.assertInstanceOf(EMetadataDuplicate.class, e.getCause());
+                    duplicates++;
+                }
+            }
+
+            Assertions.assertEquals(1, created);
+            Assertions.assertEquals(2, duplicates);
+
+            var matching = store.listTenants().stream().filter(t -> t.getTenantCode().equals(tenantCode)).count();
+            Assertions.assertEquals(1, matching);
+        }
+        finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

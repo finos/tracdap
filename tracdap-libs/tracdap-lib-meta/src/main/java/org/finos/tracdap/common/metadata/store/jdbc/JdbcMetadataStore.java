@@ -24,6 +24,7 @@ import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.db.JdbcSetup;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 
@@ -44,6 +45,8 @@ import java.util.stream.Collectors;
 
 
 public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
+
+    private static final int MAX_TENANT_ID_ATTEMPTS = 20;
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -136,6 +139,29 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
     @Override
     public void createTenant(TenantInfo tenantInfo, MetadataBatchUpdate batchUpdate) {
 
+        // Tenant IDs are allocated as the highest so far plus one, so tenants created at the same time can be
+        // given the same ID. The database refuses all but one, and the others are created again with a new ID.
+
+        for (var attempt = 1; ; attempt++) {
+
+            try {
+                createTenantTransaction(tenantInfo, batchUpdate);
+                return;
+            }
+            catch (TenantIdTaken e) {
+
+                if (attempt >= MAX_TENANT_ID_ATTEMPTS) {
+                    var message = String.format("No tenant ID could be allocated for [%s]", tenantInfo.getTenantCode());
+                    throw new ETracInternal(message, e.getCause());
+                }
+
+                log.info("Tenant ID taken by another new tenant, trying again: [{}]", tenantInfo.getTenantCode());
+            }
+        }
+    }
+
+    private void createTenantTransaction(TenantInfo tenantInfo, MetadataBatchUpdate batchUpdate) {
+
         // The tenant map only holds committed tenants, so it is not loaded inside this transaction
 
         wrapTransaction(conn -> {
@@ -152,16 +178,28 @@ public class JdbcMetadataStore extends JdbcBaseDal implements IMetadataStore {
         });
     }
 
-    private short createTenant(Connection conn, TenantInfo tenantInfo) {
+    private short createTenant(Connection conn, TenantInfo tenantInfo) throws SQLException {
+
+        if (tenants.tenantExists(conn, tenantInfo.getTenantCode()))
+            throw MetadataErrors.duplicateTenant(tenantInfo.getTenantCode());
 
         try {
             return tenants.activateTenant(conn, tenantInfo.getTenantCode(), tenantInfo.getDescription());
         }
         catch (SQLException error) {
 
-            MetadataErrors.duplicateTenant(error, dialect, tenantInfo.getTenantCode());
+            // The code was free a moment ago, so the tenant ID was taken, or the code by a create at the same time
+            if (dialect.mapErrorCode(error) == JdbcErrorCode.INSERT_DUPLICATE)
+                throw new TenantIdTaken(error);
 
             throw MetadataErrors.catchAll(error, dialect);
+        }
+    }
+
+    private static class TenantIdTaken extends RuntimeException {
+
+        TenantIdTaken(SQLException cause) {
+            super(cause);
         }
     }
 
