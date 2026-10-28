@@ -72,6 +72,13 @@ public class AdminApiValidator {
     private static final Descriptors.FieldDescriptor PCLR_CONFIG_CLASS;
     private static final Descriptors.FieldDescriptor PCLR_INCLUDE_DELETED;
 
+    private static final Descriptors.Descriptor CREATE_TENANT_REQUEST;
+    private static final Descriptors.FieldDescriptor CTR_TENANT_CODE;
+    private static final Descriptors.FieldDescriptor CTR_DISPLAY_NAME;
+
+    private static final Descriptors.Descriptor CHECK_TENANT_STORAGE_REQUEST;
+    private static final Descriptors.FieldDescriptor CTS_TENANT_CODE;
+
     static {
 
         CONFIG_WRITE_REQUEST = ConfigWriteRequest.getDescriptor();
@@ -111,6 +118,13 @@ public class AdminApiValidator {
         PLATFORM_CONFIG_LIST_REQUEST = PlatformConfigListRequest.getDescriptor();
         PCLR_CONFIG_CLASS = field(PLATFORM_CONFIG_LIST_REQUEST, PlatformConfigListRequest.CONFIGCLASS_FIELD_NUMBER);
         PCLR_INCLUDE_DELETED = field(PLATFORM_CONFIG_LIST_REQUEST, PlatformConfigListRequest.INCLUDEDELETED_FIELD_NUMBER);
+
+        CREATE_TENANT_REQUEST = CreateTenantRequest.getDescriptor();
+        CTR_TENANT_CODE = field(CREATE_TENANT_REQUEST, CreateTenantRequest.TENANTCODE_FIELD_NUMBER);
+        CTR_DISPLAY_NAME = field(CREATE_TENANT_REQUEST, CreateTenantRequest.DISPLAYNAME_FIELD_NUMBER);
+
+        CHECK_TENANT_STORAGE_REQUEST = CheckTenantStorageRequest.getDescriptor();
+        CTS_TENANT_CODE = field(CHECK_TENANT_STORAGE_REQUEST, CheckTenantStorageRequest.TENANTCODE_FIELD_NUMBER);
     }
 
     @Validator(method = "createConfigObject")
@@ -380,6 +394,33 @@ public class AdminApiValidator {
 
         ctx = ctx.push(PCLR_INCLUDE_DELETED)
                 .apply(CommonValidators::optional)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "createTenant")
+    public static ValidationContext createTenant(CreateTenantRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(CTR_TENANT_CODE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::tenantCode)
+                .pop();
+
+        ctx = ctx.push(CTR_DISPLAY_NAME)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::labelLengthLimit)
+                .pop();
+
+        return ctx;
+    }
+
+    @Validator(method = "checkTenantStorage")
+    public static ValidationContext checkTenantStorage(CheckTenantStorageRequest msg, ValidationContext ctx) {
+
+        ctx = ctx.push(CTS_TENANT_CODE)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::tenantCode)
                 .pop();
 
         return ctx;

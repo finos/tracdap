@@ -187,7 +187,7 @@ public class TracDataService extends TracServiceBase {
             storageManager = new TenantStorageManager(
                     pluginManager, configManager, formats, serviceGroup,
                     metaClientBlocking, commonConcerns,
-                    tenantConfigMap);
+                    tenantConfigMap, offloadExecutor);
 
             // Load config for all tenants and initialize storage
             storageManager.init();

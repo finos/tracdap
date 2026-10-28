@@ -19,11 +19,16 @@ package org.finos.tracdap.svc.meta.services;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.ConfigUpdateType;
+import org.finos.tracdap.api.internal.InternalMetadataProto;
 import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
+import org.finos.tracdap.common.exception.EConsistencyValidation;
+import org.finos.tracdap.common.exception.EStartup;
+import org.finos.tracdap.common.exception.EValidation;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -36,8 +41,10 @@ import org.finos.tracdap.common.service.ConfigWrite;
 import org.finos.tracdap.common.service.IConfigReader;
 import org.finos.tracdap.common.service.IConfigWriteHook;
 import org.finos.tracdap.common.validation.Validator;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
+import com.google.protobuf.Descriptors;
 import io.grpc.Context;
 
 import java.util.ArrayList;
@@ -47,20 +54,127 @@ import java.util.stream.Collectors;
 
 public class ConfigService {
 
+    private static final Descriptors.MethodDescriptor CREATE_CONFIG_METHOD = InternalMetadataProto.getDescriptor()
+            .findServiceByName("InternalMetadataApi")
+            .findMethodByName("createConfigObject");
+
+    private static final String TEMPLATE_CHECK_TENANT = "TEMPLATE_CHECK";
+
     private final Validator validator;
     private final IMetadataStore metadataStore;
     private final BundleLoader bundleLoader;
     private final UuidFactory objectIdFactory;
     private final PluginRegistry registry;
     private final IConfigReader configReader;
+    private final TenantConfig tenantTemplate;
 
-    public ConfigService(IMetadataStore metadataStore, PluginRegistry registry, IConfigReader configReader) {
+    public ConfigService(
+            IMetadataStore metadataStore, PluginRegistry registry,
+            IConfigReader configReader, TenantConfig tenantTemplate) {
+
         this.validator = new Validator();
         this.metadataStore = metadataStore;
         this.bundleLoader = new BundleLoader(metadataStore);
         this.objectIdFactory = new UuidFactory();
         this.registry = registry;
         this.configReader = configReader;
+        this.tenantTemplate = tenantTemplate;
+    }
+
+    public void checkTenantTemplate() {
+
+        if (tenantTemplate == null)
+            return;
+
+        try {
+
+            var requests = templateRequests(TEMPLATE_CHECK_TENANT, TEMPLATE_CHECK_TENANT);
+
+            for (var request : requests)
+                validator.validateFixedMethod(request, CREATE_CONFIG_METHOD);
+        }
+        catch (EValidation e) {
+
+            throw new EStartup("Tenant template is not valid: " + e.getMessage(), e);
+        }
+    }
+
+    public CreateTenantResponse createTenant(CreateTenantRequest request) {
+
+        if (tenantTemplate == null)
+            throw new EConsistencyValidation("No tenant template is configured");
+
+        // Get request and user metadata from the current gRPC context
+        var requestMetadata = RequestMetadata.get(Context.current());
+        var userMetadata = UserMetadata.get(Context.current());
+
+        var tenant = request.getTenantCode();
+        var requests = templateRequests(tenant, request.getDisplayName());
+
+        var hook = registry.trySingleton(IConfigWriteHook.class);
+
+        if (hook != null) {
+            var writes = hookWrites(tenant, ConfigUpdateType.CREATE, requests, null, null, userMetadata);
+            requests = hookTransform(hook, requests, writes);
+            hookValidate(hook, writes, requests);
+        }
+
+        // Config objects hold no references, the new tenant has no objects to load them from
+        var objects = newObjects(requests, MetadataBundle.empty(), requestMetadata, userMetadata);
+        var entries = newEntries(requests, objects, List.of(), requestMetadata);
+
+        var tenantInfo = TenantInfo.newBuilder()
+                .setTenantCode(tenant)
+                .setDescription(request.getDisplayName())
+                .build();
+
+        var batch = new MetadataBatchUpdate(null, null, objects, null, null, entries);
+        metadataStore.createTenant(tenantInfo, batch);
+
+        return CreateTenantResponse.newBuilder()
+                .setTenant(tenantInfo)
+                .addAllEntries(entries)
+                .build();
+    }
+
+    private List<ConfigWriteRequest> templateRequests(String tenant, String displayName) {
+
+        var tenantConfig = ConfigHelpers.applyTenantTemplate(tenantTemplate, tenant);
+        var requests = new ArrayList<ConfigWriteRequest>();
+
+        for (var resource : tenantConfig.getResourcesMap().entrySet()) {
+
+            var definition = ObjectDefinition.newBuilder()
+                    .setObjectType(ObjectType.RESOURCE)
+                    .setResource(resource.getValue())
+                    .build();
+
+            requests.add(ConfigWriteRequest.newBuilder()
+                    .setTenant(tenant)
+                    .setConfigClass(ConfigKeys.TRAC_RESOURCES)
+                    .setConfigKey(resource.getKey())
+                    .setDefinition(definition)
+                    .build());
+        }
+
+        var tenantProperties = ConfigDefinition.newBuilder()
+                .setConfigType(ConfigType.PROPERTIES)
+                .putAllProperties(tenantConfig.getPropertiesMap())
+                .putProperties(ConfigKeys.TENANT_DISPLAY_NAME, displayName);
+
+        var definition = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.CONFIG)
+                .setConfig(tenantProperties)
+                .build();
+
+        requests.add(ConfigWriteRequest.newBuilder()
+                .setTenant(tenant)
+                .setConfigClass(ConfigKeys.TRAC_CONFIG)
+                .setConfigKey(ConfigKeys.TRAC_TENANT_CONFIG)
+                .setDefinition(definition)
+                .build());
+
+        return requests;
     }
 
     public ConfigWriteResponse createConfigObject(ConfigWriteRequest request) {
@@ -263,6 +377,13 @@ public class ConfigService {
 
         // Load reference bundle needed for object building
         var references = bundleLoader.loadConfigReferenceBundle(tenant, requests);
+
+        return newObjects(requests, references, requestMetadata, userMetadata);
+    }
+
+    private List<Tag> newObjects(
+            List<ConfigWriteRequest> requests, MetadataBundle references,
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var newObjects = new ArrayList<Tag>(requests.size());
 

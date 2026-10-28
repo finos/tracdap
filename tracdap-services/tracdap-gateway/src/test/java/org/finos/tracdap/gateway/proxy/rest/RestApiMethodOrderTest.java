@@ -46,6 +46,8 @@ public class RestApiMethodOrderTest {
             "platform/read-config-object, readPlatformConfigObject",
             "platform/read-config-batch, readPlatformConfigBatch",
             "platform/list-config-entries, listPlatformConfigEntries",
+            "platform/create-tenant, createTenant",
+            "platform/check-tenant-storage, checkTenantStorage",
             "ACME_CORP/create-config-object, createConfigObject",
             "ACME_CORP/read-config-batch, readConfigBatch"})
     void literalSegmentWinsOverVariable(String path, String expectedMethod) {

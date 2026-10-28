@@ -29,6 +29,7 @@ import io.grpc.stub.StreamObserver;
 public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadataApiImplBase {
 
     private final MetadataApiImpl apiImpl;
+    private final ConfigService configService;
     private final PlatformConfigService platformConfigService;
 
     public InternalMetadataApi(
@@ -39,6 +40,7 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
             PlatformConfigService platformConfigService) {
 
         apiImpl = new MetadataApiImpl(readService, writeService, searchService, configService, MetadataApiImpl.INTERNAL_API);
+        this.configService = configService;
         this.platformConfigService = platformConfigService;
     }
 
@@ -201,6 +203,19 @@ public class InternalMetadataApi extends InternalMetadataApiGrpc.InternalMetadat
 
         try {
             var result = platformConfigService.readPlatformConfigBatch(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void createTenant(CreateTenantRequest request, StreamObserver<CreateTenantResponse> response) {
+
+        try {
+            var result = configService.createTenant(request);
             response.onNext(result);
             response.onCompleted();
         }

@@ -23,6 +23,7 @@ public class ConfigKeys {
 
     // Secondary config keys
     public static final String TENANTS_CONFIG_KEY = "tenants";
+    public static final String TENANT_TEMPLATE_CONFIG_KEY = "tenantTemplate";
     public static final String LOGGING_CONFIG_KEY = "logging";
     public static final String SECRET_TYPE_KEY = "secret.type";
     public static final String SECRET_URL_KEY = "secret.url";
@@ -66,6 +67,9 @@ public class ConfigKeys {
     // Tenant-level config entry
     public static final String TRAC_TENANT_CONFIG = "trac_tenant_config";
     public static final String TENANT_DISPLAY_NAME = "tenant.displayName";
+
+    // Placeholder for the tenant code in the tenant template
+    public static final String TENANT_TEMPLATE_PLACEHOLDER = "{tenant}";
 
     // Secret scopes
     public static final String CONFIG_SCOPE = "config";

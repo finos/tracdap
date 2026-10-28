@@ -155,4 +155,9 @@ public class InternalMetadataApiValidator {
     public static ValidationContext listPlatformConfigEntries(PlatformConfigListRequest msg, ValidationContext ctx) {
         return AdminApiValidator.listPlatformConfigEntries(msg, ctx);
     }
+
+    @Validator(method = "createTenant")
+    public static ValidationContext createTenant(CreateTenantRequest msg, ValidationContext ctx) {
+        return AdminApiValidator.createTenant(msg, ctx);
+    }
 }

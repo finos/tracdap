@@ -20,11 +20,13 @@ package org.finos.tracdap.common.config;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.metadata.ResourceDefinition;
 
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 
 public class ConfigHelpers {
@@ -45,6 +47,51 @@ public class ConfigHelpers {
 
         var tenantConfigFile = platformConfig.getConfigOrThrow(ConfigKeys.TENANTS_CONFIG_KEY);
         return configManager.loadConfigObject(tenantConfigFile, TenantConfigMap.class);
+    }
+
+    public static TenantConfig loadTenantTemplate(ConfigManager configManager, PlatformConfig platformConfig) {
+
+        if (!platformConfig.containsConfig(ConfigKeys.TENANT_TEMPLATE_CONFIG_KEY))
+            return null;
+
+        var templateFile = platformConfig.getConfigOrThrow(ConfigKeys.TENANT_TEMPLATE_CONFIG_KEY);
+        var template = configManager.loadConfigObject(templateFile, TenantConfig.class);
+
+        // Only storage resources and tenant properties are created from the template
+        if (template.getSecretsCount() > 0 || template.getConfigCount() > 0)
+            throw new EStartup("Tenant template can only hold resources and properties");
+
+        for (var resource : template.getResourcesMap().entrySet()) {
+            if (resource.getValue().getSecretsCount() > 0) {
+                var message = String.format("Tenant template cannot hold secrets (resource [%s])", resource.getKey());
+                throw new EStartup(message);
+            }
+        }
+
+        return template;
+    }
+
+    public static TenantConfig applyTenantTemplate(TenantConfig template, String tenantCode) {
+
+        var resources = template.getResourcesMap().entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, r -> r.getValue().toBuilder()
+                        .clearPublicProperties()
+                        .putAllPublicProperties(applyTenantTemplate(r.getValue().getPublicPropertiesMap(), tenantCode))
+                        .clearProperties()
+                        .putAllProperties(applyTenantTemplate(r.getValue().getPropertiesMap(), tenantCode))
+                        .build()));
+
+        return TenantConfig.newBuilder()
+                .putAllResources(resources)
+                .putAllProperties(applyTenantTemplate(template.getPropertiesMap(), tenantCode))
+                .build();
+    }
+
+    private static Map<String, String> applyTenantTemplate(Map<String, String> properties, String tenantCode) {
+
+        return properties.entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, p -> p.getValue()
+                        .replace(ConfigKeys.TENANT_TEMPLATE_PLACEHOLDER, tenantCode)));
     }
 
     public static PluginConfig resourceToPluginConfig(ResourceDefinition resource) {

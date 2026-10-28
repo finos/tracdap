@@ -62,6 +62,8 @@ class MetadataErrors {
     static final String PRIOR_CONFIG_MISSING = "Prior config not found for {0} [{1}] (version = {2})";
     static final String PRIOR_CONFIG_MISSING_MULTIPLE = "Prior config not found for one or more config updates";
 
+    static final String DUPLICATE_TENANT = "Tenant already exists: [{0}]";
+
     static final String UNRECOGNISED_ERROR_CODE = "Unrecognised SQL Error code: {0}, sqlstate = {1}, error code = {2}";
     static final String UNHANDLED_ERROR = "Unhandled SQL Error code: {0}";
 
@@ -338,6 +340,25 @@ class MetadataErrors {
                 configKey.getConfigVersion());
 
         throw new EMetadataNotFound(message, error);
+    }
+
+    static EMetadataDuplicate duplicateTenant(String tenantCode) {
+
+        var message = MessageFormat.format(DUPLICATE_TENANT, tenantCode);
+
+        return new EMetadataDuplicate(message);
+    }
+
+    static void duplicateTenant(SQLException error, IDialect dialect, String tenantCode) {
+
+        var code = dialect.mapErrorCode(error);
+
+        if (code != JdbcErrorCode.INSERT_DUPLICATE)
+            return;
+
+        var message = MessageFormat.format(DUPLICATE_TENANT, tenantCode);
+
+        throw new EMetadataDuplicate(message, error);
     }
 
     static ETracInternal catchAll(SQLException error, IDialect dialect) {

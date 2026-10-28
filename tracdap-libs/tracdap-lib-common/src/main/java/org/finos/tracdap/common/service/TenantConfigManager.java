@@ -39,7 +39,7 @@ public class TenantConfigManager extends TenantStateManager<TenantConfigState> {
     }
 
     @Override
-    protected TenantConfigState initTenant(String tenantCode, TenantConfig liveConfig) {
+    protected TenantConfigState initTenant(String tenantCode, TenantConfig liveConfig, boolean discoveredLive) {
         return new TenantConfigState(liveConfig);
     }
 }
