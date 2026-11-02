@@ -21,6 +21,8 @@ package tracdap.metadata;
 option java_package = "org.finos.tracdap.metadata";
 option java_multiple_files = true;
 
+import "tracdap/metadata/type.proto";
+
 
 /**
  * Available formats for representing the TRAC metadata.
@@ -69,4 +71,11 @@ message TenantInfo {
 
   /** A short description of the tenant, suitable for displaying to users in lists. */
   string description = 2;
+
+  /**
+   * Properties a deployment adds to the tenant, for display.
+   *
+   * TRAC itself does not set any tenant properties.
+   */
+  map<string, Value> tenantProps = 3;
 }

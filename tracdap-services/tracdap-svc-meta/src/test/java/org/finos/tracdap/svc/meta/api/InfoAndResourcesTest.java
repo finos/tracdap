@@ -106,5 +106,8 @@ abstract class InfoAndResourcesTest {
         // Also for integration tests, in the integration.yml workflow for GitHub actions
         var expectedDescription = "ACME Projectiles Inc.";
         Assertions.assertEquals(expectedDescription, tenants.get(0).getDescription());
+
+        // Tenant properties are only ever added by a deployment
+        Assertions.assertEquals(0, tenants.get(0).getTenantPropsCount());
     }
 }
