@@ -317,6 +317,16 @@
         <cve>CVE-2026-25087</cve>
     </suppress>
 
+    <!-- CVE-2026-111497: FALSE POSITIVE against the Java library. This is an out-of-bounds write in the -->
+    <!-- Google Brotli *C* decoder (fixed in Brotli 1.0.10 / 1.1.1 / 1.2.1). NVD lists Apache Arrow below -->
+    <!-- 26.0.0 because Arrow C++ bundles Brotli as a compression codec. The pure-Java arrow modules TRAC -->
+    <!-- uses contain no Brotli code and no native libraries. As with CVE-2026-25087, a version bump does -->
+    <!-- not clear the finding: the latest arrow-java is 19.0.0, below the CPE's 26.0.0 bound. -->
+    <suppress>
+        <packageUrl regex="true">^pkg:maven/org\.apache\.arrow/.*@.*$</packageUrl>
+        <cve>CVE-2026-111497</cve>
+    </suppress>
+
     <!-- CVE-2026-33117: FALSE POSITIVE against the artifacts listed below. The vulnerability is an -->
     <!-- incorrect authentication tag comparison in the local cryptography path of the Azure SDK for -->
     <!-- Java Key Vault Keys library (azure-security-keyvault-keys), fixed in 4.10.6. TRAC does not -->
