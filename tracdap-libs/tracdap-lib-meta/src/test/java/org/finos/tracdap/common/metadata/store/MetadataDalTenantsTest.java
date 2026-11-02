@@ -55,7 +55,8 @@ abstract class MetadataDalTenantsTest implements IMetadataStoreTest {
 
         var listing = store.listTenants();
 
-        Assertions.assertEquals(2, listing.size());
+        // Integration databases are shared with other tests, which may create more tenants
+        Assertions.assertTrue(listing.size() >= 2);
         Assertions.assertTrue(listing.stream().anyMatch(tenant -> tenant.getTenantCode().equals(TEST_TENANT)));
         Assertions.assertTrue(listing.stream().anyMatch(tenant -> tenant.getTenantCode().equals(ALT_TEST_TENANT)));
     }

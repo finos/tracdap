@@ -608,6 +608,64 @@ abstract class PlatformConfigApiTest {
         assertEquals(configObj, stateManager.getConfig("entry1"));
     }
 
+    @Test
+    void stateManagerListsAllEntries() {
+
+        var configObj = SampleMetadata.dummyDefinitionForType(ObjectType.CONFIG);
+
+        var entry1 = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("listAll").setConfigKey("entry1").setDefinition(configObj).build()).getEntry();
+
+        var entry2 = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("listAll").setConfigKey("entry2").setDefinition(configObj).build()).getEntry();
+
+        var stateManager = new PlatformStateManager(
+                "listAll", platform.metaClientInternalBlocking(),
+                new GrpcConcern() { public String concernName() { return "test"; } });
+
+        stateManager.init();
+
+        var initial = stateManager.getAllConfig();
+        assertEquals(2, initial.size());
+        assertEquals(configObj, initial.get("entry1"));
+        assertEquals(configObj, initial.get("entry2"));
+
+        var configObj2 = SampleMetadata.dummyVersionForType(configObj);
+
+        var updated1 = adminApi.updatePlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("listAll").setConfigKey("entry1").setPriorEntry(entry1).setDefinition(configObj2).build()).getEntry();
+
+        var deleted2 = adminApi.deletePlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("listAll").setConfigKey("entry2").setPriorEntry(entry2).build()).getEntry();
+
+        var created3 = adminApi.createPlatformConfigObject(PlatformConfigWriteRequest.newBuilder()
+                .setConfigClass("listAll").setConfigKey("entry3").setDefinition(configObj).build()).getEntry();
+
+        stateManager.applyConfigUpdate(liveUpdate(org.finos.tracdap.api.internal.ConfigUpdateType.UPDATE, updated1));
+        stateManager.applyConfigUpdate(liveUpdate(org.finos.tracdap.api.internal.ConfigUpdateType.DELETE, deleted2));
+        stateManager.applyConfigUpdate(liveUpdate(org.finos.tracdap.api.internal.ConfigUpdateType.CREATE, created3));
+
+        var current = stateManager.getAllConfig();
+        assertEquals(2, current.size());
+        assertEquals(configObj2, current.get("entry1"));
+        assertFalse(current.containsKey("entry2"));
+        assertEquals(configObj, current.get("entry3"));
+
+        // Each returned map is an unmodifiable snapshot
+        assertEquals(2, initial.size());
+        assertEquals(configObj, initial.get("entry1"));
+        assertThrows(UnsupportedOperationException.class, () -> current.remove("entry1"));
+    }
+
+    private static org.finos.tracdap.api.internal.PlatformConfigUpdate liveUpdate(
+            org.finos.tracdap.api.internal.ConfigUpdateType updateType, PlatformConfigEntry entry) {
+
+        return org.finos.tracdap.api.internal.PlatformConfigUpdate.newBuilder()
+                .setUpdateType(updateType)
+                .setConfigEntry(entry)
+                .build();
+    }
+
     private static Value timestampValue(PlatformConfigEntry entry) {
         return MetadataCodec.encodeValue(MetadataCodec.decodeDatetime(entry.getConfigTimestamp()));
     }

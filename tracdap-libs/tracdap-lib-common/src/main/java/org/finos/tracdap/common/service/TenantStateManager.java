@@ -34,7 +34,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
 public abstract class TenantStateManager<TState extends TenantState> {
@@ -43,36 +47,69 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
     private final TenantConfigMap staticConfigMap;
     private final ConcurrentHashMap<String, TState> liveTenantMap;
+    private final ConcurrentHashMap<String, CompletableFuture<TState>> discoveries;
+    private final Set<String> failedAtStartup;
 
     private final ConfigManager configManager;
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
+    private final Executor discoveryExecutor;
 
-    protected abstract TState initTenant(String tenantCode, TenantConfig initialConfig);
+    protected abstract TState initTenant(String tenantCode, TenantConfig initialConfig, boolean discoveredLive);
 
     public TenantStateManager(
             TenantConfigMap staticConfigMap, ConfigManager configManager,
             InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns) {
 
+        this(staticConfigMap, configManager, metaClient, commonConcerns, null);
+    }
+
+    /**
+     * Tenants missing from a lookup are discovered on the discovery executor if one is supplied,
+     * otherwise they are discovered inside the lookup.
+     */
+    public TenantStateManager(
+            TenantConfigMap staticConfigMap, ConfigManager configManager,
+            InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
+            GrpcConcern commonConcerns, Executor discoveryExecutor) {
+
         this.staticConfigMap = staticConfigMap;
         this.liveTenantMap = new ConcurrentHashMap<>();
+        this.discoveries = new ConcurrentHashMap<>();
+        this.failedAtStartup = ConcurrentHashMap.newKeySet();
 
         this.configManager = configManager;
         this.metaClient = metaClient;
         this.commonConcerns = commonConcerns;
+        this.discoveryExecutor = discoveryExecutor;
     }
 
     public TState getTenant(String tenantCode) {
 
         var liveTenant = liveTenantMap.get(tenantCode);
 
-        if (liveTenant == null) {
-            var message = String.format("Tenant not found: [%s]", tenantCode);
-            throw new ETenantNotFound(message);
+        if (liveTenant != null)
+            return liveTenant;
+
+        // Tenants that failed at startup are only brought back by a config update
+        if (!failedAtStartup.contains(tenantCode)) {
+
+            if (discoveryExecutor == null) {
+
+                var discovered = tryDiscoverTenant(tenantCode);
+
+                if (discovered != null)
+                    return discovered;
+            }
+            else if (!discoveries.containsKey(tenantCode)) {
+
+                discoveryExecutor.execute(() -> tryDiscoverTenant(tenantCode));
+            }
         }
 
-        return liveTenant;
+        var message = String.format("Tenant not found: [%s]", tenantCode);
+        throw new ETenantNotFound(message);
     }
 
     public void init() {
@@ -86,12 +123,24 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
         for (var tenantInfo : liveTenantList.getTenantsList()) {
 
-            log.info("Initializing tenant: [{}]", tenantInfo.getTenantCode());
+            var tenantCode = tenantInfo.getTenantCode();
 
-            var liveConfig = loadTenantConfig(tenantInfo.getTenantCode());
-            var liveTenant = initTenant(tenantInfo.getTenantCode(), liveConfig);
+            try {
 
-            liveTenantMap.put(tenantInfo.getTenantCode(), liveTenant);
+                log.info("Initializing tenant: [{}]", tenantCode);
+
+                var liveConfig = loadTenantConfig(tenantCode);
+                var liveTenant = initTenant(tenantCode, liveConfig, false);
+
+                liveTenantMap.put(tenantCode, liveTenant);
+            }
+            catch (Exception e) {
+
+                log.error("Tenant could not be initialized: [{}] {}", tenantCode, e.getMessage(), e);
+                log.error("Startup will continue without this tenant");
+
+                failedAtStartup.add(tenantCode);
+            }
         }
 
         if (liveTenantMap.isEmpty())
@@ -132,6 +181,78 @@ public abstract class TenantStateManager<TState extends TenantState> {
                 log.error("Shutdown sequence will continue");
             }
         }
+    }
+
+    private TState tryDiscoverTenant(String tenantCode) {
+
+        try {
+            return discoverTenant(tenantCode);
+        }
+        catch (Exception e) {
+            return null;
+        }
+    }
+
+    private TState discoverTenant(String tenantCode) {
+
+        var discovery = new CompletableFuture<TState>();
+        var priorDiscovery = discoveries.putIfAbsent(tenantCode, discovery);
+
+        if (priorDiscovery != null) {
+
+            try {
+                return priorDiscovery.join();
+            }
+            catch (CompletionException e) {
+                throw e.getCause() instanceof RuntimeException ? (RuntimeException) e.getCause() : e;
+            }
+        }
+
+        try {
+
+            var liveTenant = liveTenantMap.get(tenantCode);
+
+            if (liveTenant == null)
+                liveTenant = initDiscoveredTenant(tenantCode);
+
+            discovery.complete(liveTenant);
+
+            return liveTenant;
+        }
+        catch (RuntimeException e) {
+
+            log.error("Tenant could not be discovered: [{}] {}", tenantCode, e.getMessage(), e);
+
+            discovery.completeExceptionally(e);
+            throw e;
+        }
+        finally {
+
+            discoveries.remove(tenantCode, discovery);
+        }
+    }
+
+    private TState initDiscoveredTenant(String tenantCode) {
+
+        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+        var client = clientState.configureClient(metaClient);
+
+        var liveTenantList = client.listTenants(ListTenantsRequest.getDefaultInstance());
+        var tenantExists = liveTenantList.getTenantsList().stream()
+                .anyMatch(tenantInfo -> tenantInfo.getTenantCode().equals(tenantCode));
+
+        if (!tenantExists)
+            return null;
+
+        log.info("Initializing discovered tenant: [{}]", tenantCode);
+
+        var liveConfig = loadTenantConfig(tenantCode);
+        var liveTenant = initTenant(tenantCode, liveConfig, true);
+
+        liveTenantMap.put(tenantCode, liveTenant);
+        failedAtStartup.remove(tenantCode);
+
+        return liveTenant;
     }
 
     public TenantConfig loadTenantConfig(String tenantCode) {
@@ -182,10 +303,18 @@ public abstract class TenantStateManager<TState extends TenantState> {
         var staticConfig = staticConfigMap.getTenantsOrDefault(update.getTenant(), TenantConfig.getDefaultInstance());
         var liveState = liveTenantMap.get(update.getTenant());
 
-        // Active tenant not found - nothing to update
+        // A tenant not seen before is discovered, its current config already includes this update
         if (liveState == null) {
-            log.warn("Config update ignored (tenant not found: [{}])", update.getTenant());
-            return ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
+
+            var discovered = discoverTenant(update.getTenant());
+
+            if (discovered == null) {
+                log.warn("Config update ignored (tenant not found: [{}])", update.getTenant());
+                return ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
+            }
+
+            log.info("Config update applied successfully (tenant discovered: [{}])", update.getTenant());
+            return ReceivedStatus.newBuilder().setCode(ReceivedCode.OK).build();
         }
 
         // If the updated includes any secrets, ensure tenant secrets are refreshed

@@ -63,6 +63,29 @@ public class LocalFileStorage extends CommonFileStorage {
     }
 
     @Override
+    public void start(EventLoopGroup eventLoopGroup, boolean createRoot) {
+
+        // Only the root itself is created, a missing parent means the path or the volume is wrong
+        if (createRoot && !Files.exists(rootPath) && rootPath.getParent() != null && Files.isDirectory(rootPath.getParent())) {
+
+            try {
+                log.info("Creating storage root path: {} [{}]", storageKey, rootPath);
+                Files.createDirectory(rootPath);
+            }
+            catch (FileAlreadyExistsException e) {
+                log.info("Storage root path already exists: {} [{}]", storageKey, rootPath);
+            }
+            catch (IOException e) {
+                var err = String.format("Storage root path could not be created: %s [%s] %s", storageKey, rootPath, e.getMessage());
+                log.error(err);
+                throw new EStartup(err, e);
+            }
+        }
+
+        start(eventLoopGroup);
+    }
+
+    @Override
     public void start(EventLoopGroup eventLoopGroup) {
 
         // These are just checks, no need to initialize anything

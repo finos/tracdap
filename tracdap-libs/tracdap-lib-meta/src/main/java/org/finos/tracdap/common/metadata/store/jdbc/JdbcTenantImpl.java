@@ -125,7 +125,25 @@ class JdbcTenantImpl {
         }
     }
 
-    void activateTenant(Connection conn, String tenantCode, String description) throws SQLException {
+    boolean tenantExists(Connection conn, String tenantCode) throws SQLException {
+
+        var query = "select tenant_id from tenant where tenant_code = ?";
+
+        if (log.isDebugEnabled()) {
+            log.debug("QUERY tenantExists: \n{}", query);
+        }
+
+        try (var stmt = conn.prepareStatement(query)) {
+
+            stmt.setString(1, tenantCode);
+
+            try (var rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    short activateTenant(Connection conn, String tenantCode, String description) throws SQLException {
 
         var findNextId = "select max(tenant_id) from tenant";
         short nextId;
@@ -167,6 +185,8 @@ class JdbcTenantImpl {
 
             stmt.executeUpdate();
         }
+
+        return nextId;
     }
 
     void updateTenant(Connection conn, short tenantId, String description) throws SQLException {

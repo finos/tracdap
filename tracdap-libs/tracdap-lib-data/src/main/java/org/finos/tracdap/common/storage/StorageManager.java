@@ -109,26 +109,46 @@ public class StorageManager implements IStorageManager, AutoCloseable {
     }
 
     public void addStorage(String storageKey, ResourceDefinition resourceConfig) {
-        addStorage(storageKey, ConfigHelpers.resourceToPluginConfig(resourceConfig));
+        addStorage(storageKey, resourceConfig, false);
+    }
+
+    public void addStorage(String storageKey, ResourceDefinition resourceConfig, boolean createRoot) {
+        addStorage(storageKey, ConfigHelpers.resourceToPluginConfig(resourceConfig), createRoot);
     }
 
     public void addStorage(String storageKey, PluginConfig resourceConfig) {
+        addStorage(storageKey, resourceConfig, false);
+    }
+
+    public void addStorage(String storageKey, PluginConfig resourceConfig, boolean createRoot) {
 
         log.info("Add storage: [{}] (protocol: {})", storageKey, resourceConfig.getProtocol());
 
-        var storageBackend = createStorageBackend(storageKey, resourceConfig);
-        storage.put(storageKey, storageBackend);
+        var storageBackend = createStorageBackend(storageKey, resourceConfig, createRoot);
+        var previousBackend = storage.put(storageKey, storageBackend);
+
+        if (previousBackend != null) {
+            stopStorageBackend(storageKey, previousBackend);
+        }
     }
 
     public void updateStorage(String storageKey, ResourceDefinition resourceConfig) {
-        updateStorage(storageKey, ConfigHelpers.resourceToPluginConfig(resourceConfig));
+        updateStorage(storageKey, resourceConfig, false);
+    }
+
+    public void updateStorage(String storageKey, ResourceDefinition resourceConfig, boolean createRoot) {
+        updateStorage(storageKey, ConfigHelpers.resourceToPluginConfig(resourceConfig), createRoot);
     }
 
     public void updateStorage(String storageKey, PluginConfig resourceConfig) {
+        updateStorage(storageKey, resourceConfig, false);
+    }
+
+    public void updateStorage(String storageKey, PluginConfig resourceConfig, boolean createRoot) {
 
         log.info("Update storage: [{}] (protocol: {})", storageKey, resourceConfig.getProtocol());
 
-        var storageBackend = createStorageBackend(storageKey, resourceConfig);
+        var storageBackend = createStorageBackend(storageKey, resourceConfig, createRoot);
         var previousBackend = storage.put(storageKey, storageBackend);
 
         if (previousBackend != null) {
@@ -161,7 +181,7 @@ public class StorageManager implements IStorageManager, AutoCloseable {
         }
     }
 
-    private StorageBackend createStorageBackend(String storageKey, PluginConfig storageConfig) {
+    private StorageBackend createStorageBackend(String storageKey, PluginConfig storageConfig, boolean createRoot) {
 
         var storageConfigWithKey = storageConfig.toBuilder()
                 .putProperties(PROP_STORAGE_KEY, storageKey)
@@ -172,7 +192,7 @@ public class StorageManager implements IStorageManager, AutoCloseable {
         if (plugins.isServiceAvailable(IFileStorage.class, storageConfig.getProtocol())) {
 
             var fileInstance = plugins.createService(IFileStorage.class, storageConfigWithKey, configManager);
-            fileInstance.start(eventLoopGroup);
+            fileInstance.start(eventLoopGroup, createRoot);
 
             backend.fileInstances.add(fileInstance);
         }

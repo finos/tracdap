@@ -83,6 +83,9 @@ public class ValidationConstants {
     public static final Pattern MODEL_VERSION = Pattern.compile("\\A\\p{Alnum}[\\w-.]*\\Z");
     public static final int LABEL_LENGTH_LIMIT = 4096;
 
+    // Tenant codes are held in a varchar(16) column of the metadata store
+    public static final int TENANT_CODE_LENGTH_LIMIT = 16;
+
     // List of object types that represent config and can be used with the config objects API
     public static final List<ObjectType> CONFIG_OBJECT_TYPES = List.of(
             ObjectType.CONFIG, ObjectType.RESOURCE);

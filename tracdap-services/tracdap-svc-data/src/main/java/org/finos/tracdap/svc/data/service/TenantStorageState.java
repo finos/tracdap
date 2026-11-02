@@ -39,16 +39,26 @@ public class TenantStorageState extends TenantState {
             ConfigManager configManager,
             ICodecManager codecManager,
             EventLoopGroup eventLoopGroup,
-            TenantConfig initialConfig) {
+            TenantConfig initialConfig,
+            boolean discoveredLive) {
 
         storage = new StorageManager(pluginManager, configManager, codecManager, eventLoopGroup);
         storage.updateStorageDefaults(initialConfig);
 
-        for (var resource : initialConfig.getResourcesMap().entrySet()) {
-            // Currently only internal storage is supported
-            if (resource.getValue().getResourceType() == ResourceType.INTERNAL_STORAGE) {
-                storage.addStorage(resource.getKey(), resource.getValue());
+        try {
+
+            for (var resource : initialConfig.getResourcesMap().entrySet()) {
+                // Currently only internal storage is supported
+                if (resource.getValue().getResourceType() == ResourceType.INTERNAL_STORAGE) {
+                    storage.addStorage(resource.getKey(), resource.getValue(), discoveredLive);
+                }
             }
+        }
+        catch (RuntimeException e) {
+
+            // A tenant that fails to start can be tried again, storage already started is not left running
+            storage.close();
+            throw e;
         }
     }
 
@@ -71,12 +81,12 @@ public class TenantStorageState extends TenantState {
 
     @Override
     protected void configCreated(ConfigEntry entry, ObjectDefinition definition) {
-        storage.addStorage(entry.getConfigKey(), definition.getResource());
+        storage.addStorage(entry.getConfigKey(), definition.getResource(), true);
     }
 
     @Override
     protected void configUpdated(ConfigEntry entry, ObjectDefinition definition) {
-        storage.updateStorage(entry.getConfigKey(), definition.getResource());
+        storage.updateStorage(entry.getConfigKey(), definition.getResource(), true);
     }
 
     @Override

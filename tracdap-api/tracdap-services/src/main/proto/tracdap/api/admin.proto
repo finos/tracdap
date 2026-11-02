@@ -135,4 +135,20 @@ service TracAdminApi {
             body: "*"
         };
     }
+
+    /// Create a new tenant, with its storage and tenant config from the tenant template
+    rpc createTenant(CreateTenantRequest) returns (CreateTenantResponse) {
+        option (google.api.http) = {
+            post: "/platform/create-tenant"
+            body: "*"
+        };
+    }
+
+    /// Check whether the data service has a tenant's internal storage
+    rpc checkTenantStorage(CheckTenantStorageRequest) returns (CheckTenantStorageResponse) {
+        option (google.api.http) = {
+            post: "/platform/check-tenant-storage"
+            body: "*"
+        };
+    }
 }

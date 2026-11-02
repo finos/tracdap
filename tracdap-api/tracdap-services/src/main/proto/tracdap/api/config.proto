@@ -261,3 +261,53 @@ message PlatformConfigListResponse {
   /// The list of available config entries matching the filter criteria.
   repeated metadata.PlatformConfigEntry entries = 1;
 }
+
+/**
+ * Request to create a new tenant.
+ *
+ * @see TracAdminApi
+ */
+message CreateTenantRequest {
+
+  /// Tenant code for the new tenant, a valid identifier of at most 16 characters.
+  string tenantCode = 1;
+
+  /// Display name for the new tenant.
+  string displayName = 2;
+}
+
+/**
+ * Result of creating a new tenant.
+ *
+ * @see TracAdminApi
+ */
+message CreateTenantResponse {
+
+  /// The tenant that was created.
+  metadata.TenantInfo tenant = 1;
+
+  /// The config entries created for the tenant from the tenant template.
+  repeated metadata.ConfigEntry entries = 2;
+}
+
+/**
+ * Request to check a tenant's internal storage.
+ *
+ * @see TracAdminApi
+ */
+message CheckTenantStorageRequest {
+
+  /// Tenant code of the tenant to check.
+  string tenantCode = 1;
+}
+
+/**
+ * Result of checking a tenant's internal storage.
+ *
+ * @see TracAdminApi
+ */
+message CheckTenantStorageResponse {
+
+  /// One result per internal storage key, true if the data service has that storage.
+  map<string, bool> storage = 1;
+}

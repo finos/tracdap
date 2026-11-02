@@ -20,6 +20,7 @@ package org.finos.tracdap.svc.admin.api;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.svc.admin.services.ConfigService;
 import org.finos.tracdap.svc.admin.services.PlatformConfigService;
+import org.finos.tracdap.svc.admin.services.TenantService;
 
 import io.grpc.stub.StreamObserver;
 
@@ -28,10 +29,16 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
 
     private final ConfigService configService;
     private final PlatformConfigService platformConfigService;
+    private final TenantService tenantService;
 
-    public TracAdminApi(ConfigService configService, PlatformConfigService platformConfigService) {
+    public TracAdminApi(
+            ConfigService configService,
+            PlatformConfigService platformConfigService,
+            TenantService tenantService) {
+
         this.configService = configService;
         this.platformConfigService = platformConfigService;
+        this.tenantService = tenantService;
     }
 
     @Override
@@ -182,6 +189,32 @@ public class TracAdminApi extends TracAdminApiGrpc.TracAdminApiImplBase {
 
         try {
             var result = platformConfigService.listPlatformConfigEntries(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void createTenant(CreateTenantRequest request, StreamObserver<CreateTenantResponse> response) {
+
+        try {
+            var result = tenantService.createTenant(request);
+            response.onNext(result);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+            response.onError(e);
+        }
+    }
+
+    @Override
+    public void checkTenantStorage(CheckTenantStorageRequest request, StreamObserver<CheckTenantStorageResponse> response) {
+
+        try {
+            var result = tenantService.checkTenantStorage(request);
             response.onNext(result);
             response.onCompleted();
         }

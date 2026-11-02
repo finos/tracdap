@@ -28,6 +28,8 @@ import org.finos.tracdap.common.storage.StorageManager;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.config.TenantConfigMap;
 
+import java.util.concurrent.Executor;
+
 public class TenantStorageManager extends TenantStateManager<TenantStorageState> {
 
     private final PluginManager pluginManager;
@@ -38,9 +40,10 @@ public class TenantStorageManager extends TenantStateManager<TenantStorageState>
     public TenantStorageManager(
             PluginManager pluginManager, ConfigManager configManager, ICodecManager codecManager,
             EventLoopGroup eventLoopGroup, InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
-            GrpcConcern commonConcerns, TenantConfigMap staticConfigMap)  {
+            GrpcConcern commonConcerns, TenantConfigMap staticConfigMap,
+            Executor discoveryExecutor)  {
 
-        super(staticConfigMap, configManager, metaClient, commonConcerns);
+        super(staticConfigMap, configManager, metaClient, commonConcerns, discoveryExecutor);
 
         this.pluginManager = pluginManager;
         this.configManager = configManager;
@@ -49,8 +52,8 @@ public class TenantStorageManager extends TenantStateManager<TenantStorageState>
     }
 
     @Override
-    protected TenantStorageState initTenant(String tenantCode, TenantConfig initialConfig) {
-        return new TenantStorageState(pluginManager, configManager, codecManager, eventLoopGroup, initialConfig);
+    protected TenantStorageState initTenant(String tenantCode, TenantConfig initialConfig, boolean discoveredLive) {
+        return new TenantStorageState(pluginManager, configManager, codecManager, eventLoopGroup, initialConfig, discoveredLive);
     }
 
     public StorageManager getTenantStorage(String tenantCode) {
