@@ -1,0 +1,42 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  good:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  bad:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [failed_accounts]
+
+  count:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [account_count]
+
+  region_totals:
+    nodeType: OUTPUT_NODE
+
+  account_count:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: good, socket: accounts }
+
+  - source: { node: accounts }
+    target: { node: bad, socket: accounts }
+
+  - source: { node: bad, socket: failed_accounts }
+    target: { node: count, socket: accounts }
+
+  - source: { node: good, socket: region_totals }
+    target: { node: region_totals }
+
+  - source: { node: count, socket: account_count }
+    target: { node: account_count }

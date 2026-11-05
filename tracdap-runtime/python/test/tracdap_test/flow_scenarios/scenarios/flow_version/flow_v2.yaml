@@ -1,0 +1,20 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  aggregate:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  region_totals:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: aggregate, socket: accounts }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: region_totals }

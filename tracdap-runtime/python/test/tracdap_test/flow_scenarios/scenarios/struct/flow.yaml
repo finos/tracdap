@@ -1,0 +1,20 @@
+nodes:
+
+  settings:
+    nodeType: INPUT_NODE
+
+  apply:
+    nodeType: MODEL_NODE
+    inputs: [settings]
+    outputs: [applied_settings]
+
+  applied_settings:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: settings }
+    target: { node: apply, socket: settings }
+
+  - source: { node: apply, socket: applied_settings }
+    target: { node: applied_settings }

@@ -1,0 +1,597 @@
+tracdap_test.flow_scenarios.models.AnnotateReport:
+  inputs:
+    report:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Region report
+  outputs:
+    annotated_report:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Annotated report
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.ApplySettings:
+  inputs:
+    settings:
+      objectType: DATA
+      schema:
+        schemaType: STRUCT_SCHEMA
+        partType: PART_ROOT
+        struct:
+          fields:
+          - fieldName: scale
+            fieldType: FLOAT
+            notNull: true
+          - fieldName: label
+            fieldOrder: 1
+            fieldType: STRING
+            notNull: true
+      label: Run settings
+  outputs:
+    applied_settings:
+      objectType: DATA
+      schema:
+        schemaType: STRUCT_SCHEMA
+        partType: PART_ROOT
+        struct:
+          fields:
+          - fieldName: scale
+            fieldType: FLOAT
+            notNull: true
+          - fieldName: label
+            fieldOrder: 1
+            fieldType: STRING
+            notNull: true
+      label: Applied settings
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.CombineAccounts:
+  inputs:
+    left:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Left accounts
+    right:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Right accounts
+  outputs:
+    combined_accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Combined accounts
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.CountAccounts:
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    account_count:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: account_count
+            fieldType: INTEGER
+            label: Number of accounts
+      label: Account count
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.FailingModel:
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    failed_accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Never produced
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.FilterAccounts:
+  parameters:
+    min_amount:
+      paramType:
+        basicType: FLOAT
+      label: Minimum amount
+      defaultValue:
+        type:
+          basicType: FLOAT
+        floatValue: 0.0
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    filtered_accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Filtered accounts
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.RenderReport:
+  inputs:
+    region_totals:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: region
+            fieldType: STRING
+            label: Region
+            businessKey: true
+            categorical: true
+            notNull: true
+          - fieldName: total
+            fieldOrder: 1
+            fieldType: FLOAT
+            label: Total amount
+      label: Totals by region
+  outputs:
+    report:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Region report
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.ScaleAmountsA:
+  parameters:
+    factor:
+      paramType:
+        basicType: FLOAT
+      label: Scaling factor
+      defaultValue:
+        type:
+          basicType: FLOAT
+        floatValue: 2.0
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    scaled_a:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Scaled accounts (A)
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.ScaleAmountsB:
+  parameters:
+    factor:
+      paramType:
+        basicType: FLOAT
+      label: Scaling factor
+      defaultValue:
+        type:
+          basicType: FLOAT
+        floatValue: 0.5
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    scaled_b:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Scaled accounts (B)
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.SelectAccounts:
+  inputs:
+    source:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+      label: Any table with account columns
+      dynamic: true
+    exclude_ids:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+      label: Accounts to exclude
+      optional: true
+  outputs:
+    selected_accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Selected accounts
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.SplitAccounts:
+  parameters:
+    threshold:
+      paramType:
+        basicType: FLOAT
+      label: High value threshold
+      defaultValue:
+        type:
+          basicType: FLOAT
+        floatValue: 100.0
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    high_value:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: High value accounts
+    low_value:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Low value accounts
+    rejects:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Rejected accounts
+      optional: true
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.SumByRegion:
+  inputs:
+    accounts:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: id
+            fieldType: STRING
+            label: Account ID
+            businessKey: true
+            notNull: true
+          - fieldName: region
+            fieldOrder: 1
+            fieldType: STRING
+            label: Region
+            categorical: true
+          - fieldName: amount
+            fieldOrder: 2
+            fieldType: FLOAT
+            label: Amount
+      label: Accounts
+  outputs:
+    region_totals:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: region
+            fieldType: STRING
+            label: Region
+            businessKey: true
+            categorical: true
+            notNull: true
+          - fieldName: total
+            fieldOrder: 1
+            fieldType: FLOAT
+            label: Total amount
+      label: Totals by region
+  modelType: STANDARD_MODEL

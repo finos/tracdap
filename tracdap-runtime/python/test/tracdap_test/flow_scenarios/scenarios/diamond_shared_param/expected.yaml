@@ -1,0 +1,14 @@
+description: A diamond, with sockets wired across different names and a parameter shared by models that declare different defaults
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    combined_accounts: { objectType: DATA }
+
+outputs:
+  combined_accounts: DATA
+
+e2e: false

@@ -1,0 +1,17 @@
+description: One model with three outputs - one saved, one passed to another model unsaved, and one optional that is not produced
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    high_value: { objectType: DATA }
+    rejects: { objectType: DATA, optional: true }
+    region_totals: { objectType: DATA }
+
+outputs:
+  high_value: DATA
+  region_totals: DATA
+
+e2e: false

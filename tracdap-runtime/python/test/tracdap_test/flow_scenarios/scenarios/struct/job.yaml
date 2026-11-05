@@ -1,0 +1,5 @@
+models:
+  apply: tracdap_test.flow_scenarios.models.ApplySettings
+
+inputs:
+  settings: settings.yaml

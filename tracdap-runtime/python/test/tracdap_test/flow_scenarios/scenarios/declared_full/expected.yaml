@@ -1,0 +1,14 @@
+description: The chain with every input, output and parameter declared in full, and parameters still autowired
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    region_totals: { objectType: DATA }
+
+outputs:
+  region_totals: DATA
+
+e2e: true

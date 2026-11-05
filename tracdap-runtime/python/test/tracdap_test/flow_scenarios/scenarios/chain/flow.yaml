@@ -1,0 +1,31 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  filter:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [filtered_accounts]
+
+  aggregate:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  region_totals:
+    nodeType: OUTPUT_NODE
+    nodeAttrs:
+      - attrName: scenario_output
+        value: { type: { basicType: STRING }, stringValue: chain }
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: filter, socket: accounts }
+
+  - source: { node: filter, socket: filtered_accounts }
+    target: { node: aggregate, socket: accounts }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: region_totals }

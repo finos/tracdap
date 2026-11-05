@@ -1,0 +1,14 @@
+description: A struct schema input and output
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    settings: { objectType: DATA }
+  outputs:
+    applied_settings: { objectType: DATA }
+
+outputs:
+  applied_settings: DATA
+
+e2e: false

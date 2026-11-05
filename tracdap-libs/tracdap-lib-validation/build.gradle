@@ -32,3 +32,11 @@ dependencies {
 
     testImplementation project(':tracdap-lib-test')
 }
+
+test {
+
+    // FlowScenarioTest reads the flow scenario catalogue, which lives in the Python runtime tests
+    inputs.files(fileTree("${rootProject.projectDir}/tracdap-runtime/python/test/tracdap_test/flow_scenarios") {
+        exclude "**/__pycache__/**"
+    }).withPropertyName("flowScenarios")
+}

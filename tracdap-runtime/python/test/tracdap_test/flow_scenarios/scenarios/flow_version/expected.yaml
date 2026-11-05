@@ -1,0 +1,17 @@
+description: Version 1 of a flow is run after version 2, with a different structure, has been saved
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    region_totals: { objectType: DATA }
+
+outputs:
+  region_totals: DATA
+
+e2e: true
+
+devMode:
+  skip: Flow versions exist only on the platform, dev mode loads a flow from a file

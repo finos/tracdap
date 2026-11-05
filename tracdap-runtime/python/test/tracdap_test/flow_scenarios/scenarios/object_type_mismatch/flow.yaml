@@ -1,0 +1,28 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  aggregate:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  annotate:
+    nodeType: MODEL_NODE
+    inputs: [report]
+    outputs: [annotated_report]
+
+  annotated_report:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: aggregate, socket: accounts }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: annotate, socket: report }
+
+  - source: { node: annotate, socket: annotated_report }
+    target: { node: annotated_report }

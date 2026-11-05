@@ -1,0 +1,26 @@
+nodes:
+
+  source:
+    nodeType: INPUT_NODE
+
+  exclude_ids:
+    nodeType: INPUT_NODE
+
+  select:
+    nodeType: MODEL_NODE
+    inputs: [source, exclude_ids]
+    outputs: [selected_accounts]
+
+  selected_accounts:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: source }
+    target: { node: select, socket: source }
+
+  - source: { node: exclude_ids }
+    target: { node: select, socket: exclude_ids }
+
+  - source: { node: select, socket: selected_accounts }
+    target: { node: selected_accounts }

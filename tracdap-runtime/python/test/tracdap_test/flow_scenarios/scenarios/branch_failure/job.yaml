@@ -1,0 +1,7 @@
+models:
+  good: tracdap_test.flow_scenarios.models.SumByRegion
+  bad: tracdap_test.flow_scenarios.models.FailingModel
+  count: tracdap_test.flow_scenarios.models.CountAccounts
+
+inputs:
+  accounts: accounts.csv

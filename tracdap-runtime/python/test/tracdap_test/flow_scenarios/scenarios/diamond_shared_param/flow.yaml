@@ -1,0 +1,39 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  scale_a:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [scaled_a]
+
+  scale_b:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [scaled_b]
+
+  combine:
+    nodeType: MODEL_NODE
+    inputs: [left, right]
+    outputs: [combined_accounts]
+
+  combined_accounts:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: scale_a, socket: accounts }
+
+  - source: { node: accounts }
+    target: { node: scale_b, socket: accounts }
+
+  - source: { node: scale_a, socket: scaled_a }
+    target: { node: combine, socket: left }
+
+  - source: { node: scale_b, socket: scaled_b }
+    target: { node: combine, socket: right }
+
+  - source: { node: combine, socket: combined_accounts }
+    target: { node: combined_accounts }
