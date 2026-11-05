@@ -1,0 +1,37 @@
+nodes:
+
+  report:
+    nodeType: INPUT_NODE
+
+  annotate:
+    nodeType: MODEL_NODE
+    inputs: [report]
+    outputs: [annotated_report]
+
+  stamp:
+    nodeType: MODEL_NODE
+    inputs: [report]
+    outputs: [stamped_report]
+
+  annotated_report:
+    nodeType: OUTPUT_NODE
+
+  stamped_report:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: report }
+    target: { node: annotate, socket: report }
+
+  - source: { node: report }
+    target: { node: stamp, socket: report }
+
+  - source: { node: annotate, socket: annotated_report }
+    target: { node: annotated_report }
+
+  - source: { node: stamp, socket: stamped_report }
+    target: { node: stamped_report }
+
+inputs:
+  report: { objectType: FILE }

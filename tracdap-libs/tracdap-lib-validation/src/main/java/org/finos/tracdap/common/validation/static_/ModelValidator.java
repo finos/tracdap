@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.validation.core.ValidationContext;
+import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
 import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.metadata.*;
@@ -183,6 +184,35 @@ public class ModelValidator {
             Descriptors.FieldDescriptor resourcesField,
             ValidationContext ctx) {
 
+        return modelSchema(
+                paramsField, inputsField, outputsField, resourcesField,
+                ModelValidator::modelInputSchema, ModelValidator::modelOutputSchema,
+                ctx);
+    }
+
+    // Flow inputs and outputs can be declared by object type alone, the rest of the schema is inferred
+    public static ValidationContext flowSchema(
+            Descriptors.FieldDescriptor paramsField,
+            Descriptors.FieldDescriptor inputsField,
+            Descriptors.FieldDescriptor outputsField,
+            Descriptors.FieldDescriptor resourcesField,
+            ValidationContext ctx) {
+
+        return modelSchema(
+                paramsField, inputsField, outputsField, resourcesField,
+                ModelValidator::flowInputSchema, ModelValidator::flowOutputSchema,
+                ctx);
+    }
+
+    private static ValidationContext modelSchema(
+            Descriptors.FieldDescriptor paramsField,
+            Descriptors.FieldDescriptor inputsField,
+            Descriptors.FieldDescriptor outputsField,
+            Descriptors.FieldDescriptor resourcesField,
+            ValidationFunction.Typed<ModelInputSchema> inputValidator,
+            ValidationFunction.Typed<ModelOutputSchema> outputValidator,
+            ValidationContext ctx) {
+
         var knownIdentifiers = new HashMap<String, String>();
 
         ctx = ctx.pushMap(paramsField)
@@ -198,7 +228,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
                 .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, inputsField.getName()))
-                .applyMapValues(ModelValidator::modelInputSchema, ModelInputSchema.class)
+                .applyMapValues(inputValidator, ModelInputSchema.class)
                 .pop();
 
         ctx = ctx.pushMap(outputsField)
@@ -206,7 +236,7 @@ public class ModelValidator {
                 .applyMapKeys(CommonValidators::notTracReserved)
                 .apply(CommonValidators::caseInsensitiveDuplicates)
                 .applyMapKeys(CommonValidators.uniqueContextCheck(knownIdentifiers, outputsField.getName()))
-                .applyMapValues(ModelValidator::modelOutputSchema, ModelOutputSchema.class)
+                .applyMapValues(outputValidator, ModelOutputSchema.class)
                 .pop();
 
         ctx = ctx.pushMap(resourcesField)
@@ -334,6 +364,74 @@ public class ModelValidator {
                 .pop();
 
         return ctx;
+    }
+
+    public static ValidationContext flowInputSchema(ModelInputSchema msg, ValidationContext ctx) {
+
+        if (msg.getRequirementCase() != ModelInputSchema.RequirementCase.REQUIREMENT_NOT_SET)
+            return modelInputSchema(msg, ctx);
+
+        // Optional and dynamic are set by type inference, so they cannot be declared without a schema
+        return typeOnlySchema(
+                MIS_OBJECT_TYPE, msg.getObjectType(),
+                MIS_OPTIONAL, msg.getOptional(), MIS_DYNAMIC, msg.getDynamic(),
+                MIS_LABEL, MIS_INPUT_PROPS, ctx);
+    }
+
+    public static ValidationContext flowOutputSchema(ModelOutputSchema msg, ValidationContext ctx) {
+
+        if (msg.getRequirementCase() != ModelOutputSchema.RequirementCase.REQUIREMENT_NOT_SET)
+            return modelOutputSchema(msg, ctx);
+
+        return typeOnlySchema(
+                MOS_OBJECT_TYPE, msg.getObjectType(),
+                MOS_OPTIONAL, msg.getOptional(), MOS_DYNAMIC, msg.getDynamic(),
+                MOS_LABEL, MOS_OUTPUT_PROPS, ctx);
+    }
+
+    private static ValidationContext typeOnlySchema(
+            Descriptors.FieldDescriptor objectTypeField, ObjectType objectType,
+            Descriptors.FieldDescriptor optionalField, boolean optional,
+            Descriptors.FieldDescriptor dynamicField, boolean dynamic,
+            Descriptors.FieldDescriptor labelField,
+            Descriptors.FieldDescriptor propsField,
+            ValidationContext ctx) {
+
+        ctx = ctx.push(objectTypeField)
+                .apply(CommonValidators::required)
+                .apply(CommonValidators::nonZeroEnum, ObjectType.class)
+                .pop();
+
+        if (objectType != ObjectType.DATA && objectType != ObjectType.FILE && objectType != ObjectType.OBJECT_TYPE_NOT_SET) {
+            ctx = ctx.push(objectTypeField)
+                    .error(String.format("Object type [%s] is not supported", objectType))
+                    .pop();
+        }
+
+        if (optional)
+            ctx = typeOnlyFlag(optionalField, ctx);
+
+        if (dynamic)
+            ctx = typeOnlyFlag(dynamicField, ctx);
+
+        ctx = ctx.push(labelField)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::labelLengthLimit)
+                .pop();
+
+        ctx = ctx.pushMap(propsField)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::standardProps)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext typeOnlyFlag(Descriptors.FieldDescriptor flagField, ValidationContext ctx) {
+
+        return ctx.push(flagField)
+                .error(String.format("[%s] cannot be set when only the object type is declared", flagField.getName()))
+                .pop();
     }
 
     @Validator

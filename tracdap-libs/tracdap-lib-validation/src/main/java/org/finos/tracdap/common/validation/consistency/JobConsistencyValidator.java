@@ -640,6 +640,10 @@ public class JobConsistencyValidator {
         if (ctx.failed())
             return ctx;
 
+        // A type-only declaration that was not replaced by inference has no schema or file type to compare
+        if (inputDef.getRequirementCase() == ModelInputSchema.RequirementCase.REQUIREMENT_NOT_SET)
+            return ctx;
+
         if (inputDef.getObjectType() == ObjectType.FILE)
             return checkFileType(inputObject.getFile(), inputDef.getFileType(), ctx);
         else if (inputDef.getDynamic())
@@ -692,7 +696,7 @@ public class JobConsistencyValidator {
     private static ValidationContext outputMatchesSchema(String outputName, TagSelector outputSelector, Node<NodeMetadata> outputNode, ValidationContext ctx) {
 
         if (outputNode.payload().modelOutputSchema() == null)
-            ctx.error("Type inference failed for output [" + outputName + "]");
+            return ctx.error("Type inference failed for output [" + outputName + "]");
 
         return outputMatchesSchema(outputName, outputSelector, outputNode.payload().modelOutputSchema(), ctx);
     }
@@ -719,8 +723,11 @@ public class JobConsistencyValidator {
                     outputName, outputDef.getObjectType(), outputObject.getObjectType()));
         }
 
-        // In case inference failed, outputDef == null so stop here
         if (ctx.failed())
+            return ctx;
+
+        // A type-only declaration that was not replaced by inference has no schema or file type to compare
+        if (outputDef.getRequirementCase() == ModelOutputSchema.RequirementCase.REQUIREMENT_NOT_SET)
             return ctx;
 
         if (outputDef.getObjectType() == ObjectType.FILE)
@@ -736,7 +743,7 @@ public class JobConsistencyValidator {
 
         if (inputSchema.getObjectType() != outputDef.getObjectType()) {
             return ctx.error(String.format(
-                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    "Output [%s] is not the right object type (expected %s, got %s)",
                     outputName, outputDef.getObjectType(), inputSchema.getObjectType()));
         }
 
@@ -756,7 +763,7 @@ public class JobConsistencyValidator {
 
         if (outputSchema.getObjectType() != outputDef.getObjectType()) {
             return ctx.error(String.format(
-                    "Input [%s] is not the right object type (expected %s, got %s)",
+                    "Output [%s] is not the right object type (expected %s, got %s)",
                     outputName, outputDef.getObjectType(), outputSchema.getObjectType()));
         }
 
@@ -985,7 +992,7 @@ public class JobConsistencyValidator {
 
             ctx.error(String.format(
                     "Mime type does not match (expected [%s], got [%s])",
-                    fileType.getExtension(), fileDef.getExtension()));
+                    fileType.getMimeType(), fileDef.getMimeType()));
         }
 
         return ctx;
@@ -1004,7 +1011,7 @@ public class JobConsistencyValidator {
 
             ctx.error(String.format(
                     "Mime type does not match (expected [%s], got [%s])",
-                    requiredFileType.getExtension(), suppliedFileType.getExtension()));
+                    requiredFileType.getMimeType(), suppliedFileType.getMimeType()));
         }
 
         return ctx;
@@ -1148,7 +1155,7 @@ public class JobConsistencyValidator {
             if (sourceMetadata.modelInputSchema() == null)
                 return ctx.error(String.format("No schema available for connected input [%s]", sourceNodeName));
 
-            return inputMatchesSchema(inputName, sourceMetadata.modelInputSchema(), modelInput, ctx);
+            return inputMatchesSchema(socketName(node, inputName), sourceMetadata.modelInputSchema(), modelInput, ctx);
         }
         else if (sourceNodeType == FlowNodeType.MODEL_NODE) {
 
@@ -1163,13 +1170,17 @@ public class JobConsistencyValidator {
             // TODO: Support pushing virtual locations onto ctx
             // Model is a tag selector, inputs[input] does not exist in the message structure
 
-            return inputMatchesSchema(inputName, sourceModel.getOutputsOrThrow(sourceSocket.socket()), modelInput, ctx);
+            return inputMatchesSchema(socketName(node, inputName), sourceModel.getOutputsOrThrow(sourceSocket.socket()), modelInput, ctx);
         }
         else {
             return ctx.error(String.format(
                     "Input [%s] cannot be supplied from [%s] (%s)",
                     inputName, sourceNodeName, sourceNodeType));
         }
+    }
+
+    private static String socketName(Node<NodeMetadata> node, String socket) {
+        return node.nodeId().name() + "." + socket;
     }
 
     private static ValidationContext modelResource(

@@ -647,17 +647,66 @@ class DevModeTranslator:
                 model_parameter = cls._infer_parameter(node_name, targets, job_def, job_config)
                 updated_flow.parameters[node_name] = model_parameter
 
-            if node.nodeType == _meta.FlowNodeType.INPUT_NODE and node_name not in flow.inputs:
+            if node.nodeType == _meta.FlowNodeType.INPUT_NODE:
                 targets = edges_by_source.get(node_name) or []
-                model_input = cls._infer_input_schema(node_name, targets, job_def, job_config)
-                updated_flow.inputs[node_name] = model_input
+                declared_input = flow.inputs.get(node_name)
+                if declared_input is not None:
+                    cls._check_declared_type("Input", node_name, declared_input, targets, lambda model: model.inputs, job_def, job_config)
+                if declared_input is None or cls._is_type_only(declared_input):
+                    model_input = cls._infer_input_schema(node_name, targets, job_def, job_config)
+                    updated_flow.inputs[node_name] = cls._apply_type_only(declared_input, model_input, "inputProps")
 
-            if node.nodeType == _meta.FlowNodeType.OUTPUT_NODE and node_name not in flow.outputs:
+            if node.nodeType == _meta.FlowNodeType.OUTPUT_NODE:
                 sources = edges_by_target.get(node_name) or []
-                model_output = cls._infer_output_schema(node_name, sources, job_def, job_config)
-                updated_flow.outputs[node_name] = model_output
+                declared_output = flow.outputs.get(node_name)
+                if declared_output is not None:
+                    cls._check_declared_type("Output", node_name, declared_output, sources, lambda model: model.outputs, job_def, job_config)
+                if declared_output is None or cls._is_type_only(declared_output):
+                    model_output = cls._infer_output_schema(node_name, sources, job_def, job_config)
+                    updated_flow.outputs[node_name] = cls._apply_type_only(declared_output, model_output, "outputProps")
 
         return updated_flow
+
+    @classmethod
+    def _check_declared_type(
+            cls, socket_kind: str, node_name: str, declared, sockets: tp.List[_meta.FlowSocket],
+            socket_func: tp.Callable[[_meta.ModelDefinition], dict],
+            job_def: _meta.JobDefinition, job_config: _cfg.JobConfig):
+
+        # Same wording as the object type checks in the platform's job validation
+        for socket in sockets:
+            model_selector = job_def.runFlow.models.get(socket.node)
+            if model_selector is None:
+                continue
+            model_obj = _util.get_job_metadata(model_selector, job_config)
+            model_socket = socket_func(model_obj.model).get(socket.socket)
+            if model_socket is not None and model_socket.objectType != declared.objectType:
+                err = f"{socket_kind} [{node_name}] is not the right object type" \
+                      + f" (expected {declared.objectType.name}, got {model_socket.objectType.name})"
+                cls._log.error(err)
+                raise _ex.EJobValidation(err)
+
+    @staticmethod
+    def _is_type_only(declared: tp.Union[_meta.ModelInputSchema, _meta.ModelOutputSchema]) -> bool:
+        return declared.schema is None and declared.fileType is None
+
+    @staticmethod
+    def _apply_type_only(declared, inferred, props_field: str):
+
+        # A type-only declaration keeps its label and props, everything else comes from inference
+        if declared is None:
+            return inferred
+
+        schema = copy.copy(inferred)
+
+        if declared.label is not None:
+            schema.label = declared.label
+
+        declared_props = getattr(declared, props_field)
+        if declared_props:
+            setattr(schema, props_field, {**(getattr(inferred, props_field) or {}), **declared_props})
+
+        return schema
 
     @classmethod
     def _infer_resource(

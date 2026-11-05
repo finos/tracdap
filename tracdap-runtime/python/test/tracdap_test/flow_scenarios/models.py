@@ -270,3 +270,40 @@ class AnnotateReport(trac.TracModel):
         _log_run(self, ctx)
         report = ctx.get_file("report")
         ctx.put_file("annotated_report", b"Region report\n" + report)
+
+
+class StampReport(trac.TracModel):
+
+    def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
+        return {}
+
+    def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
+        return {"report": trac.define_input(trac.CommonFileTypes.TXT, label="Region report")}
+
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
+        return {"stamped_report": trac.define_output(trac.CommonFileTypes.TXT, label="Stamped report")}
+
+    def run_model(self, ctx: trac.TracContext):
+        _log_run(self, ctx)
+        report = ctx.get_file("report")
+        ctx.put_file("stamped_report", b"Stamped report\n" + report)
+
+
+class NoteTotals(trac.TracModel):
+
+    def define_parameters(self) -> tp.Dict[str, trac.ModelParameter]:
+        return {}
+
+    def define_inputs(self) -> tp.Dict[str, trac.ModelInputSchema]:
+        return {
+            "region_totals": trac.define_input_table(*_total_fields(), label="Totals by region"),
+            "notes": trac.define_input(trac.CommonFileTypes.TXT, label="Notes", optional=True)}
+
+    def define_outputs(self) -> tp.Dict[str, trac.ModelOutputSchema]:
+        return {"summary": trac.define_output(trac.CommonFileTypes.TXT, label="Totals summary")}
+
+    def run_model(self, ctx: trac.TracContext):
+        _log_run(self, ctx)
+        totals = ctx.get_pandas_table("region_totals").sort_values("region", key=lambda region: region.astype(str))
+        summary = "\n".join(f"{row.region}: {row.total}" for row in totals.itertuples())
+        ctx.put_file("summary", f"Totals by region\n{summary}".encode("utf-8"))

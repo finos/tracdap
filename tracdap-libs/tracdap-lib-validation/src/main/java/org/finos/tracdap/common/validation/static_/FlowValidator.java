@@ -127,11 +127,12 @@ public class FlowValidator {
             ctx = ctx.apply(FlowValidator::flowConsistency, FlowDefinition.class);
 
         // If the flow declares an explicit schema this must be validated as well
-        // Parameters, inputs, outputs & resources on a flow have the same structure as a model
+        // Parameters, inputs, outputs & resources on a flow have the same structure as a model,
+        // except that flow inputs and outputs can be declared by object type alone
         if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getParametersCount() > 0 || flow.getResourcesCount() > 0)
-            ctx = ModelValidator.modelSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, FD_RESOURCES, ctx);
+            ctx = ModelValidator.flowSchema(FD_PARAMETERS, FD_INPUTS, FD_OUTPUTS, FD_RESOURCES, ctx);
 
-        // If inputs, outputs and resources are declared, they must match what is declared in the nodes
+        // Each of inputs, outputs and resources that is declared must match the nodes of that type
         if (flow.getInputsCount() > 0 || flow.getOutputsCount() > 0 || flow.getResourcesCount() > 0)
             ctx = ctx.apply(FlowValidator::flowSchemaMatch, FlowDefinition.class);
 
@@ -273,31 +274,35 @@ public class FlowValidator {
         var schemaOutputs = new HashSet<>(flow.getOutputsMap().keySet());
         var schemaResources = new HashSet<>(flow.getResourcesMap().keySet());
 
-        // First check that every input and output node is declared explicitly
+        var inputsDeclared = !schemaInputs.isEmpty();
+        var outputsDeclared = !schemaOutputs.isEmpty();
+        var resourcesDeclared = !schemaResources.isEmpty();
+
+        // First check that every node of each declared type is declared explicitly
 
         for (var nodeEntry : flow.getNodesMap().entrySet()) {
 
             var nodeName = nodeEntry.getKey();
             var node = nodeEntry.getValue();
 
-            if (node.getNodeType() == FlowNodeType.INPUT_NODE) {
+            if (node.getNodeType() == FlowNodeType.INPUT_NODE && inputsDeclared) {
                 var matched = schemaInputs.remove(nodeName);
                 if (!matched)
                     ctx = ctx.error(String.format("Input node [%s] is missing from flow explicit inputs", nodeName));
 
             }
 
-            if (node.getNodeType() == FlowNodeType.OUTPUT_NODE) {
+            if (node.getNodeType() == FlowNodeType.OUTPUT_NODE && outputsDeclared) {
                 var matched = schemaOutputs.remove(nodeName);
                 if (!matched)
                     ctx = ctx.error(String.format("Output node [%s] is missing from flow explicit outputs", nodeName));
 
             }
 
-            if (node.getNodeType() == FlowNodeType.RESOURCE_NODE) {
+            if (node.getNodeType() == FlowNodeType.RESOURCE_NODE && resourcesDeclared) {
                 var matched = schemaResources.remove(nodeName);
                 if (!matched)
-                    ctx = ctx.error(String.format("Resource node [%s] is missing from flow explicit outputs", nodeName));
+                    ctx = ctx.error(String.format("Resource node [%s] is missing from flow explicit resources", nodeName));
 
             }
         }
@@ -324,7 +329,7 @@ public class FlowValidator {
         for (var paramName : flow.getParametersMap().keySet()) {
             if (flow.containsNodes(paramName)) {
                 var node = flow.getNodesOrThrow(paramName);
-                if (node.getNodeType() == FlowNodeType.PARAMETER_NODE)
+                if (node.getNodeType() != FlowNodeType.PARAMETER_NODE)
                     ctx = ctx.error(String.format("Flow parameter [%s] conflicts with a node of type [%s]", paramName, node.getNodeType()));
             }
         }

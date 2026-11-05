@@ -532,23 +532,25 @@ public class GraphBuilder {
                 nodes.put(node.nodeId(), inferredNode);
             }
 
-            if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.INPUT_NODE && nodeMetadata.modelInputSchema() == null) {
+            if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.INPUT_NODE && isUndeclaredOrTypeOnly(nodeMetadata.modelInputSchema())) {
 
                 var targets = dependents.getOrDefault(node.nodeId(), List.of());
-                var inputSchema = inferInputSchema(node.nodeId(), targets, graph);
+                var inferredSchema = inferInputSchema(node.nodeId(), targets, graph);
+                var inputSchema = applyTypeOnlyInput(nodeMetadata.modelInputSchema(), inferredSchema);
                 var inferredMetadata = nodeMetadata.withModelInputSchema(inputSchema);
                 var inferredNode = node.withPayload(inferredMetadata);
 
                 nodes.put(node.nodeId(), inferredNode);
             }
 
-            if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.OUTPUT_NODE && nodeMetadata.modelOutputSchema() == null) {
+            if (nodeMetadata.flowNode().getNodeType() == FlowNodeType.OUTPUT_NODE && isUndeclaredOrTypeOnly(nodeMetadata.modelOutputSchema())) {
 
                 if (node.dependencies().size() != 1)
                     continue;
 
                 var source = node.dependencies().values().iterator().next();
-                var outputSchema = inferOutputSchema(source, graph);
+                var inferredSchema = inferOutputSchema(source, graph);
+                var outputSchema = applyTypeOnlyOutput(nodeMetadata.modelOutputSchema(), inferredSchema);
                 var inferredMetadata = nodeMetadata.withModelOutputSchema(outputSchema);
                 var inferredNode = node.withPayload(inferredMetadata);
 
@@ -569,6 +571,49 @@ public class GraphBuilder {
         return new GraphSection<>(nodes, graph.inputs(), graph.outputs());
     }
 
+
+    private static boolean isUndeclaredOrTypeOnly(ModelInputSchema declared) {
+        return declared == null || declared.getRequirementCase() == ModelInputSchema.RequirementCase.REQUIREMENT_NOT_SET;
+    }
+
+    private static boolean isUndeclaredOrTypeOnly(ModelOutputSchema declared) {
+        return declared == null || declared.getRequirementCase() == ModelOutputSchema.RequirementCase.REQUIREMENT_NOT_SET;
+    }
+
+    // A type-only declaration keeps its label and props, everything else comes from inference
+    // If the inferred object type is different, the declaration is kept and job consistency checks will reject it
+
+    private static ModelInputSchema applyTypeOnlyInput(ModelInputSchema declared, ModelInputSchema inferred) {
+
+        if (declared == null || inferred == null)
+            return inferred;
+
+        if (inferred.getObjectType() != declared.getObjectType())
+            return declared;
+
+        var schema = inferred.toBuilder().putAllInputProps(declared.getInputPropsMap());
+
+        if (declared.hasLabel())
+            schema.setLabel(declared.getLabel());
+
+        return schema.build();
+    }
+
+    private static ModelOutputSchema applyTypeOnlyOutput(ModelOutputSchema declared, ModelOutputSchema inferred) {
+
+        if (declared == null || inferred == null)
+            return inferred;
+
+        if (inferred.getObjectType() != declared.getObjectType())
+            return declared;
+
+        var schema = inferred.toBuilder().putAllOutputProps(declared.getOutputPropsMap());
+
+        if (declared.hasLabel())
+            schema.setLabel(declared.getLabel());
+
+        return schema.build();
+    }
 
     private ModelParameter inferParameter(NodeId paramId, List<SocketId> targets, GraphSection<NodeMetadata> graph) {
 
@@ -661,6 +706,24 @@ public class GraphBuilder {
             var nextSchema = targetInputs.get(i).getValue();
             var nextSchemaTarget = targetInputs.get(i).getKey();
 
+            var objectTypeMismatch = nextSchema.getObjectType() != schema.getObjectType();
+            var fileTypeMismatch = !objectTypeMismatch &&
+                    schema.getObjectType() == ObjectType.FILE &&
+                    !nextSchema.getFileType().equals(schema.getFileType());
+
+            if (objectTypeMismatch || fileTypeMismatch) {
+
+                var message = String.format("Input is ambiguous for [%s]: %s are different for [%s.%s] and [%s.%s]",
+                        inputId.name(),
+                        objectTypeMismatch ? "Object types" : "File types",
+                        schemaTarget.nodeId().name(), schemaTarget.socket(),
+                        nextSchemaTarget.nodeId().name(), nextSchemaTarget.socket());
+
+                errorHandler.error(inputId, message);
+
+                return null;
+            }
+
             schema = combineInputSchema(inputId, schema, nextSchema);
 
             // If combination is not possible, schema cannot be inferred
@@ -685,6 +748,10 @@ public class GraphBuilder {
         // Combining optional and non-optional inputs is allowed, the result is non-optional
         if (!nextModelInput.getOptional())
             modelInput.setOptional(false);
+
+        // File inputs have already been checked for a matching file type, there is no schema to combine
+        if (modelInput.getObjectType() == ObjectType.FILE)
+            return modelInput;
 
         var schema = modelInput.getSchema();
         var nextSchema = nextModelInput.getSchema();

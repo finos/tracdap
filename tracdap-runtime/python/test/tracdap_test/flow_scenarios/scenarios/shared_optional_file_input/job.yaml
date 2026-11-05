@@ -1,0 +1,7 @@
+models:
+  aggregate: tracdap_test.flow_scenarios.models.SumByRegion
+  note_a: tracdap_test.flow_scenarios.models.NoteTotals
+  note_b: tracdap_test.flow_scenarios.models.NoteTotals
+
+inputs:
+  accounts: accounts.csv

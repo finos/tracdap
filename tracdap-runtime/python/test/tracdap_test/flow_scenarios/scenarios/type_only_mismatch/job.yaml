@@ -1,0 +1,7 @@
+models:
+  aggregate: tracdap_test.flow_scenarios.models.SumByRegion
+  render: tracdap_test.flow_scenarios.models.RenderReport
+  annotate: tracdap_test.flow_scenarios.models.AnnotateReport
+
+inputs:
+  accounts: accounts.csv
