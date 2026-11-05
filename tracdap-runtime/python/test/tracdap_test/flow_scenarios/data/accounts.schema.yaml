@@ -1,0 +1,7 @@
+schemaType: TABLE_SCHEMA
+partType: PART_ROOT
+table:
+  fields:
+    - { fieldName: id, fieldOrder: 0, fieldType: STRING, label: Account ID, businessKey: true, notNull: true }
+    - { fieldName: region, fieldOrder: 1, fieldType: STRING, label: Region, categorical: true }
+    - { fieldName: amount, fieldOrder: 2, fieldType: FLOAT, label: Amount }

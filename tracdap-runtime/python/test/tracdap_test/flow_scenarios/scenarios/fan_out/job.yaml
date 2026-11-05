@@ -1,0 +1,11 @@
+models:
+  filter: tracdap_test.flow_scenarios.models.FilterAccounts
+  sum_all: tracdap_test.flow_scenarios.models.SumByRegion
+  sum_filtered: tracdap_test.flow_scenarios.models.SumByRegion
+  count_filtered: tracdap_test.flow_scenarios.models.CountAccounts
+
+parameters:
+  min_amount: 100.0
+
+inputs:
+  accounts: accounts.csv

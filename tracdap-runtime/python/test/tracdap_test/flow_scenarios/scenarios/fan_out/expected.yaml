@@ -1,0 +1,18 @@
+description: One flow input feeds two models, one model output feeds two models, and one model is used in two nodes
+
+outcome: SUCCEEDED
+
+flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    totals_all: { objectType: DATA }
+    totals_filtered: { objectType: DATA }
+    account_count: { objectType: DATA }
+
+outputs:
+  totals_all: DATA
+  totals_filtered: DATA
+  account_count: DATA

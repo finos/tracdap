@@ -1,3 +1,4 @@
 * text=auto
 *.sh text eol=lf
 /dev/**/*.py text eol=lf
+/tracdap-runtime/python/test/tracdap_test/flow_scenarios/scenarios/**/expected/** -text

@@ -1,0 +1,6 @@
+models:
+  select: tracdap_test.flow_scenarios.models.SelectAccounts
+
+inputs:
+  source: accounts.parquet
+  exclude_ids: exclude_ids.csv

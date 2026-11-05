@@ -1,0 +1,13 @@
+description: A dynamic schema input, and an optional input that the job supplies, so the model excludes the listed accounts
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    source: { objectType: DATA }
+    exclude_ids: { objectType: DATA, optional: true }
+  outputs:
+    selected_accounts: { objectType: DATA }
+
+outputs:
+  selected_accounts: DATA

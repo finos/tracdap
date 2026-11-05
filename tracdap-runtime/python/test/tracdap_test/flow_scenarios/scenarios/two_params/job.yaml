@@ -1,0 +1,10 @@
+models:
+  filter: tracdap_test.flow_scenarios.models.FilterAccounts
+  split: tracdap_test.flow_scenarios.models.SplitAccounts
+
+parameters:
+  min_amount: 100.0
+  threshold: 200.0
+
+inputs:
+  accounts: accounts.csv

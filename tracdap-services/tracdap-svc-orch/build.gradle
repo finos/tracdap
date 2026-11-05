@@ -99,3 +99,11 @@ tasks.withType(CreateStartScripts) {
         windowsScript.text = windowsScript.text.replace("<DEFAULT_CONFIG_FILE>", "trac-platform.yaml")
     }}
 }
+
+tasks.named("integration") {
+
+    // RunFlowScenarioTest reads the flow scenario catalogue, which lives in the Python runtime tests
+    inputs.files(fileTree("${rootProject.projectDir}/tracdap-runtime/python/test/tracdap_test/flow_scenarios") {
+        exclude "**/__pycache__/**"
+    }).withPropertyName("flowScenarios")
+}

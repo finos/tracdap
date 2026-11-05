@@ -1,0 +1,10 @@
+models:
+  scale_a: tracdap_test.flow_scenarios.models.ScaleAmountsA
+  scale_b: tracdap_test.flow_scenarios.models.ScaleAmountsB
+  combine: tracdap_test.flow_scenarios.models.CombineAccounts
+
+parameters:
+  factor: 4.0
+
+inputs:
+  accounts: accounts.csv

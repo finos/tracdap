@@ -1,0 +1,20 @@
+description: The diamond with the shared parameter left unsupplied; the models' defaults differ, so the flow parameter has none and is required
+
+outcome: REJECTED
+error: "Missing required parameter [factor]"
+
+flow:
+  parameters:
+    factor: { paramType: FLOAT }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    combined_accounts: { objectType: DATA }
+
+
+devMode:
+  reason: Dev mode doesn't run job consistency validation, so the runtime fails the job when it builds the graph, before any model runs
+  outcome: FAILED
+  error: "Invalid job configuration\nMissing required parameter: [factor]"
+  outputs: {}
+  ran: []

@@ -1,0 +1,9 @@
+models:
+  split: tracdap_test.flow_scenarios.models.SplitAccounts
+  aggregate: tracdap_test.flow_scenarios.models.SumByRegion
+
+parameters:
+  threshold: 90.0
+
+inputs:
+  accounts: accounts.csv

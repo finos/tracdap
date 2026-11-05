@@ -1,0 +1,18 @@
+description: Version 1 of a flow is run after version 2, with a different model chain and output, has been saved
+
+outcome: SUCCEEDED
+
+flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    region_totals: { objectType: DATA }
+
+outputs:
+  region_totals: DATA
+
+
+devMode:
+  skip: Flow versions exist only on the platform, dev mode loads a flow from a file

@@ -1,0 +1,14 @@
+description: A model turns a dataset into a file, which is saved and also read by a model producing a second file
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    report: { objectType: FILE, fileType: txt }
+    annotated_report: { objectType: FILE, fileType: txt }
+
+outputs:
+  report: FILE
+  annotated_report: FILE

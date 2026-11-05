@@ -1,0 +1,18 @@
+description: A model's dataset output is wired to another model's file input, so validation rejects the job
+
+outcome: REJECTED
+error: "Input [report] is not the right object type (expected FILE, got DATA)"
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    annotated_report: { objectType: FILE }
+
+
+devMode:
+  reason: Dev mode doesn't check object types between models, so the job runs and the model fails when it reads the input
+  outcome: FAILED
+  error: "The object referenced by [report] in the current context has the wrong type (expected FILE, got DATA)"
+  outputs: {}
+  ran: [aggregate, annotate]
