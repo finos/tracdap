@@ -17,15 +17,20 @@
 
 package org.finos.tracdap.common.validation.static_;
 
+import org.finos.tracdap.api.TracErrorItem;
+import org.finos.tracdap.common.exception.EInputValidation;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.TypeSystem;
+import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.*;
 
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 
 
 public class FlowValidatorTest extends BaseValidatorTest {
@@ -1005,5 +1010,149 @@ public class FlowValidatorTest extends BaseValidatorTest {
     @Test
     void nodeSearch_resourceNode() {
         expectInvalid(flowWithAllNodeTypes("resource_1"));
+    }
+
+
+    private static FlowDefinition.Builder declaredFlow() {
+
+        return FlowDefinition.newBuilder()
+                .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("param_1", FlowNode.newBuilder().setNodeType(FlowNodeType.PARAMETER_NODE).build())
+                .putNodes("resource_1", FlowNode.newBuilder().setNodeType(FlowNodeType.RESOURCE_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("input_1")
+                        .addParameters("param_1")
+                        .addResources("resource_1")
+                        .addOutputs("output_1")
+                        .build())
+                .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(edge("input_1", null, "model_1", "input_1"))
+                .addEdges(edge("param_1", null, "model_1", "param_1"))
+                .addEdges(edge("resource_1", null, "model_1", "resource_1"))
+                .addEdges(edge("model_1", "output_1", "output_1", null));
+    }
+
+    private static void expectInvalid(FlowDefinition flow, String expectedError) {
+
+        var error = Assertions.assertThrows(EInputValidation.class, () -> new Validator().validateFixedObject(flow));
+
+        var details = error.getDetails().getItemsList().stream()
+                .map(TracErrorItem::getDetail)
+                .collect(Collectors.toList());
+
+        Assertions.assertTrue(
+                details.stream().anyMatch(detail -> detail.startsWith(expectedError)),
+                String.format("Expected an error starting [%s], got %s", expectedError, details));
+    }
+
+    @Test
+    void typeOnly_dataAndFile_ok() {
+
+        var flow = declaredFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).setLabel("Input one").build())
+                .putOutputs("output_1", ModelOutputSchema.newBuilder().setObjectType(ObjectType.FILE).build())
+                .build();
+
+        expectValid(flow);
+    }
+
+    @Test
+    void typeOnly_missingObjectType() {
+
+        var flow = declaredFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setLabel("Input one").build())
+                .build();
+
+        expectInvalid(flow);
+    }
+
+    @Test
+    void typeOnly_mixedWithFull_ok() {
+
+        var flow = declaredFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder()
+                        .setObjectType(ObjectType.FILE)
+                        .setFileType(FileType.newBuilder().setExtension("txt").setMimeType("text/plain"))
+                        .build())
+                .putOutputs("output_1", ModelOutputSchema.newBuilder().setObjectType(ObjectType.DATA).build())
+                .build();
+
+        expectValid(flow);
+    }
+
+    @Test
+    void typeOnly_optionalSet() {
+
+        var flow = declaredFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).setOptional(true).build())
+                .build();
+
+        expectInvalid(flow, "[optional] cannot be set when only the object type is declared");
+    }
+
+    @Test
+    void typeOnly_dynamicSet() {
+
+        var flow = declaredFlow()
+                .putOutputs("output_1", ModelOutputSchema.newBuilder().setObjectType(ObjectType.DATA).setDynamic(true).build())
+                .build();
+
+        expectInvalid(flow, "[dynamic] cannot be set when only the object type is declared");
+    }
+
+    @Test
+    void declarations_inputsAndOutputsWithoutResources_ok() {
+
+        var flow = declaredFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).build())
+                .putOutputs("output_1", ModelOutputSchema.newBuilder().setObjectType(ObjectType.DATA).build())
+                .build();
+
+        expectValid(flow);
+    }
+
+    @Test
+    void declarations_keysDoNotMatchNodes() {
+
+        var flow = declaredFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).build())
+                .putInputs("input_2", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).build())
+                .build();
+
+        expectInvalid(flow, "Flow explicit input [input_2] does not correspond to an input node");
+    }
+
+    @Test
+    void declarations_resourceNodeMissing() {
+
+        var flow = declaredFlow()
+                .putResources("resource_2", ModelResource.newBuilder().setResourceType(ResourceType.EXTERNAL_STORAGE).build())
+                .build();
+
+        expectInvalid(flow, "Resource node [resource_1] is missing from flow explicit resources");
+    }
+
+    @Test
+    void declaredParameter_parameterNode_ok() {
+
+        var flow = declaredFlow()
+                .putParameters("param_1", ModelParameter.newBuilder()
+                        .setParamType(TypeSystem.descriptor(BasicType.FLOAT))
+                        .build())
+                .build();
+
+        expectValid(flow);
+    }
+
+    @Test
+    void declaredParameter_conflictsWithInputNode() {
+
+        var flow = declaredFlow()
+                .putParameters("input_1", ModelParameter.newBuilder()
+                        .setParamType(TypeSystem.descriptor(BasicType.FLOAT))
+                        .build())
+                .build();
+
+        expectInvalid(flow, "Flow parameter [input_1] conflicts with a node of type [INPUT_NODE]");
     }
 }

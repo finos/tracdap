@@ -1,0 +1,17 @@
+description: One input read as a dataset by one model and as a file by another
+
+outcome: REJECTED
+error: "Input is ambiguous for [accounts]: Object types are different for"
+
+flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    filtered_accounts: { objectType: DATA }
+    annotated_report: { objectType: FILE }
+
+devMode:
+  reason: Dev mode requires every model sharing an input to declare an identical socket, and reports a mixed input in those terms
+  error: "Multiple models use input [accounts] but expect different schemas"

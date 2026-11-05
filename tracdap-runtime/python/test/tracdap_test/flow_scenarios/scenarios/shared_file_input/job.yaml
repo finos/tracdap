@@ -1,0 +1,6 @@
+models:
+  annotate: tracdap_test.flow_scenarios.models.AnnotateReport
+  stamp: tracdap_test.flow_scenarios.models.StampReport
+
+inputs:
+  report: report.txt

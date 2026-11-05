@@ -1,0 +1,15 @@
+description: A DATA branch and a FILE branch with every input and output declared by object type only, run twice
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA, label: Accounts for the flow, fields: [id, region, amount], props: { source_system: ledger } }
+    report: { objectType: FILE, label: Notes for the flow, fileType: txt }
+  outputs:
+    region_totals: { objectType: DATA, label: Totals for the flow, fields: [region, total] }
+    annotated_report: { objectType: FILE, label: Annotated notes for the flow, fileType: txt, props: { audience: internal } }
+
+outputs:
+  region_totals: DATA
+  annotated_report: FILE

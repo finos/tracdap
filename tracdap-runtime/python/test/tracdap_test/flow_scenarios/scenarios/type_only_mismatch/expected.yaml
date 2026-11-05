@@ -1,0 +1,11 @@
+description: An output declared as a dataset by object type only, fed by a model's file output
+
+outcome: REJECTED
+error: "Output [report] is not the right object type (expected DATA, got FILE)"
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    report: { objectType: DATA }
+    annotated_report: { objectType: FILE }

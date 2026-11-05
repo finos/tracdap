@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.orch.api;
 
+import com.google.protobuf.ByteString;
 import com.google.protobuf.UnsafeByteOperations;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -1828,4 +1829,262 @@ public class JobValidationTest {
         expectPlacementInvalid(exportData, Status.Code.FAILED_PRECONDITION, "is the wrong type");
     }
 
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // TYPE-ONLY DECLARATIONS AND FILE SOCKETS
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private static final org.finos.tracdap.metadata.FileType TXT_FILE = org.finos.tracdap.metadata.FileType.newBuilder().setExtension("txt").setMimeType("text/plain").build();
+    private static final org.finos.tracdap.metadata.FileType CSV_FILE = org.finos.tracdap.metadata.FileType.newBuilder().setExtension("csv").setMimeType("text/csv").build();
+
+    private static ModelInputSchema dataInput(SchemaDefinition schema) {
+        return ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).setSchema(schema).build();
+    }
+
+    private static ModelInputSchema fileInput(org.finos.tracdap.metadata.FileType fileType) {
+        return ModelInputSchema.newBuilder().setObjectType(ObjectType.FILE).setFileType(fileType).build();
+    }
+
+    private static ModelOutputSchema dataOutput(SchemaDefinition schema) {
+        return ModelOutputSchema.newBuilder().setObjectType(ObjectType.DATA).setSchema(schema).build();
+    }
+
+    private static ModelOutputSchema fileOutput(org.finos.tracdap.metadata.FileType fileType) {
+        return ModelOutputSchema.newBuilder().setObjectType(ObjectType.FILE).setFileType(fileType).build();
+    }
+
+    private TagSelector createSocketModel(String entryPoint, Map<String, ModelInputSchema> inputs, Map<String, ModelOutputSchema> outputs) {
+
+        var modelDef = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository("UNIT_TEST_REPO")
+                .setVersion("v1.0.0")
+                .setPath("src/")
+                .setEntryPoint(entryPoint)
+                .putAllInputs(inputs)
+                .putAllOutputs(outputs);
+
+        var modelId = metaClient.createObject(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .setModel(modelDef))
+                .build());
+
+        return MetadataUtil.selectorFor(modelId);
+    }
+
+    private TagSelector createFlow(FlowDefinition.Builder flow) {
+
+        var flowId = metaClient.createObject(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(flow))
+                .build());
+
+        return MetadataUtil.selectorFor(flowId);
+    }
+
+    private TagSelector createTextFile(String name) {
+
+        var fileId = dataClient.createSmallFile(FileWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setName(name)
+                .setMimeType("text/plain")
+                .setContent(ByteString.copyFromUtf8("Some text content"))
+                .build());
+
+        return MetadataUtil.selectorFor(fileId);
+    }
+
+    private static FlowDefinition.Builder singleModelFlow() {
+
+        return FlowDefinition.newBuilder()
+                .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("input_1").addOutputs("output_1").build())
+                .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(flowEdge("input_1", null, "model_1", "input_1"))
+                .addEdges(flowEdge("model_1", "output_1", "output_1", null));
+    }
+
+    private List<String> runFlowErrors(RunFlowJob.Builder runFlow, Status.Code expectedCode) {
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> validateRunFlow(runFlow));
+        Assertions.assertEquals(expectedCode, e.getStatus().getCode());
+
+        var trailers = e.getTrailers();
+        var errorDetails = trailers != null ? trailers.get(TRAC_ERROR_DETAILS_KEY) : null;
+
+        Assertions.assertNotNull(errorDetails, "No error details for status " + e.getStatus());
+
+        return errorDetails.getItemsList().stream().map(TracErrorItem::getDetail).collect(Collectors.toList());
+    }
+
+    @Test
+    public void runFlow_typeOnlyInput_modelReadsFile() {
+
+        var flowSelector = createFlow(singleModelFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).build()));
+
+        var model1 = createSocketModel(
+                "acme.models.test_model.FileReader",
+                Map.of("input_1", fileInput(TXT_FILE)),
+                Map.of("output_1", dataOutput(SampleData.BASIC_TABLE_SCHEMA)));
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(flowSelector)
+                .putModels("model_1", model1)
+                .putInputs("input_1", basicDataSelector);
+
+        var errors = runFlowErrors(runFlow, Status.Code.FAILED_PRECONDITION);
+
+        Assertions.assertEquals(1, errors.size(), "Expected one error, got " + errors);
+        Assertions.assertTrue(errors.get(0).startsWith(
+                "Input [model_1.input_1] is not the right object type (expected FILE, got DATA)"), errors.get(0));
+    }
+
+    @Test
+    public void runFlow_typeOnlyInput_fileSupplied() {
+
+        var flowSelector = createFlow(singleModelFlow()
+                .putInputs("input_1", ModelInputSchema.newBuilder().setObjectType(ObjectType.DATA).build()));
+
+        var model1 = createSocketModel(
+                "acme.models.test_model.DataReader",
+                Map.of("input_1", dataInput(SampleData.BASIC_TABLE_SCHEMA)),
+                Map.of("output_1", dataOutput(SampleData.BASIC_TABLE_SCHEMA)));
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(flowSelector)
+                .putModels("model_1", model1)
+                .putInputs("input_1", createTextFile("input_1.txt"));
+
+        var errors = runFlowErrors(runFlow, Status.Code.FAILED_PRECONDITION);
+
+        Assertions.assertTrue(
+                errors.stream().anyMatch(error -> error.startsWith("Input [input_1] is not the right object type (expected DATA, got FILE)")),
+                "Expected the supplied input object type error, got " + errors);
+    }
+
+    @Test
+    public void runFlow_typeOnlyOutput_priorOutputModelDisagrees() {
+
+        var flowSelector = createFlow(singleModelFlow()
+                .putOutputs("output_1", ModelOutputSchema.newBuilder().setObjectType(ObjectType.DATA).build()));
+
+        var model1 = createSocketModel(
+                "acme.models.test_model.FileWriter",
+                Map.of("input_1", dataInput(SampleData.BASIC_TABLE_SCHEMA)),
+                Map.of("output_1", fileOutput(TXT_FILE)));
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(flowSelector)
+                .putModels("model_1", model1)
+                .putInputs("input_1", basicDataSelector)
+                .putPriorOutputs("output_1", enrichedDataSelector);
+
+        var errors = runFlowErrors(runFlow, Status.Code.FAILED_PRECONDITION);
+
+        Assertions.assertEquals(1, errors.size(), "Expected one error, got " + errors);
+        Assertions.assertTrue(errors.get(0).startsWith(
+                "Output [output_1] is not the right object type (expected DATA, got FILE)"), errors.get(0));
+    }
+
+    @Test
+    public void runFlow_sharedInput_differentFileTypes() {
+
+        var flow = FlowDefinition.newBuilder()
+                .putNodes("shared_input", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_a", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("shared_input").addOutputs("output_a").build())
+                .putNodes("model_b", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("shared_input").addOutputs("output_b").build())
+                .putNodes("output_a", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .putNodes("output_b", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE).build())
+                .addEdges(flowEdge("shared_input", null, "model_a", "shared_input"))
+                .addEdges(flowEdge("shared_input", null, "model_b", "shared_input"))
+                .addEdges(flowEdge("model_a", "output_a", "output_a", null))
+                .addEdges(flowEdge("model_b", "output_b", "output_b", null));
+
+        var modelA = createSocketModel(
+                "acme.models.test_model.TextReader",
+                Map.of("shared_input", fileInput(TXT_FILE)),
+                Map.of("output_a", dataOutput(SampleData.BASIC_TABLE_SCHEMA)));
+
+        var modelB = createSocketModel(
+                "acme.models.test_model.CsvReader",
+                Map.of("shared_input", fileInput(CSV_FILE)),
+                Map.of("output_b", dataOutput(SampleData.BASIC_TABLE_SCHEMA)));
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(createFlow(flow))
+                .putModels("model_a", modelA)
+                .putModels("model_b", modelB)
+                .putInputs("shared_input", createTextFile("shared_input.txt"));
+
+        var errors = runFlowErrors(runFlow, Status.Code.FAILED_PRECONDITION);
+
+        Assertions.assertTrue(
+                errors.stream().anyMatch(error -> error.startsWith("Input is ambiguous for [shared_input]: File types are different for")),
+                "Expected the file type ambiguity error, got " + errors);
+
+        Assertions.assertTrue(
+                errors.stream().noneMatch(error -> error.startsWith("Cannot combine schema types") || error.contains("Schemas are not compatible")),
+                "Expected no schema combination errors, got " + errors);
+    }
+
+    @Test
+    public void runFlow_priorOutputWithoutModel() {
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(createFlow(singleModelFlow()))
+                .putInputs("input_1", basicDataSelector)
+                .putPriorOutputs("output_1", enrichedDataSelector);
+
+        var errors = runFlowErrors(runFlow, Status.Code.FAILED_PRECONDITION);
+
+        Assertions.assertTrue(
+                errors.stream().anyMatch(error -> error.startsWith("Type inference failed for output [output_1]")),
+                "Expected the output inference error, got " + errors);
+    }
+
+    @Test
+    public void runFlow_fileSocketMimeTypeMismatch() {
+
+        var flow = singleModelFlow()
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("input_1").addOutputs("report").build())
+                .putNodes("model_2", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                        .addInputs("report").addOutputs("output_1").build())
+                .clearEdges()
+                .addEdges(flowEdge("input_1", null, "model_1", "input_1"))
+                .addEdges(flowEdge("model_1", "report", "model_2", "report"))
+                .addEdges(flowEdge("model_2", "output_1", "output_1", null));
+
+        var model1 = createSocketModel(
+                "acme.models.test_model.TextWriter",
+                Map.of("input_1", dataInput(SampleData.BASIC_TABLE_SCHEMA)),
+                Map.of("report", fileOutput(TXT_FILE)));
+
+        var model2 = createSocketModel(
+                "acme.models.test_model.MarkdownReader",
+                Map.of("report", fileInput(TXT_FILE.toBuilder().setMimeType("text/markdown").build())),
+                Map.of("output_1", dataOutput(SampleData.BASIC_TABLE_SCHEMA)));
+
+        var runFlow = RunFlowJob.newBuilder()
+                .setFlow(createFlow(flow))
+                .putModels("model_1", model1)
+                .putModels("model_2", model2)
+                .putInputs("input_1", basicDataSelector);
+
+        var errors = runFlowErrors(runFlow, Status.Code.FAILED_PRECONDITION);
+
+        Assertions.assertTrue(
+                errors.stream().anyMatch(error -> error.startsWith("Mime type does not match (expected [text/markdown], got [text/plain])")),
+                "Expected the MIME type error, got " + errors);
+    }
 }

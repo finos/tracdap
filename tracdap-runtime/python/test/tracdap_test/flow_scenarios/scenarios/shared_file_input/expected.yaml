@@ -1,0 +1,14 @@
+description: A file input declared by object type only, shared by two models that read it with identical sockets
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    report: { objectType: FILE, fileType: txt }
+  outputs:
+    annotated_report: { objectType: FILE, fileType: txt }
+    stamped_report: { objectType: FILE, fileType: txt }
+
+outputs:
+  annotated_report: FILE
+  stamped_report: FILE

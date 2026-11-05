@@ -1,0 +1,61 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  aggregate:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  region_totals:
+    nodeType: OUTPUT_NODE
+
+  report:
+    nodeType: INPUT_NODE
+
+  annotate:
+    nodeType: MODEL_NODE
+    inputs: [report]
+    outputs: [annotated_report]
+
+  annotated_report:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: aggregate, socket: accounts }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: region_totals }
+
+  - source: { node: report }
+    target: { node: annotate, socket: report }
+
+  - source: { node: annotate, socket: annotated_report }
+    target: { node: annotated_report }
+
+inputs:
+
+  accounts:
+    objectType: DATA
+    label: Accounts for the flow
+    inputProps:
+      source_system: { type: { basicType: STRING }, stringValue: ledger }
+
+  report:
+    objectType: FILE
+    label: Notes for the flow
+
+outputs:
+
+  region_totals:
+    objectType: DATA
+    label: Totals for the flow
+
+  annotated_report:
+    objectType: FILE
+    label: Annotated notes for the flow
+    outputProps:
+      audience: { type: { basicType: STRING }, stringValue: internal }

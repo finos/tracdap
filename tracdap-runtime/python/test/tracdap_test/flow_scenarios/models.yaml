@@ -260,6 +260,41 @@ tracdap_test.flow_scenarios.models.FilterAccounts:
             label: Amount
       label: Filtered accounts
   modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.NoteTotals:
+  inputs:
+    region_totals:
+      objectType: DATA
+      schema:
+        schemaType: TABLE_SCHEMA
+        partType: PART_ROOT
+        table:
+          fields:
+          - fieldName: region
+            fieldType: STRING
+            label: Region
+            businessKey: true
+            categorical: true
+            notNull: true
+          - fieldName: total
+            fieldOrder: 1
+            fieldType: FLOAT
+            label: Total amount
+      label: Totals by region
+    notes:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Notes
+      optional: true
+  outputs:
+    summary:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Totals summary
+  modelType: STANDARD_MODEL
 tracdap_test.flow_scenarios.models.RenderReport:
   inputs:
     region_totals:
@@ -550,6 +585,22 @@ tracdap_test.flow_scenarios.models.SplitAccounts:
             label: Amount
       label: Rejected accounts
       optional: true
+  modelType: STANDARD_MODEL
+tracdap_test.flow_scenarios.models.StampReport:
+  inputs:
+    report:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Region report
+  outputs:
+    stamped_report:
+      objectType: FILE
+      fileType:
+        extension: txt
+        mimeType: text/plain
+      label: Stamped report
   modelType: STANDARD_MODEL
 tracdap_test.flow_scenarios.models.SumByRegion:
   inputs:
