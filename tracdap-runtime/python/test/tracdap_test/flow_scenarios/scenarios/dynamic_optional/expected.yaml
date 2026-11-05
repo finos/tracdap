@@ -11,5 +11,3 @@ flow:
 
 outputs:
   selected_accounts: DATA
-
-e2e: false

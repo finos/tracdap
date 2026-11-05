@@ -10,5 +10,3 @@ flow:
 
 outputs:
   applied_settings: DATA
-
-e2e: false

@@ -32,7 +32,7 @@ parameters:
   min_amount:
     paramType: { basicType: FLOAT }
     label: Minimum amount for the flow
-    defaultValue: { type: { basicType: FLOAT }, floatValue: 25.0 }
+    defaultValue: { type: { basicType: FLOAT }, floatValue: 60.0 }
 
 inputs:
 

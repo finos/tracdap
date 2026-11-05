@@ -16,5 +16,3 @@ outputs:
   totals_all: DATA
   totals_filtered: DATA
   account_count: DATA
-
-e2e: false

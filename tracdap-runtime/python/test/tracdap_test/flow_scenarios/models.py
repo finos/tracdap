@@ -79,7 +79,7 @@ class SumByRegion(trac.TracModel):
     def run_model(self, ctx: trac.TracContext):
         _log_run(self, ctx)
         accounts = ctx.get_pandas_table("accounts")
-        totals = accounts.groupby("region", as_index=False)["amount"].sum().rename(columns={"amount": "total"})
+        totals = accounts.groupby("region", as_index=False, observed=True)["amount"].sum().rename(columns={"amount": "total"})
         ctx.put_pandas_table("region_totals", totals)
 
 
@@ -155,7 +155,7 @@ class CombineAccounts(trac.TracModel):
         _log_run(self, ctx)
         left = ctx.get_pandas_table("left")
         right = ctx.get_pandas_table("right").set_index("id")
-        left["amount"] = left["amount"] + left["id"].map(right["amount"])
+        left["amount"] = left["amount"] - left["id"].map(right["amount"])
         ctx.put_pandas_table("combined_accounts", left)
 
 
@@ -250,7 +250,7 @@ class RenderReport(trac.TracModel):
 
     def run_model(self, ctx: trac.TracContext):
         _log_run(self, ctx)
-        totals = ctx.get_pandas_table("region_totals")
+        totals = ctx.get_pandas_table("region_totals").sort_values("region", key=lambda region: region.astype(str))
         lines = [f"{row.region}: {row.total}" for row in totals.itertuples()]
         ctx.put_file("report", "\n".join(lines).encode("utf-8"))
 

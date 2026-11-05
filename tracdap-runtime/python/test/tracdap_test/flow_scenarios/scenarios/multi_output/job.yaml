@@ -3,7 +3,7 @@ models:
   aggregate: tracdap_test.flow_scenarios.models.SumByRegion
 
 parameters:
-  threshold: 100.0
+  threshold: 90.0
 
 inputs:
   accounts: accounts.csv

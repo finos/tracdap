@@ -9,7 +9,6 @@ flow:
   outputs:
     annotated_report: { objectType: FILE }
 
-e2e: false
 
 devMode:
   reason: Dev mode doesn't check object types between models, so the job runs and the model fails when it reads the input

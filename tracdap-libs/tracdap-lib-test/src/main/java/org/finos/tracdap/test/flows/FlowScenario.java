@@ -25,10 +25,13 @@ import org.finos.tracdap.metadata.*;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvMapper;
+import com.fasterxml.jackson.dataformat.csv.CsvParser;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.protobuf.Message;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -85,6 +88,7 @@ public class FlowScenario {
     private static final YAMLMapper YAML = new YAMLMapper();
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final ConfigParser PARSER = new ConfigParser();
+    private static final CsvMapper CSV = new CsvMapper();
 
     private final String name;
     private final Path dataDir;
@@ -104,7 +108,7 @@ public class FlowScenario {
     private final Map<String, ExpectedEntry> flowInputs;
     private final Map<String, ExpectedEntry> flowOutputs;
     private final Map<String, ObjectType> outputs;
-    private final boolean e2e;
+    private final Path expectedDir;
 
     public static Path findTracRepoDir() {
 
@@ -180,7 +184,7 @@ public class FlowScenario {
         this.flowParameters = expectedParameters(expected.path("flow").path("parameters"));
         this.flowInputs = expectedEntries(expected.path("flow").path("inputs"));
         this.flowOutputs = expectedEntries(expected.path("flow").path("outputs"));
-        this.e2e = expected.path("e2e").asBoolean(false);
+        this.expectedDir = scenarioDir.resolve("expected");
         this.outputs = new LinkedHashMap<>();
 
         expected.path("outputs").properties().forEach(output ->
@@ -195,6 +199,25 @@ public class FlowScenario {
                 throw new ETracInternal(String.format("Scenario [%s] expects node [%s] to run, which is not a model node in job.yaml", name, node));
 
         checkExpectedError(outcome, error, "expected.yaml");
+
+        var expectedFiles = new TreeSet<String>();
+
+        if (Files.isDirectory(expectedDir)) {
+            try (var files = Files.list(expectedDir)) {
+                files.forEach(file -> expectedFiles.add(file.getFileName().toString().replaceFirst("\\.[^.]+$", "")));
+            }
+            catch (IOException e) {
+                throw new ETracInternal(String.format("Failed to read [%s]: %s", expectedDir, e.getMessage()), e);
+            }
+        }
+
+        var savedOutputs = new TreeSet<>(outputs.keySet());
+        expected.path("devMode").path("outputs").fieldNames().forEachRemaining(savedOutputs::add);
+
+        if (!expectedFiles.equals(savedOutputs))
+            throw new ETracInternal(String.format(
+                    "Scenario [%s]: every output saved by either runner needs one file in expected/ (outputs %s, files %s)",
+                    name, savedOutputs, expectedFiles));
 
         if (expected.has("devMode")) {
 
@@ -229,10 +252,196 @@ public class FlowScenario {
     public Map<String, ExpectedEntry> flowInputs() { return flowInputs; }
     public Map<String, ExpectedEntry> flowOutputs() { return flowOutputs; }
     public Map<String, ObjectType> outputs() { return outputs; }
-    public boolean e2e() { return e2e; }
-
     public Path dataFile(String inputName) {
         return dataDir.resolve(inputs.get(inputName));
+    }
+
+    /**
+     * The data file and schema the platform loads for an input. A dynamic input's file carries its own schema,
+     * so the platform loads the CSV file of the same name, with the schema beside it in {@code <name>.schema.yaml}.
+     */
+    public Map.Entry<Path, SchemaDefinition> platformData(String inputName) {
+
+        var requirement = inputRequirement(inputName);
+        var dataFile = dataFile(inputName);
+
+        if (!requirement.getDynamic())
+            return Map.entry(dataFile, requirement.getSchema());
+
+        var baseName = dataFile.getFileName().toString().replaceFirst("\\.[^.]+$", "");
+        var schema = parseProto(readYaml(dataDir.resolve(baseName + ".schema.yaml")), SchemaDefinition.class);
+
+        return Map.entry(dataDir.resolve(baseName + ".csv"), schema);
+    }
+
+    /** The content the platform loads for an input: the data file, with a struct given as JSON */
+    public byte[] platformContent(String inputName) {
+
+        var platformData = platformData(inputName);
+
+        try {
+
+            var content = Files.readAllBytes(platformData.getKey());
+
+            return platformData.getValue().getSchemaType() == SchemaType.STRUCT_SCHEMA
+                    ? JSON.writeValueAsBytes(YAML.readTree(content))
+                    : content;
+        }
+        catch (IOException e) {
+            throw new ETracInternal(String.format("Failed to read [%s]: %s", platformData.getKey(), e.getMessage()), e);
+        }
+    }
+
+    /** The file in expected/ holding the content a saved output must have */
+    public Path expectedOutput(String outputName) {
+
+        try (var files = Files.list(expectedDir)) {
+            return files
+                    .filter(file -> file.getFileName().toString().replaceFirst("\\.[^.]+$", "").equals(outputName))
+                    .findFirst()
+                    .orElseThrow();
+        }
+        catch (IOException e) {
+            throw new ETracInternal(String.format("Failed to read [%s]: %s", expectedDir, e.getMessage()), e);
+        }
+    }
+
+    /** The content a saved output must have, from expected/, in the form {@link #outputContent} gives */
+    public Object expectedContent(String outputName) {
+
+        var expectedFile = expectedOutput(outputName);
+
+        try {
+            return outputContent(outputName, Files.readAllBytes(expectedFile));
+        }
+        catch (IOException e) {
+            throw new ETracInternal(String.format("Failed to read [%s]: %s", expectedFile, e.getMessage()), e);
+        }
+    }
+
+    /**
+     * A saved output's content in a comparable form: a table (CSV) as its columns and its rows, typed by the
+     * output's schema and sorted, a struct (YAML or JSON) as its values, and a file as its bytes.
+     */
+    public Object outputContent(String outputName, byte[] content) {
+
+        var socket = outputRequirement(outputName);
+
+        if (socket.getObjectType() == ObjectType.FILE)
+            return ByteBuffer.wrap(content);
+
+        try {
+
+            if (socket.getSchema().getSchemaType() == SchemaType.STRUCT_SCHEMA)
+                return JSON.convertValue(YAML.readTree(content), Object.class);
+
+            var fieldTypes = socket.getSchema().getTable().getFieldsList().stream()
+                    .collect(Collectors.toMap(FieldSchema::getFieldName, FieldSchema::getFieldType));
+
+            List<List<String>> csvRows = CSV.readerForListOf(String.class)
+                    .with(CsvParser.Feature.WRAP_AS_ARRAY)
+                    .<List<String>>readValues(content)
+                    .readAll();
+
+            var columns = csvRows.isEmpty() ? List.<String>of() : csvRows.get(0);
+            var rows = new ArrayList<List<Object>>();
+
+            for (var csvRow : csvRows.subList(Math.min(1, csvRows.size()), csvRows.size())) {
+                var row = new ArrayList<Object>();
+                for (var i = 0; i < columns.size(); i++)
+                    row.add(csvValue(csvRow.get(i), fieldTypes.get(columns.get(i))));
+                rows.add(row);
+            }
+
+            rows.sort(Comparator.comparing(Object::toString));
+
+            var table = new LinkedHashMap<String, Object>();
+            table.put("columns", columns);
+            table.put("rows", rows);
+
+            return table;
+        }
+        catch (IOException e) {
+            throw new ETracInternal(String.format("Scenario [%s]: failed to read output [%s]: %s", name, outputName, e.getMessage()), e);
+        }
+    }
+
+    /** Where two contents from {@link #outputContent} differ, or null when they match, with floats compared to 1e-9 */
+    public static String contentMismatch(Object expected, Object actual) {
+        return contentMismatch("", expected, actual);
+    }
+
+    private static String contentMismatch(String path, Object expected, Object actual) {
+
+        if (expected == null || actual == null)
+            return Objects.equals(expected, actual) ? null : String.format("%s: expected %s, got %s", path, expected, actual);
+
+        if (expected instanceof Number && actual instanceof Number) {
+
+            var floating = expected instanceof Double || expected instanceof Float || actual instanceof Double || actual instanceof Float;
+            var e = ((Number) expected).doubleValue();
+            var a = ((Number) actual).doubleValue();
+
+            var match = floating
+                    ? Math.abs(e - a) <= 1e-9 * Math.max(1.0, Math.abs(e))
+                    : ((Number) expected).longValue() == ((Number) actual).longValue();
+
+            return match ? null : String.format("%s: expected %s, got %s", path, expected, actual);
+        }
+
+        if (expected instanceof Map && actual instanceof Map) {
+
+            var expectedMap = (Map<?, ?>) expected;
+            var actualMap = (Map<?, ?>) actual;
+
+            if (!expectedMap.keySet().equals(actualMap.keySet()))
+                return String.format("%s: expected keys %s, got %s", path, expectedMap.keySet(), actualMap.keySet());
+
+            for (var key : expectedMap.keySet()) {
+                var mismatch = contentMismatch(path + "[" + key + "]", expectedMap.get(key), actualMap.get(key));
+                if (mismatch != null)
+                    return mismatch;
+            }
+
+            return null;
+        }
+
+        if (expected instanceof List && actual instanceof List) {
+
+            var expectedList = (List<?>) expected;
+            var actualList = (List<?>) actual;
+
+            if (expectedList.size() != actualList.size())
+                return String.format("%s: expected %s, got %s", path, expected, actual);
+
+            for (var i = 0; i < expectedList.size(); i++) {
+                var mismatch = contentMismatch(path + "[" + i + "]", expectedList.get(i), actualList.get(i));
+                if (mismatch != null)
+                    return mismatch;
+            }
+
+            return null;
+        }
+
+        if (expected instanceof ByteBuffer && actual instanceof ByteBuffer)
+            return expected.equals(actual) ? null : String.format("%s: expected [%s], got [%s]", path,
+                    StandardCharsets.UTF_8.decode(((ByteBuffer) expected).duplicate()),
+                    StandardCharsets.UTF_8.decode(((ByteBuffer) actual).duplicate()));
+
+        return expected.equals(actual) ? null : String.format("%s: expected %s, got %s", path, expected, actual);
+    }
+
+    private static Object csvValue(String value, BasicType fieldType) {
+
+        if (value == null || value.isEmpty())
+            return null;
+
+        switch (fieldType) {
+            case FLOAT: return Double.parseDouble(value);
+            case INTEGER: return Long.parseLong(value);
+            case BOOLEAN: return Boolean.parseBoolean(value);
+            default: return value;
+        }
     }
 
     /** The model's interface from models.yaml, as a model stub that loads it from the given repository */

@@ -12,5 +12,3 @@ flow:
 outputs:
   report: FILE
   annotated_report: FILE
-
-e2e: true

@@ -12,5 +12,3 @@ flow:
 
 outputs:
   region_totals: DATA
-
-e2e: true

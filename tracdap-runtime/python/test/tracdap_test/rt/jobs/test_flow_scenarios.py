@@ -13,13 +13,16 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import csv
 import json
+import math
 import pathlib
 import shutil
 import tempfile
 import typing as tp
 import unittest
 
+import pyarrow.parquet as pq
 import yaml
 
 import tracdap.rt.config as cfg
@@ -58,6 +61,68 @@ def _model_interfaces() -> tp.Dict[str, meta.ModelDefinition]:
 
 def _scenario_names() -> tp.List[str]:
     return sorted(path.name for path in SCENARIOS_DIR.iterdir() if path.joinpath("expected.yaml").exists())
+
+
+_CSV_TYPES = {
+    meta.BasicType.STRING: str,
+    meta.BasicType.FLOAT: float,
+    meta.BasicType.INTEGER: int}
+
+
+def _read_table(path: pathlib.Path, field_types: tp.Dict[str, meta.BasicType]) -> dict:
+
+    """A CSV table as its columns and its rows, typed by the schema and sorted, so row order is not compared"""
+
+    with path.open(newline="") as csv_file:
+        reader = csv.DictReader(csv_file)
+        columns = list(reader.fieldnames or [])
+        rows = [
+            tuple(_CSV_TYPES[field_types[col]](row[col]) if row[col] != "" else None for col in columns)
+            for row in reader]
+
+    return {"columns": columns, "rows": sorted(rows, key=repr)}
+
+
+def _assert_values_match(test: unittest.TestCase, expected: tp.Any, actual: tp.Any, msg: str):
+
+    if expected is None or actual is None:
+        test.assertEqual(expected, actual, msg)
+    elif isinstance(expected, float) or isinstance(actual, float):
+        test.assertTrue(
+            isinstance(actual, (int, float)) and math.isclose(expected, actual, rel_tol=1e-9, abs_tol=1e-9),
+            f"{msg}: expected {expected}, got {actual}")
+    elif isinstance(expected, dict) and isinstance(actual, dict):
+        test.assertEqual(set(expected), set(actual), msg)
+        for key in expected:
+            _assert_values_match(test, expected[key], actual[key], f"{msg} [{key}]")
+    elif isinstance(expected, (list, tuple)) and isinstance(actual, (list, tuple)):
+        test.assertEqual(len(expected), len(actual), f"{msg}: expected {expected}, got {actual}")
+        for index, (expected_item, actual_item) in enumerate(zip(expected, actual)):
+            _assert_values_match(test, expected_item, actual_item, f"{msg} [{index}]")
+    else:
+        test.assertEqual(expected, actual, msg)
+
+
+class FlowScenarioDataTest(unittest.TestCase):
+
+    """Each parquet file in the catalogue holds the same table as the CSV file and schema the platform runner uploads"""
+
+    def test_parquet_matches_csv(self):
+
+        for parquet_file in DATA_DIR.glob("*.parquet"):
+            with self.subTest(parquet_file.name):
+
+                schema_def = cfg_p.ConfigParser(meta.SchemaDefinition).parse(
+                    _read_yaml(DATA_DIR.joinpath(f"{parquet_file.stem}.schema.yaml")))
+
+                field_types = {f.fieldName: f.fieldType for f in schema_def.table.fields}
+                csv_table = _read_table(DATA_DIR.joinpath(f"{parquet_file.stem}.csv"), field_types)
+
+                parquet_table = pq.read_table(parquet_file)
+                parquet_rows = sorted((tuple(row.values()) for row in parquet_table.to_pylist()), key=repr)
+
+                self.assertEqual([f.fieldName for f in schema_def.table.fields], parquet_table.column_names)
+                _assert_values_match(self, csv_table, {"columns": parquet_table.column_names, "rows": parquet_rows}, parquet_file.name)
 
 
 class FlowScenarioModelsTest(unittest.TestCase):
@@ -136,6 +201,12 @@ class FlowScenarioDevModeTest(unittest.TestCase):
                 expected["devMode"].get("reason") or expected["devMode"].get("skip"),
                 f"[{scenario_name}]: the devMode override needs a reason or a skip")
 
+        saved_outputs = {*(expected.get("outputs") or {}), *(expected.get("devMode", {}).get("outputs") or {})}
+        expected_files = {p.stem for p in scenario_dir.joinpath("expected").glob("*")}
+        self.assertEqual(
+            sorted(saved_outputs), sorted(expected_files),
+            f"[{scenario_name}]: every output saved by either runner needs one file in expected/")
+
         expected = {**expected, **expected.get("devMode", {})}
 
         if expected["outcome"] != "SUCCEEDED":
@@ -164,6 +235,7 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
                 self._check_strict_flow(job_config, expected)
                 self._check_result(job_result, job_error, expected, expected_version=run)
+                self._check_output_values(tmp_dir, scenario_dir, job_spec, job_result, expected)
                 self._check_model_log_lines(tmp_dir, job_spec, job_result, expected)
 
     def _run_job(self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path, job_spec: dict) \
@@ -230,11 +302,16 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
         return translated_config, job_result, job_error
 
-    def _output_extension(self, output_name: str, flow_def: dict, job_spec: dict) -> str:
+    def _output_socket(self, output_name: str, flow_def: dict, job_spec: dict) -> meta.ModelOutputSchema:
 
         edge = next(edge for edge in flow_def["edges"] if edge["target"]["node"] == output_name)
         source = edge["source"]
-        output_schema = self.interfaces[job_spec["models"][source["node"]]].outputs[source["socket"]]
+
+        return self.interfaces[job_spec["models"][source["node"]]].outputs[source["socket"]]
+
+    def _output_extension(self, output_name: str, flow_def: dict, job_spec: dict) -> str:
+
+        output_schema = self._output_socket(output_name, flow_def, job_spec)
 
         if output_schema.objectType == meta.ObjectType.FILE:
             return output_schema.fileType.extension
@@ -310,6 +387,47 @@ class FlowScenarioDevModeTest(unittest.TestCase):
             self.assertEqual(meta.ObjectType[object_type], output_selector.objectType, f"Output [{output_name}]")
             output_id = next(oid for oid in job_result.objectIds if oid.objectId == output_selector.objectId)
             self.assertEqual(expected_version, output_id.objectVersion, f"Version of output [{output_name}]")
+
+    def _check_output_values(
+            self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path,
+            job_spec: dict, job_result: cfg.JobResult, expected: dict):
+
+        flow_def = _read_yaml(scenario_dir.joinpath("flow.yaml"))
+
+        for output_name in expected.get("outputs") or {}:
+
+            socket = self._output_socket(output_name, flow_def, job_spec)
+            expected_file = next(scenario_dir.joinpath("expected").glob(f"{output_name}.*"))
+            saved_file = self._saved_output_path(tmp_dir, job_result, output_name)
+
+            if socket.objectType == meta.ObjectType.FILE:
+                self.assertEqual(expected_file.read_bytes(), saved_file.read_bytes(), f"Content of output [{output_name}]")
+            elif socket.schema.schemaType == meta.SchemaType.STRUCT_SCHEMA:
+                _assert_values_match(self, _read_yaml(expected_file), _read_yaml(saved_file), f"Content of output [{output_name}]")
+            else:
+                field_types = {f.fieldName: f.fieldType for f in socket.schema.table.fields}
+                _assert_values_match(
+                    self, _read_table(expected_file, field_types), _read_table(saved_file, field_types),
+                    f"Content of output [{output_name}]")
+
+    @staticmethod
+    def _saved_output_path(tmp_dir: pathlib.Path, job_result: cfg.JobResult, output_name: str) -> pathlib.Path:
+
+        def job_object(selector):
+            object_id = next(oid for oid in job_result.objectIds if oid.objectId == selector.objectId)
+            return job_result.objects[util.object_key(object_id)]
+
+        output_obj = job_object(job_result.result.outputs[output_name])
+
+        if output_obj.file is not None:
+            storage_id, data_item = output_obj.file.storageId, output_obj.file.dataItem
+        else:
+            part = next(iter(output_obj.data.parts.values()))
+            storage_id, data_item = output_obj.data.storageId, part.snap.deltas[0].dataItem
+
+        storage_copy = job_object(storage_id).storage.dataItems[data_item].incarnations[0].copies[0]
+
+        return tmp_dir.joinpath("data", storage_copy.storagePath)
 
     def _check_model_log_lines(self, tmp_dir: pathlib.Path, job_spec: dict, job_result: cfg.JobResult, expected: dict):
 

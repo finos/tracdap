@@ -1,4 +1,4 @@
-description: A diamond, with sockets wired across different names and a parameter shared by models that declare different defaults
+description: A diamond, with sockets wired across different names into an asymmetric combine, and a parameter shared by models that declare different defaults
 
 outcome: SUCCEEDED
 
@@ -12,5 +12,3 @@ flow:
 
 outputs:
   combined_accounts: DATA
-
-e2e: false

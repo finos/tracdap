@@ -1,0 +1,40 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  filter:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [filtered_accounts]
+
+  split:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [high_value, low_value, rejects]
+
+  high_value:
+    nodeType: OUTPUT_NODE
+
+  low_value:
+    nodeType: OUTPUT_NODE
+
+  rejects:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: filter, socket: accounts }
+
+  - source: { node: filter, socket: filtered_accounts }
+    target: { node: split, socket: accounts }
+
+  - source: { node: split, socket: high_value }
+    target: { node: high_value }
+
+  - source: { node: split, socket: low_value }
+    target: { node: low_value }
+
+  - source: { node: split, socket: rejects }
+    target: { node: rejects }

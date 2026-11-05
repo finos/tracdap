@@ -13,5 +13,3 @@ flow:
 outputs: {}
 
 ran: [good, bad]
-
-e2e: true

@@ -3,7 +3,7 @@ models:
   aggregate: tracdap_test.flow_scenarios.models.SumByRegion
 
 parameters:
-  min_amount: 50.0
+  min_amount: 85.0
 
 inputs:
   accounts: accounts.csv

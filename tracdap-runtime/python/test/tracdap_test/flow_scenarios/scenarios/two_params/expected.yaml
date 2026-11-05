@@ -1,0 +1,18 @@
+description: Two models in a chain, each with its own parameter, valued so that swapping them changes both outputs
+
+outcome: SUCCEEDED
+
+flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
+    threshold: { paramType: FLOAT, default: 100.0 }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    high_value: { objectType: DATA }
+    low_value: { objectType: DATA }
+    rejects: { objectType: DATA, optional: true }
+
+outputs:
+  high_value: DATA
+  low_value: DATA

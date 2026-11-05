@@ -13,7 +13,6 @@ flow:
 outputs:
   region_totals: DATA
 
-e2e: true
 
 devMode:
   skip: Flow versions exist only on the platform, dev mode loads a flow from a file

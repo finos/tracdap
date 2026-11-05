@@ -15,5 +15,3 @@ flow:
 outputs:
   high_value: DATA
   region_totals: DATA
-
-e2e: false

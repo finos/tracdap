@@ -1,0 +1,6 @@
+models:
+  filter: tracdap_test.flow_scenarios.models.FilterAccounts
+  aggregate: tracdap_test.flow_scenarios.models.SumByRegion
+
+inputs:
+  accounts: accounts.csv

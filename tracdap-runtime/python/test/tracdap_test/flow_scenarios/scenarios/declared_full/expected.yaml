@@ -4,7 +4,7 @@ outcome: SUCCEEDED
 
 flow:
   parameters:
-    min_amount: { paramType: FLOAT, default: 25.0, label: Minimum amount for the flow }
+    min_amount: { paramType: FLOAT, default: 60.0, label: Minimum amount for the flow }
   inputs:
     accounts: { objectType: DATA, label: Accounts for the flow, fields: [id, region, amount] }
   outputs:
@@ -12,5 +12,3 @@ flow:
 
 outputs:
   region_totals: DATA
-
-e2e: true

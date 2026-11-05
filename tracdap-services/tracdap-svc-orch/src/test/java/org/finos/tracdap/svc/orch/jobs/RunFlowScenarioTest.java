@@ -30,6 +30,8 @@ import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
 import com.google.protobuf.ByteString;
+import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.ProtoUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Timeout;
@@ -37,7 +39,6 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
-import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -46,8 +47,8 @@ import java.util.stream.Collectors;
 
 
 /**
- * Run the scenarios marked e2e in the flow scenario catalogue on the platform, through the orchestrator
- * and the local executor, and check each against its expected.yaml.
+ * Run every scenario in the flow scenario catalogue on the platform, through the orchestrator
+ * and the local executor, and check each against its expected.yaml and expected outputs.
  */
 @Tag("integration")
 @Tag("int-e2e")
@@ -77,13 +78,12 @@ public class RunFlowScenarioTest {
 
     private static final Map<String, TagHeader> importedModels = new ConcurrentHashMap<>();
 
+    private static final io.grpc.Metadata.Key<TracErrorDetails> TRAC_ERROR_DETAILS_KEY = io.grpc.Metadata.Key.of(
+            "trac-error-details-bin", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
+
     static List<String> scenarios() {
 
-        var tracRepoDir = FlowScenario.findTracRepoDir();
-
-        return FlowScenario.scenarioNames(tracRepoDir).stream()
-                .filter(name -> FlowScenario.load(tracRepoDir, name).e2e())
-                .collect(Collectors.toList());
+        return FlowScenario.scenarioNames(FlowScenario.findTracRepoDir());
     }
 
     @ParameterizedTest
@@ -96,6 +96,11 @@ public class RunFlowScenarioTest {
         var flowId = createFlow(scenario);
         var models = importModels(scenario);
         var inputs = loadInputs(scenario);
+
+        if (scenario.outcome() == FlowScenario.Outcome.REJECTED) {
+            checkRejected(scenario, () -> runFlow(scenario, flowId, models, inputs, Map.of()));
+            return;
+        }
 
         var jobId = runFlow(scenario, flowId, models, inputs, Map.of());
         var result = checkResult(scenario, jobId, 1);
@@ -157,8 +162,10 @@ public class RunFlowScenarioTest {
         for (var input : scenario.inputs().keySet()) {
 
             var requirement = scenario.inputRequirement(input);
-            var dataFile = scenario.dataFile(input);
-            var content = ByteString.copyFrom(Files.readAllBytes(dataFile));
+            var platformData = scenario.platformData(input);
+            var dataFile = platformData.getKey();
+            var schema = platformData.getValue();
+            var content = ByteString.copyFrom(scenario.platformContent(input));
 
             if (requirement.getObjectType() == ObjectType.FILE) {
 
@@ -171,10 +178,12 @@ public class RunFlowScenarioTest {
             }
             else {
 
+                var isStruct = schema.getSchemaType() == SchemaType.STRUCT_SCHEMA;
+
                 inputs.put(input, dataClient.createSmallDataset(DataWriteRequest.newBuilder()
                         .setTenant(TEST_TENANT)
-                        .setSchema(requirement.getSchema())
-                        .setFormat("text/csv")
+                        .setSchema(schema)
+                        .setFormat(isStruct ? "application/json" : "text/csv")
                         .setContent(content)
                         .build()));
             }
@@ -249,11 +258,56 @@ public class RunFlowScenarioTest {
 
             for (var nodeAttr : outputNode.getNodeAttrsList())
                 Assertions.assertEquals(nodeAttr.getValue(), outputTag.getAttrsOrThrow(nodeAttr.getAttrName()));
+
+            var content = readOutput(scenario, output.getKey(), result.getOutputsOrThrow(output.getKey()));
+            var mismatch = FlowScenario.contentMismatch(scenario.expectedContent(output.getKey()), content);
+
+            Assertions.assertNull(mismatch, String.format("Content of output [%s] %s", output.getKey(), mismatch));
         }
 
         checkModelLogLines(scenario, result);
 
         return result;
+    }
+
+    private void checkRejected(FlowScenario scenario, Runnable submit) {
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, submit::run, "Expected the job to be rejected");
+
+        var errorDetails = e.getTrailers() != null ? e.getTrailers().get(TRAC_ERROR_DETAILS_KEY) : null;
+        var errors = errorDetails != null
+                ? errorDetails.getItemsList().stream().map(TracErrorItem::getDetail).collect(Collectors.toList())
+                : List.<String>of();
+
+        Assertions.assertTrue(
+                errors.stream().anyMatch(error -> error.startsWith(scenario.error())),
+                String.format("Expected an error starting [%s], got %s", scenario.error(), errors));
+    }
+
+    private Object readOutput(FlowScenario scenario, String outputName, TagSelector outputSelector) {
+
+        var socket = scenario.outputRequirement(outputName);
+        var dataClient = platform.dataClientBlocking();
+
+        if (socket.getObjectType() == ObjectType.FILE) {
+
+            var file = dataClient.readSmallFile(FileReadRequest.newBuilder()
+                    .setTenant(TEST_TENANT)
+                    .setSelector(outputSelector)
+                    .build());
+
+            return scenario.outputContent(outputName, file.getContent().toByteArray());
+        }
+
+        var isStruct = socket.getSchema().getSchemaType() == SchemaType.STRUCT_SCHEMA;
+
+        var data = dataClient.readSmallDataset(DataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(outputSelector)
+                .setFormat(isStruct ? "application/json" : "text/csv")
+                .build());
+
+        return scenario.outputContent(outputName, data.getContent().toByteArray());
     }
 
     private void checkModelLogLines(FlowScenario scenario, ResultDefinition result) {

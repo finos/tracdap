@@ -1,0 +1,18 @@
+description: The chain with a parameter that has a model default left unsupplied; the platform requires every parameter, dev mode applies the default
+
+outcome: REJECTED
+error: "Missing required parameter [min_amount]"
+
+flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    region_totals: { objectType: DATA }
+
+devMode:
+  reason: Dev mode fills an unsupplied parameter from its default, where the platform requires the job to supply every parameter
+  outcome: SUCCEEDED
+  outputs:
+    region_totals: DATA
