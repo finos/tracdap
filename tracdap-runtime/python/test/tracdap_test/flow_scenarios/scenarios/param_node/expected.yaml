@@ -1,0 +1,14 @@
+description: The chain with its parameter supplied by an explicit parameter node, named differently from the model's parameter
+
+outcome: SUCCEEDED
+
+flow:
+  parameters:
+    filter_threshold: { paramType: FLOAT, default: 0.0 }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    region_totals: { objectType: DATA }
+
+outputs:
+  region_totals: DATA
