@@ -22,6 +22,7 @@ import org.finos.tracdap.common.exception.EValidation;
 import org.finos.tracdap.common.graph.GraphBuilder;
 import org.finos.tracdap.common.graph.NodeNamespace;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.common.validation.Validator;
@@ -77,8 +78,33 @@ class FlowScenarioTest {
         var graph = graphBuilder.buildJob(job.definition(scenario.rerun()));
         var strictFlow = graphBuilder.exportFlow(graph);
 
+        checkParameters(scenario.flowParameters(), strictFlow.getParametersMap());
         checkEntries("inputs", scenario.flowInputs(), strictFlow.getInputsMap());
         checkEntries("outputs", scenario.flowOutputs(), strictFlow.getOutputsMap());
+    }
+
+    private static void checkParameters(Map<String, FlowScenario.ExpectedParameter> expected, Map<String, ModelParameter> strict) {
+
+        Assertions.assertEquals(expected.keySet(), strict.keySet(), "Flow parameters");
+
+        for (var entry : expected.entrySet()) {
+
+            var param = strict.get(entry.getKey());
+            var paramName = entry.getKey();
+
+            Assertions.assertEquals(entry.getValue().paramType, param.getParamType().getBasicType(), String.format("Type of flow parameter [%s]", paramName));
+
+            if (entry.getValue().defaultValue == null)
+                Assertions.assertFalse(param.hasDefaultValue(), String.format("Flow parameter [%s] should have no default", paramName));
+            else
+                Assertions.assertEquals(
+                        MetadataCodec.decodeValue(entry.getValue().defaultValue),
+                        param.hasDefaultValue() ? MetadataCodec.decodeValue(param.getDefaultValue()) : null,
+                        String.format("Default of flow parameter [%s]", paramName));
+
+            if (entry.getValue().label != null)
+                Assertions.assertEquals(entry.getValue().label, param.getLabel(), String.format("Label of flow parameter [%s]", paramName));
+        }
     }
 
     private boolean checkValid(FlowScenario scenario, Runnable validation) {
@@ -112,16 +138,36 @@ class FlowScenarioTest {
         for (var entry : expected.entrySet()) {
 
             var strictEntry = strict.get(entry.getKey());
-            var objectType = strictEntry instanceof ModelInputSchema
-                    ? ((ModelInputSchema) strictEntry).getObjectType()
-                    : ((ModelOutputSchema) strictEntry).getObjectType();
-            var optional = strictEntry instanceof ModelInputSchema
-                    ? ((ModelInputSchema) strictEntry).getOptional()
-                    : ((ModelOutputSchema) strictEntry).getOptional();
+            var expectedEntry = entry.getValue();
+            var isInput = strictEntry instanceof ModelInputSchema;
 
-            Assertions.assertEquals(entry.getValue().objectType, objectType, String.format("Object type of flow %s [%s]", section, entry.getKey()));
-            Assertions.assertEquals(entry.getValue().optional, optional, String.format("Optional flag of flow %s [%s]", section, entry.getKey()));
+            var objectType = isInput ? ((ModelInputSchema) strictEntry).getObjectType() : ((ModelOutputSchema) strictEntry).getObjectType();
+            var optional = isInput ? ((ModelInputSchema) strictEntry).getOptional() : ((ModelOutputSchema) strictEntry).getOptional();
+            var label = isInput ? ((ModelInputSchema) strictEntry).getLabel() : ((ModelOutputSchema) strictEntry).getLabel();
+            var schema = isInput ? ((ModelInputSchema) strictEntry).getSchema() : ((ModelOutputSchema) strictEntry).getSchema();
+            var fileType = isInput ? ((ModelInputSchema) strictEntry).getFileType() : ((ModelOutputSchema) strictEntry).getFileType();
+
+            Assertions.assertEquals(expectedEntry.objectType, objectType, String.format("Object type of flow %s [%s]", section, entry.getKey()));
+            Assertions.assertEquals(expectedEntry.optional, optional, String.format("Optional flag of flow %s [%s]", section, entry.getKey()));
+
+            if (expectedEntry.label != null)
+                Assertions.assertEquals(expectedEntry.label, label, String.format("Label of flow %s [%s]", section, entry.getKey()));
+
+            if (expectedEntry.fields != null)
+                Assertions.assertEquals(expectedEntry.fields, fieldNames(schema), String.format("Fields of flow %s [%s]", section, entry.getKey()));
+
+            if (expectedEntry.fileType != null)
+                Assertions.assertEquals(expectedEntry.fileType, fileType.getExtension(), String.format("File type of flow %s [%s]", section, entry.getKey()));
         }
+    }
+
+    private static List<String> fieldNames(SchemaDefinition schema) {
+
+        var fields = schema.getSchemaType() == SchemaType.STRUCT_SCHEMA
+                ? schema.getStruct().getFieldsList()
+                : schema.getTable().getFieldsList();
+
+        return fields.stream().map(FieldSchema::getFieldName).collect(Collectors.toList());
     }
 
     /**

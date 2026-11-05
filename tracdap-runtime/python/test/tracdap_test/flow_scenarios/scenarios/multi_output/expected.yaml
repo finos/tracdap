@@ -3,6 +3,8 @@ description: One model with three outputs - one saved, one passed to another mod
 outcome: SUCCEEDED
 
 flow:
+  parameters:
+    threshold: { paramType: FLOAT, default: 100.0 }
   inputs:
     accounts: { objectType: DATA }
   outputs:

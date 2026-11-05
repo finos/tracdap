@@ -32,6 +32,7 @@ import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.models as models  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
 import tracdap.rt._impl.core.repos as repos  # noqa
+import tracdap.rt._impl.core.type_system as types  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 
 import tracdap_test.flow_scenarios.models as scenario_models
@@ -129,7 +130,16 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
         scenario_dir = SCENARIOS_DIR.joinpath(scenario_name)
         expected = _read_yaml(scenario_dir.joinpath("expected.yaml"))
+
+        if "devMode" in expected:
+            self.assertTrue(
+                expected["devMode"].get("reason") or expected["devMode"].get("skip"),
+                f"[{scenario_name}]: the devMode override needs a reason or a skip")
+
         expected = {**expected, **expected.get("devMode", {})}
+
+        if expected["outcome"] != "SUCCEEDED":
+            self.assertTrue(expected.get("error"), f"[{scenario_name}]: expects {expected['outcome']}, so it needs an error")
 
         if "skip" in expected:
             self.skipTest(f"[{scenario_name}] does not run in dev mode: {expected['skip']}")
@@ -154,9 +164,7 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
                 self._check_strict_flow(job_config, expected)
                 self._check_result(job_result, job_error, expected, expected_version=run)
-
-                if expected["outcome"] == "SUCCEEDED":
-                    self._check_model_log_lines(tmp_dir, job_spec, job_result)
+                self._check_model_log_lines(tmp_dir, job_spec, job_result, expected)
 
     def _run_job(self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path, job_spec: dict) \
             -> tp.Tuple[tp.Optional[cfg.JobConfig], tp.Optional[cfg.JobResult], tp.Optional[Exception]]:
@@ -239,6 +247,21 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
         flow_def = job_config.objects[util.object_key(job_config.job.runFlow.flow)].flow
 
+        expected_params = expected["flow"].get("parameters", {})
+        self.assertEqual(set(expected_params.keys()), set(flow_def.parameters.keys()), "Flow parameters")
+
+        for name, expected_param in expected_params.items():
+            param = flow_def.parameters[name]
+            self.assertEqual(
+                meta.BasicType[expected_param["paramType"]], param.paramType.basicType,
+                f"Type of flow parameter [{name}]")
+            self.assertEqual(
+                expected_param.get("default"),
+                types.MetadataCodec.decode_value(param.defaultValue) if param.defaultValue is not None else None,
+                f"Default of flow parameter [{name}]")
+            if "label" in expected_param:
+                self.assertEqual(expected_param["label"], param.label, f"Label of flow parameter [{name}]")
+
         for section, declared in [("inputs", flow_def.inputs), ("outputs", flow_def.outputs)]:
 
             expected_section = expected["flow"].get(section, {})
@@ -251,6 +274,17 @@ class FlowScenarioDevModeTest(unittest.TestCase):
                 self.assertEqual(
                     expected_entry.get("optional", False), declared[name].optional,
                     f"Optional flag of flow {section} [{name}]")
+                if "label" in expected_entry:
+                    self.assertEqual(expected_entry["label"], declared[name].label, f"Label of flow {section} [{name}]")
+                if "fields" in expected_entry:
+                    self.assertEqual(expected_entry["fields"], self._field_names(declared[name].schema), f"Fields of flow {section} [{name}]")
+                if "fileType" in expected_entry:
+                    self.assertEqual(expected_entry["fileType"], declared[name].fileType.extension, f"File type of flow {section} [{name}]")
+
+    @staticmethod
+    def _field_names(schema: meta.SchemaDefinition) -> tp.List[str]:
+        fields = schema.struct.fields if schema.schemaType == meta.SchemaType.STRUCT_SCHEMA else schema.table.fields
+        return [field.fieldName for field in fields]
 
     def _check_result(
             self, job_result: cfg.JobResult, job_error: tp.Optional[Exception],
@@ -277,7 +311,7 @@ class FlowScenarioDevModeTest(unittest.TestCase):
             output_id = next(oid for oid in job_result.objectIds if oid.objectId == output_selector.objectId)
             self.assertEqual(expected_version, output_id.objectVersion, f"Version of output [{output_name}]")
 
-    def _check_model_log_lines(self, tmp_dir: pathlib.Path, job_spec: dict, job_result: cfg.JobResult):
+    def _check_model_log_lines(self, tmp_dir: pathlib.Path, job_spec: dict, job_result: cfg.JobResult, expected: dict):
 
         log_file_id = next(oid for oid in job_result.objectIds if oid.objectId == job_result.result.logFileId.objectId)
         log_file = job_result.objects[util.object_key(log_file_id)].file
@@ -287,6 +321,16 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
         job_log = tmp_dir.joinpath("data", storage_copy.storagePath).read_text()
 
-        for entry_point in set(job_spec["models"].values()):
-            model_class_name = entry_point.rsplit(".", 1)[-1]
+        ran = expected.get("ran", list(job_spec["models"].keys()))
+        classes_run = {self._model_class(ep) for node, ep in job_spec["models"].items() if node in ran}
+        classes_not_run = {self._model_class(ep) for ep in job_spec["models"].values()} - classes_run
+
+        for model_class_name in classes_run:
             self.assertIn(scenario_models.MODEL_LOG_LINE.format(model_class_name), job_log)
+
+        for model_class_name in classes_not_run:
+            self.assertNotIn(scenario_models.MODEL_LOG_LINE.format(model_class_name), job_log)
+
+    @staticmethod
+    def _model_class(entry_point: str) -> str:
+        return entry_point.rsplit(".", 1)[-1]

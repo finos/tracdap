@@ -4,7 +4,7 @@ outcome: SUCCEEDED
 
 flow:
   inputs:
-    settings: { objectType: DATA }
+    settings: { objectType: DATA, fields: [scale, label] }
   outputs:
     applied_settings: { objectType: DATA }
 

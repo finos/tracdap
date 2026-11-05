@@ -16,3 +16,4 @@ devMode:
   outcome: FAILED
   error: "The object referenced by [report] in the current context has the wrong type (expected FILE, got DATA)"
   outputs: {}
+  ran: [aggregate, annotate]

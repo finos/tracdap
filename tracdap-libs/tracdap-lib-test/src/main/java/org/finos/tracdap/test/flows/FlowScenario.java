@@ -50,14 +50,35 @@ public class FlowScenario {
 
     public enum Outcome { SUCCEEDED, FAILED, REJECTED }
 
+    /** An input or output of the strict flow; label, fields and file type are checked only when given */
     public static class ExpectedEntry {
 
         public final ObjectType objectType;
         public final boolean optional;
+        public final String label;
+        public final List<String> fields;
+        public final String fileType;
 
-        ExpectedEntry(ObjectType objectType, boolean optional) {
+        ExpectedEntry(ObjectType objectType, boolean optional, String label, List<String> fields, String fileType) {
             this.objectType = objectType;
             this.optional = optional;
+            this.label = label;
+            this.fields = fields;
+            this.fileType = fileType;
+        }
+    }
+
+    /** A parameter of the strict flow; a null default value means the parameter has none */
+    public static class ExpectedParameter {
+
+        public final BasicType paramType;
+        public final Value defaultValue;
+        public final String label;
+
+        ExpectedParameter(BasicType paramType, Value defaultValue, String label) {
+            this.paramType = paramType;
+            this.defaultValue = defaultValue;
+            this.label = label;
         }
     }
 
@@ -78,6 +99,8 @@ public class FlowScenario {
 
     private final Outcome outcome;
     private final String error;
+    private final Set<String> ran;
+    private final Map<String, ExpectedParameter> flowParameters;
     private final Map<String, ExpectedEntry> flowInputs;
     private final Map<String, ExpectedEntry> flowOutputs;
     private final Map<String, ObjectType> outputs;
@@ -153,6 +176,8 @@ public class FlowScenario {
 
         this.outcome = Outcome.valueOf(expected.path("outcome").asText());
         this.error = expected.path("error").asText("");
+        this.ran = expected.has("ran") ? new LinkedHashSet<>(stringList(expected.path("ran"))) : new LinkedHashSet<>(models.keySet());
+        this.flowParameters = expectedParameters(expected.path("flow").path("parameters"));
         this.flowInputs = expectedEntries(expected.path("flow").path("inputs"));
         this.flowOutputs = expectedEntries(expected.path("flow").path("outputs"));
         this.e2e = expected.path("e2e").asBoolean(false);
@@ -164,6 +189,29 @@ public class FlowScenario {
         for (var entryPoint : models.values())
             if (!interfaces.containsKey(entryPoint))
                 throw new ETracInternal(String.format("Scenario [%s] uses model [%s], which is not in models.yaml", name, entryPoint));
+
+        for (var node : ran)
+            if (!models.containsKey(node))
+                throw new ETracInternal(String.format("Scenario [%s] expects node [%s] to run, which is not a model node in job.yaml", name, node));
+
+        checkExpectedError(outcome, error, "expected.yaml");
+
+        if (expected.has("devMode")) {
+
+            var devMode = expected.path("devMode");
+
+            if (!devMode.hasNonNull("reason") && !devMode.hasNonNull("skip"))
+                throw new ETracInternal(String.format("Scenario [%s]: the devMode override needs a reason or a skip", name));
+
+            var devOutcome = devMode.has("outcome") ? Outcome.valueOf(devMode.path("outcome").asText()) : outcome;
+            checkExpectedError(devOutcome, devMode.path("error").asText(error), "the devMode override");
+        }
+    }
+
+    private void checkExpectedError(Outcome expectedOutcome, String expectedError, String source) {
+
+        if (expectedOutcome != Outcome.SUCCEEDED && expectedError.isEmpty())
+            throw new ETracInternal(String.format("Scenario [%s]: %s expects %s, so it needs an error", name, source, expectedOutcome));
     }
 
     public String name() { return name; }
@@ -176,6 +224,8 @@ public class FlowScenario {
 
     public Outcome outcome() { return outcome; }
     public String error() { return error; }
+    public Set<String> ran() { return ran; }
+    public Map<String, ExpectedParameter> flowParameters() { return flowParameters; }
     public Map<String, ExpectedEntry> flowInputs() { return flowInputs; }
     public Map<String, ExpectedEntry> flowOutputs() { return flowOutputs; }
     public Map<String, ObjectType> outputs() { return outputs; }
@@ -264,9 +314,32 @@ public class FlowScenario {
 
         node.properties().forEach(entry -> entries.put(entry.getKey(), new ExpectedEntry(
                 ObjectType.valueOf(entry.getValue().path("objectType").asText()),
-                entry.getValue().path("optional").asBoolean(false))));
+                entry.getValue().path("optional").asBoolean(false),
+                entry.getValue().path("label").asText(null),
+                entry.getValue().has("fields") ? stringList(entry.getValue().path("fields")) : null,
+                entry.getValue().path("fileType").asText(null))));
 
         return entries;
+    }
+
+    private Map<String, ExpectedParameter> expectedParameters(JsonNode node) {
+
+        var params = new LinkedHashMap<String, ExpectedParameter>();
+
+        node.properties().forEach(entry -> params.put(entry.getKey(), new ExpectedParameter(
+                BasicType.valueOf(entry.getValue().path("paramType").asText()),
+                entry.getValue().has("default") ? encodeParameter(entry.getKey(), entry.getValue().path("default")) : null,
+                entry.getValue().path("label").asText(null))));
+
+        return params;
+    }
+
+    private static List<String> stringList(JsonNode node) {
+
+        var list = new ArrayList<String>();
+        node.forEach(item -> list.add(item.asText()));
+
+        return list;
     }
 
     private Value encodeParameter(String paramName, JsonNode value) {

@@ -3,6 +3,8 @@ description: Two models in a chain, with an unsaved link between them and attrib
 outcome: SUCCEEDED
 
 flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
   inputs:
     accounts: { objectType: DATA }
   outputs:

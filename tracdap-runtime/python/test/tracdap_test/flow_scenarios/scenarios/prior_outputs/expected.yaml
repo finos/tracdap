@@ -3,6 +3,8 @@ description: The chain run twice, the second run supplying the first run's outpu
 outcome: SUCCEEDED
 
 flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
   inputs:
     accounts: { objectType: DATA }
   outputs:

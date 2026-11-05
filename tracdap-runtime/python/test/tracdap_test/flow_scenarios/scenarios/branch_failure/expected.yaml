@@ -1,4 +1,4 @@
-description: One input feeds two branches; a model on one branch raises, so its consumer is skipped and the job fails
+description: One input feeds two branches; a model on one branch raises, so its consumer never runs, the other branch runs and the job fails
 
 outcome: FAILED
 error: "There was an unhandled error in the model: Scenario model failure"
@@ -11,5 +11,7 @@ flow:
     account_count: { objectType: DATA }
 
 outputs: {}
+
+ran: [good, bad]
 
 e2e: true

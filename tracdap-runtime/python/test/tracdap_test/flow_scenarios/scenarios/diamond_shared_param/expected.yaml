@@ -3,6 +3,8 @@ description: A diamond, with sockets wired across different names and a paramete
 outcome: SUCCEEDED
 
 flow:
+  parameters:
+    factor: { paramType: FLOAT }
   inputs:
     accounts: { objectType: DATA }
   outputs:

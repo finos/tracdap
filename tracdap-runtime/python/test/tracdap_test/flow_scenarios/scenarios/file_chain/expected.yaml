@@ -6,8 +6,8 @@ flow:
   inputs:
     accounts: { objectType: DATA }
   outputs:
-    report: { objectType: FILE }
-    annotated_report: { objectType: FILE }
+    report: { objectType: FILE, fileType: txt }
+    annotated_report: { objectType: FILE, fileType: txt }
 
 outputs:
   report: FILE

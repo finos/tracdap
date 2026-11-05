@@ -8,7 +8,7 @@ nodes:
     inputs: [accounts]
     outputs: [region_totals]
 
-  region_totals:
+  totals_v2:
     nodeType: OUTPUT_NODE
 
 edges:
@@ -17,4 +17,4 @@ edges:
     target: { node: aggregate, socket: accounts }
 
   - source: { node: aggregate, socket: region_totals }
-    target: { node: region_totals }
+    target: { node: totals_v2 }

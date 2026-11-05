@@ -32,6 +32,7 @@ import org.finos.tracdap.test.helpers.PlatformTest;
 import com.google.protobuf.ByteString;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -87,6 +88,7 @@ public class RunFlowScenarioTest {
 
     @ParameterizedTest
     @MethodSource("scenarios")
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
     void scenario(String scenarioName) throws Exception {
 
         var scenario = FlowScenario.load(platform.tracRepoDir(), scenarioName);
@@ -249,8 +251,7 @@ public class RunFlowScenarioTest {
                 Assertions.assertEquals(nodeAttr.getValue(), outputTag.getAttrsOrThrow(nodeAttr.getAttrName()));
         }
 
-        if (scenario.outcome() == FlowScenario.Outcome.SUCCEEDED)
-            checkModelLogLines(scenario, result);
+        checkModelLogLines(scenario, result);
 
         return result;
     }
@@ -266,10 +267,25 @@ public class RunFlowScenarioTest {
 
         var logText = logFile.getContent().toStringUtf8();
 
-        for (var entryPoint : new HashSet<>(scenario.models().values())) {
-            var modelClass = entryPoint.substring(entryPoint.lastIndexOf('.') + 1);
+        var classesRun = scenario.models().entrySet().stream()
+                .filter(node -> scenario.ran().contains(node.getKey()))
+                .map(node -> modelClass(node.getValue()))
+                .collect(Collectors.toSet());
+
+        var classesNotRun = scenario.models().values().stream()
+                .map(RunFlowScenarioTest::modelClass)
+                .filter(modelClass -> !classesRun.contains(modelClass))
+                .collect(Collectors.toSet());
+
+        for (var modelClass : classesRun)
             Assertions.assertTrue(logText.contains(String.format(MODEL_LOG_LINE, modelClass)), "Log line for " + modelClass);
-        }
+
+        for (var modelClass : classesNotRun)
+            Assertions.assertFalse(logText.contains(String.format(MODEL_LOG_LINE, modelClass)), "Unexpected log line for " + modelClass);
+    }
+
+    private static String modelClass(String entryPoint) {
+        return entryPoint.substring(entryPoint.lastIndexOf('.') + 1);
     }
 
     private JobStatus waitForCompletion(TagHeader jobId) {

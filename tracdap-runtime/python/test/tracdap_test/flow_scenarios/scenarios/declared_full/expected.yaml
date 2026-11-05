@@ -3,10 +3,12 @@ description: The chain with every input, output and parameter declared in full, 
 outcome: SUCCEEDED
 
 flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 25.0, label: Minimum amount for the flow }
   inputs:
-    accounts: { objectType: DATA }
+    accounts: { objectType: DATA, label: Accounts for the flow, fields: [id, region, amount] }
   outputs:
-    region_totals: { objectType: DATA }
+    region_totals: { objectType: DATA, label: Totals for the flow, fields: [region, total] }
 
 outputs:
   region_totals: DATA

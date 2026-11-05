@@ -3,6 +3,8 @@ description: One flow input feeds two models, one model output feeds two models,
 outcome: SUCCEEDED
 
 flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
   inputs:
     accounts: { objectType: DATA }
   outputs:
