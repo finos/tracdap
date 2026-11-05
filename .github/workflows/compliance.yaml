@@ -153,12 +153,14 @@ jobs:
       # It is only pulled in as a dependency of safety check itself, it is not a dependency of the dist wheels
       # CVE-2026-81726 (safety id: SFTY-20260902-58666) is a vulnerability in the latest version of nltk, no fix is available
       # Likewise it is only pulled in as a dependency of safety check itself
+      # CVE-2026-104851 (safety id: SFTY-20261005-00671) is in fsspec's ReferenceFileSystem, which the runtime never uses
+      # It is also ignored in the pip-audit check below, which gives the full reasoning
       - name: Safety check
         run: |
           mkdir -p build/compliance/python-runtime-safety
           cd tracdap-runtime/python
-          safety check --ignore 70612 --ignore SFTY-20260902-58666 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
-          safety check --ignore 70612 --ignore SFTY-20260902-58666 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
+          safety check --ignore 70612 --ignore SFTY-20260902-58666 --ignore SFTY-20261005-00671 --output text > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.txt
+          safety check --ignore 70612 --ignore SFTY-20260902-58666 --ignore SFTY-20261005-00671 --output json > ../../build/compliance/python-runtime-safety/python-runtime-safety-report.json
 
       # Always save the reports - they are especially needed when the checks have failed!
       - name: Store compliance reports
