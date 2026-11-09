@@ -1,0 +1,12 @@
+description: The chain with its input declared in full as a file, read by a model as a dataset
+
+outcome: REJECTED
+error: "Input [accounts] is not the right object type (expected FILE, got DATA)"
+
+flow:
+  parameters:
+    min_amount: { paramType: FLOAT, default: 0.0 }
+  inputs:
+    accounts: { objectType: FILE }
+  outputs:
+    region_totals: { objectType: DATA }

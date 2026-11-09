@@ -1,7 +1,7 @@
 description: A model's dataset output is wired to another model's file input, so validation rejects the job
 
 outcome: REJECTED
-error: "Input [report] is not the right object type (expected FILE, got DATA)"
+error: "Input [annotate.report] is not the right object type (expected FILE, got DATA)"
 
 flow:
   inputs:

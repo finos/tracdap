@@ -1,0 +1,51 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  notes:
+    nodeType: INPUT_NODE
+
+  aggregate:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  note_a:
+    nodeType: MODEL_NODE
+    inputs: [region_totals, notes]
+    outputs: [summary]
+
+  note_b:
+    nodeType: MODEL_NODE
+    inputs: [region_totals, notes]
+    outputs: [summary]
+
+  summary_a:
+    nodeType: OUTPUT_NODE
+
+  summary_b:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: aggregate, socket: accounts }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: note_a, socket: region_totals }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: note_b, socket: region_totals }
+
+  - source: { node: notes }
+    target: { node: note_a, socket: notes }
+
+  - source: { node: notes }
+    target: { node: note_b, socket: notes }
+
+  - source: { node: note_a, socket: summary }
+    target: { node: summary_a }
+
+  - source: { node: note_b, socket: summary }
+    target: { node: summary_b }

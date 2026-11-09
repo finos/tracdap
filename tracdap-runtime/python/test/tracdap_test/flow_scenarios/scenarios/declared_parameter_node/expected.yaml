@@ -1,0 +1,14 @@
+description: An explicit parameter node whose parameter is also declared, with a label and a default different from the model's
+
+outcome: SUCCEEDED
+
+flow:
+  parameters:
+    filter_threshold: { paramType: FLOAT, default: 30.0, label: Threshold for the flow }
+  inputs:
+    accounts: { objectType: DATA }
+  outputs:
+    region_totals: { objectType: DATA }
+
+outputs:
+  region_totals: DATA

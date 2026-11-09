@@ -1,0 +1,23 @@
+nodes:
+
+  report:
+    nodeType: INPUT_NODE
+
+  annotate:
+    nodeType: MODEL_NODE
+    inputs: [report]
+    outputs: [annotated_report]
+
+  annotated_report:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: report }
+    target: { node: annotate, socket: report }
+
+  - source: { node: annotate, socket: annotated_report }
+    target: { node: annotated_report }
+
+inputs:
+  report: { objectType: DATA }

@@ -2,3 +2,4 @@
 *.sh text eol=lf
 /dev/**/*.py text eol=lf
 /tracdap-runtime/python/test/tracdap_test/flow_scenarios/scenarios/**/expected/** -text
+/tracdap-runtime/python/test/tracdap_test/flow_scenarios/data/*.txt -text

@@ -124,7 +124,24 @@ message FlowDefinition {
   repeated FlowEdge edges = 2;
 
   map<string, ModelParameter> parameters = 3;
+
+  /**
+   * Explicit declarations for the flow's input nodes
+   *
+   * Inputs can be left undeclared, in which case TRAC infers them from the models they connect to.
+   * An input declared with only its object type (and optionally a label and props) is checked against
+   * that type, and the rest of its schema is inferred. An input declared in full, with a schema or file type,
+   * is used as it is. If any inputs are declared, every input node must be declared.
+   */
   map<string, ModelInputSchema> inputs = 4;
+
+  /**
+   * Explicit declarations for the flow's output nodes
+   *
+   * Outputs can be undeclared, declared with only their object type, or declared in full, as for inputs.
+   * If any outputs are declared, every output node must be declared.
+   */
   map<string, ModelOutputSchema> outputs = 5;
+
   map<string, ModelResource> resources = 6;
 }

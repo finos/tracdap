@@ -1,0 +1,42 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  filter_threshold:
+    nodeType: PARAMETER_NODE
+
+  filter:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    parameters: [min_amount]
+    outputs: [filtered_accounts]
+
+  aggregate:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [region_totals]
+
+  region_totals:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: filter, socket: accounts }
+
+  - source: { node: filter_threshold }
+    target: { node: filter, socket: min_amount }
+
+  - source: { node: filter, socket: filtered_accounts }
+    target: { node: aggregate, socket: accounts }
+
+  - source: { node: aggregate, socket: region_totals }
+    target: { node: region_totals }
+
+parameters:
+
+  filter_threshold:
+    paramType: { basicType: FLOAT }
+    label: Threshold for the flow
+    defaultValue: { type: { basicType: FLOAT }, floatValue: 30.0 }

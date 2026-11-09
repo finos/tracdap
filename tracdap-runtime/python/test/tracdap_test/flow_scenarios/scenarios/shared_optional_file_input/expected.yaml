@@ -1,0 +1,15 @@
+description: An optional file input shared by two models and left unsupplied, with nothing declared
+
+outcome: SUCCEEDED
+
+flow:
+  inputs:
+    accounts: { objectType: DATA }
+    notes: { objectType: FILE, optional: true, fileType: txt }
+  outputs:
+    summary_a: { objectType: FILE }
+    summary_b: { objectType: FILE }
+
+outputs:
+  summary_a: FILE
+  summary_b: FILE

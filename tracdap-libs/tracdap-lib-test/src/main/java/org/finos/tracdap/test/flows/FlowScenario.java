@@ -53,7 +53,7 @@ public class FlowScenario {
 
     public enum Outcome { SUCCEEDED, FAILED, REJECTED }
 
-    /** An input or output of the strict flow; label, fields and file type are checked only when given */
+    /** An input or output of the strict flow; label, fields, file type and props are checked only when given */
     public static class ExpectedEntry {
 
         public final ObjectType objectType;
@@ -61,13 +61,15 @@ public class FlowScenario {
         public final String label;
         public final List<String> fields;
         public final String fileType;
+        public final Map<String, Object> props;
 
-        ExpectedEntry(ObjectType objectType, boolean optional, String label, List<String> fields, String fileType) {
+        ExpectedEntry(ObjectType objectType, boolean optional, String label, List<String> fields, String fileType, Map<String, Object> props) {
             this.objectType = objectType;
             this.optional = optional;
             this.label = label;
             this.fields = fields;
             this.fileType = fileType;
+            this.props = props;
         }
     }
 
@@ -526,7 +528,8 @@ public class FlowScenario {
                 entry.getValue().path("optional").asBoolean(false),
                 entry.getValue().path("label").asText(null),
                 entry.getValue().has("fields") ? stringList(entry.getValue().path("fields")) : null,
-                entry.getValue().path("fileType").asText(null))));
+                entry.getValue().path("fileType").asText(null),
+                entry.getValue().has("props") ? plainMap(entry.getValue().path("props")) : null)));
 
         return entries;
     }
@@ -541,6 +544,11 @@ public class FlowScenario {
                 entry.getValue().path("label").asText(null))));
 
         return params;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> plainMap(JsonNode node) {
+        return JSON.convertValue(node, Map.class);
     }
 
     private static List<String> stringList(JsonNode node) {

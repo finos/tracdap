@@ -1,0 +1,34 @@
+nodes:
+
+  accounts:
+    nodeType: INPUT_NODE
+
+  filter:
+    nodeType: MODEL_NODE
+    inputs: [accounts]
+    outputs: [filtered_accounts]
+
+  annotate:
+    nodeType: MODEL_NODE
+    inputs: [report]
+    outputs: [annotated_report]
+
+  filtered_accounts:
+    nodeType: OUTPUT_NODE
+
+  annotated_report:
+    nodeType: OUTPUT_NODE
+
+edges:
+
+  - source: { node: accounts }
+    target: { node: filter, socket: accounts }
+
+  - source: { node: accounts }
+    target: { node: annotate, socket: report }
+
+  - source: { node: filter, socket: filtered_accounts }
+    target: { node: filtered_accounts }
+
+  - source: { node: annotate, socket: annotated_report }
+    target: { node: annotated_report }

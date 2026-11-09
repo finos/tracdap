@@ -146,6 +146,7 @@ class FlowScenarioTest {
             var label = isInput ? ((ModelInputSchema) strictEntry).getLabel() : ((ModelOutputSchema) strictEntry).getLabel();
             var schema = isInput ? ((ModelInputSchema) strictEntry).getSchema() : ((ModelOutputSchema) strictEntry).getSchema();
             var fileType = isInput ? ((ModelInputSchema) strictEntry).getFileType() : ((ModelOutputSchema) strictEntry).getFileType();
+            var props = isInput ? ((ModelInputSchema) strictEntry).getInputPropsMap() : ((ModelOutputSchema) strictEntry).getOutputPropsMap();
 
             Assertions.assertEquals(expectedEntry.objectType, objectType, String.format("Object type of flow %s [%s]", section, entry.getKey()));
             Assertions.assertEquals(expectedEntry.optional, optional, String.format("Optional flag of flow %s [%s]", section, entry.getKey()));
@@ -158,6 +159,15 @@ class FlowScenarioTest {
 
             if (expectedEntry.fileType != null)
                 Assertions.assertEquals(expectedEntry.fileType, fileType.getExtension(), String.format("File type of flow %s [%s]", section, entry.getKey()));
+
+            if (expectedEntry.props != null) {
+
+                var decodedProps = props.entrySet().stream()
+                        .collect(Collectors.toMap(Map.Entry::getKey, prop -> MetadataCodec.decodeValue(prop.getValue())));
+
+                var mismatch = FlowScenario.contentMismatch(expectedEntry.props, decodedProps);
+                Assertions.assertNull(mismatch, String.format("Props of flow %s [%s] %s", section, entry.getKey(), mismatch));
+            }
         }
     }
 

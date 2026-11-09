@@ -238,6 +238,52 @@ class FlowScenarioDevModeTest(unittest.TestCase):
                 self._check_output_values(tmp_dir, scenario_dir, job_spec, job_result, expected)
                 self._check_model_log_lines(tmp_dir, job_spec, job_result, expected)
 
+    def test_type_only_not_inferred(self):
+
+        # Dev mode requires models sharing an input to declare identical sockets, so this input cannot be inferred
+        flow = {
+            "nodes": {
+                "accounts": {"nodeType": "INPUT_NODE"},
+                "exclude_ids": {"nodeType": "INPUT_NODE"},
+                "filter": {"nodeType": "MODEL_NODE", "inputs": ["accounts"], "outputs": ["filtered_accounts"]},
+                "select": {"nodeType": "MODEL_NODE", "inputs": ["source", "exclude_ids"], "outputs": ["selected_accounts"]},
+                "filtered_accounts": {"nodeType": "OUTPUT_NODE"},
+                "selected_accounts": {"nodeType": "OUTPUT_NODE"}},
+            "edges": [
+                {"source": {"node": "accounts"}, "target": {"node": "filter", "socket": "accounts"}},
+                {"source": {"node": "accounts"}, "target": {"node": "select", "socket": "source"}},
+                {"source": {"node": "exclude_ids"}, "target": {"node": "select", "socket": "exclude_ids"}},
+                {"source": {"node": "filter", "socket": "filtered_accounts"}, "target": {"node": "filtered_accounts"}},
+                {"source": {"node": "select", "socket": "selected_accounts"}, "target": {"node": "selected_accounts"}}]}
+
+        job_spec = {
+            "models": {
+                "filter": "tracdap_test.flow_scenarios.models.FilterAccounts",
+                "select": "tracdap_test.flow_scenarios.models.SelectAccounts"},
+            "parameters": {"min_amount": 50.0},
+            "inputs": {"accounts": "accounts.parquet"}}
+
+        errors = []
+
+        for declared in [False, True]:
+            with tempfile.TemporaryDirectory() as tmp:
+
+                tmp_dir = pathlib.Path(tmp)
+                scenario_dir = tmp_dir.joinpath("scenario")
+                scenario_dir.mkdir()
+
+                flow_def = {**flow, "inputs": {"accounts": {"objectType": "DATA"}, "exclude_ids": {"objectType": "DATA"}}} if declared else flow
+                scenario_dir.joinpath("flow.yaml").write_text(yaml.safe_dump(flow_def))
+
+                _, job_result, job_error = self._run_job(tmp_dir, scenario_dir, job_spec)
+
+                self.assertIsNone(job_result)
+                self.assertIsInstance(job_error, ex.EJobValidation)
+                errors.append(str(job_error))
+
+        self.assertEqual("Multiple models use input [accounts] but expect different schemas", errors[0])
+        self.assertEqual(errors[0], errors[1])
+
     def _run_job(self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path, job_spec: dict) \
             -> tp.Tuple[tp.Optional[cfg.JobConfig], tp.Optional[cfg.JobResult], tp.Optional[Exception]]:
 
@@ -357,6 +403,10 @@ class FlowScenarioDevModeTest(unittest.TestCase):
                     self.assertEqual(expected_entry["fields"], self._field_names(declared[name].schema), f"Fields of flow {section} [{name}]")
                 if "fileType" in expected_entry:
                     self.assertEqual(expected_entry["fileType"], declared[name].fileType.extension, f"File type of flow {section} [{name}]")
+                if "props" in expected_entry:
+                    props = declared[name].inputProps if section == "inputs" else declared[name].outputProps
+                    decoded_props = {key: types.MetadataCodec.decode_value(value) for key, value in (props or {}).items()}
+                    _assert_values_match(self, expected_entry["props"], decoded_props, f"Props of flow {section} [{name}]")
 
     @staticmethod
     def _field_names(schema: meta.SchemaDefinition) -> tp.List[str]:

@@ -1,0 +1,9 @@
+models:
+  filter: tracdap_test.flow_scenarios.models.FilterAccounts
+  annotate: tracdap_test.flow_scenarios.models.AnnotateReport
+
+parameters:
+  min_amount: 50.0
+
+inputs:
+  accounts: accounts.csv
