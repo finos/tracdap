@@ -183,7 +183,8 @@ jobs:
       BUILD_sql_${{ inputs.dialect }}: true
       TRAC_RT_SYS_CONFIG: ".github/config/rt-storage-ext-${{ inputs.dialect }}.yaml"
 
-    runs-on: ubuntu-latest
+    # setup-python reuses the runner's Python inside the container, so the runner must match the container OS
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     container:
