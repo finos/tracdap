@@ -36,12 +36,13 @@ public class TenantStorageManager extends TenantStateManager<TenantStorageState>
     private final ConfigManager configManager;
     private final ICodecManager codecManager;
     private final EventLoopGroup eventLoopGroup;
+    private final String createUnder;
 
     public TenantStorageManager(
             PluginManager pluginManager, ConfigManager configManager, ICodecManager codecManager,
             EventLoopGroup eventLoopGroup, InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient,
             GrpcConcern commonConcerns, TenantConfigMap staticConfigMap,
-            Executor discoveryExecutor)  {
+            Executor discoveryExecutor, String createUnder)  {
 
         super(staticConfigMap, configManager, metaClient, commonConcerns, discoveryExecutor);
 
@@ -49,11 +50,12 @@ public class TenantStorageManager extends TenantStateManager<TenantStorageState>
         this.configManager = configManager;
         this.codecManager = codecManager;
         this.eventLoopGroup = eventLoopGroup;
+        this.createUnder = createUnder;
     }
 
     @Override
     protected TenantStorageState initTenant(String tenantCode, TenantConfig initialConfig, boolean discoveredLive) {
-        return new TenantStorageState(pluginManager, configManager, codecManager, eventLoopGroup, initialConfig, discoveredLive);
+        return new TenantStorageState(pluginManager, configManager, codecManager, eventLoopGroup, initialConfig, discoveredLive, createUnder);
     }
 
     public StorageManager getTenantStorage(String tenantCode) {

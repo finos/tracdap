@@ -184,10 +184,12 @@ public class TracDataService extends TracServiceBase {
 
             var formats = new CodecManager(pluginManager, configManager);
 
+            var createUnder = serviceConfig.getPropertiesMap().get(ConfigKeys.STORAGE_LOCAL_CREATE_UNDER);
+
             storageManager = new TenantStorageManager(
                     pluginManager, configManager, formats, serviceGroup,
                     metaClientBlocking, commonConcerns,
-                    tenantConfigMap, offloadExecutor);
+                    tenantConfigMap, offloadExecutor, createUnder);
 
             // Load config for all tenants and initialize storage
             storageManager.init();

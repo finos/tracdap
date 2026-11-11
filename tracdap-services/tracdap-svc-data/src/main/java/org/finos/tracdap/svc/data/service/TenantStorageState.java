@@ -40,9 +40,10 @@ public class TenantStorageState extends TenantState {
             ICodecManager codecManager,
             EventLoopGroup eventLoopGroup,
             TenantConfig initialConfig,
-            boolean discoveredLive) {
+            boolean discoveredLive,
+            String createUnder) {
 
-        storage = new StorageManager(pluginManager, configManager, codecManager, eventLoopGroup);
+        storage = new StorageManager(pluginManager, configManager, codecManager, eventLoopGroup, createUnder);
         storage.updateStorageDefaults(initialConfig);
 
         try {

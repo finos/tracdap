@@ -47,6 +47,7 @@ public class StorageManager implements IStorageManager, AutoCloseable {
     private final ConfigManager configManager;
     private final ICodecManager formats;
     private final EventLoopGroup eventLoopGroup;
+    private final String createUnder;
 
 
     private final Map<String, StorageBackend> storage;
@@ -58,10 +59,23 @@ public class StorageManager implements IStorageManager, AutoCloseable {
             IPluginManager plugins, ConfigManager configManager,
             ICodecManager formats, EventLoopGroup eventLoopGroup) {
 
+        this(plugins, configManager, formats, eventLoopGroup, null);
+    }
+
+    /**
+     * A storage manager that may create missing storage roots, including their missing parents, below the
+     * {@code createUnder} folder when storage is added or updated with {@code createRoot} set.
+     */
+    public StorageManager(
+            IPluginManager plugins, ConfigManager configManager,
+            ICodecManager formats, EventLoopGroup eventLoopGroup,
+            String createUnder) {
+
         this.plugins = plugins;
         this.configManager = configManager;
         this.formats = formats;
         this.eventLoopGroup = eventLoopGroup;
+        this.createUnder = createUnder;
 
         this.storage = new ConcurrentHashMap<>();
         this.defaultLocation = null;
@@ -183,9 +197,15 @@ public class StorageManager implements IStorageManager, AutoCloseable {
 
     private StorageBackend createStorageBackend(String storageKey, PluginConfig storageConfig, boolean createRoot) {
 
-        var storageConfigWithKey = storageConfig.toBuilder()
-                .putProperties(PROP_STORAGE_KEY, storageKey)
-                .build();
+        // The create-under folder comes only from the service, never from a resource's own properties
+        var storageConfigBuilder = storageConfig.toBuilder()
+                .removeProperties(PROP_CREATE_UNDER)
+                .putProperties(PROP_STORAGE_KEY, storageKey);
+
+        if (createRoot && createUnder != null)
+            storageConfigBuilder.putProperties(PROP_CREATE_UNDER, createUnder);
+
+        var storageConfigWithKey = storageConfigBuilder.build();
 
         var backend = new StorageBackend();
 
