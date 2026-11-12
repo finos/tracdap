@@ -49,6 +49,7 @@ public class LocalFileStorage extends CommonFileStorage {
     public static final String CONFIG_ROOT_PATH = "rootPath";
 
     private final Path rootPath;
+    private final Path createUnder;
 
     public LocalFileStorage(String storageKey, Properties properties) {
 
@@ -60,17 +61,21 @@ public class LocalFileStorage extends CommonFileStorage {
         this.rootPath = Paths.get(rootDirProp)
                 .toAbsolutePath()
                 .normalize();
+
+        var createUnderProp = properties.getProperty(IStorageManager.PROP_CREATE_UNDER);
+        this.createUnder = createUnderProp != null && !createUnderProp.isBlank()
+                ? Paths.get(createUnderProp).toAbsolutePath().normalize()
+                : null;
     }
 
     @Override
     public void start(EventLoopGroup eventLoopGroup, boolean createRoot) {
 
-        // Only the root itself is created, a missing parent means the path or the volume is wrong
-        if (createRoot && !Files.exists(rootPath) && rootPath.getParent() != null && Files.isDirectory(rootPath.getParent())) {
+        if (createRoot && !Files.exists(rootPath) && canCreateRoot()) {
 
             try {
                 log.info("Creating storage root path: {} [{}]", storageKey, rootPath);
-                Files.createDirectory(rootPath);
+                Files.createDirectories(rootPath);
             }
             catch (FileAlreadyExistsException e) {
                 log.info("Storage root path already exists: {} [{}]", storageKey, rootPath);
@@ -83,6 +88,17 @@ public class LocalFileStorage extends CommonFileStorage {
         }
 
         start(eventLoopGroup);
+    }
+
+    private boolean canCreateRoot() {
+
+        // Below a create-under folder the root and any missing parents are created, the folder itself must exist
+        if (createUnder != null)
+            return rootPath.startsWith(createUnder) && !rootPath.equals(createUnder) && Files.isDirectory(createUnder);
+
+        // Otherwise only the root itself is created, a missing parent means the path or the volume is wrong
+        var parent = rootPath.getParent();
+        return parent != null && Files.isDirectory(parent);
     }
 
     @Override

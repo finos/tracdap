@@ -95,11 +95,73 @@ public class LocalStorageRootTest {
         storage.stop();
     }
 
+    @Test
+    void createUnder_nestedRootCreated() throws Exception {
+
+        var base = Files.createDirectory(tempDir.resolve("tenant"));
+        var rootPath = base.resolve("TENANT_1").resolve("datasets");
+        var storage = localStorage(rootPath, base);
+
+        storage.start(elg, true);
+
+        Assertions.assertTrue(Files.isDirectory(rootPath));
+
+        storage.stop();
+    }
+
+    @Test
+    void createUnder_missingBase_notCreated() {
+
+        var base = tempDir.resolve("tenant");
+        var rootPath = base.resolve("TENANT_1").resolve("datasets");
+
+        Assertions.assertThrows(EStartup.class, () -> localStorage(rootPath, base).start(elg, true));
+        Assertions.assertFalse(Files.exists(base));
+    }
+
+    @Test
+    void createUnder_rootOutsideBase_notCreated() throws Exception {
+
+        var base = Files.createDirectory(tempDir.resolve("tenant"));
+        var rootPath = tempDir.resolve("other").resolve("TENANT_1");
+
+        Assertions.assertThrows(EStartup.class, () -> localStorage(rootPath, base).start(elg, true));
+        Assertions.assertFalse(Files.exists(rootPath.getParent()));
+    }
+
+    @Test
+    void createUnder_rootEscapingBase_notCreated() throws Exception {
+
+        var base = Files.createDirectory(tempDir.resolve("tenant"));
+        var rootPath = base.resolve("..").resolve("escaped").resolve("TENANT_1");
+
+        Assertions.assertThrows(EStartup.class, () -> localStorage(rootPath, base).start(elg, true));
+        Assertions.assertFalse(Files.exists(tempDir.resolve("escaped")));
+    }
+
+    @Test
+    void createUnder_notAtStartup() throws Exception {
+
+        var base = Files.createDirectory(tempDir.resolve("tenant"));
+        var rootPath = base.resolve("TENANT_1").resolve("datasets");
+
+        Assertions.assertThrows(EStartup.class, () -> localStorage(rootPath, base).start(elg, false));
+        Assertions.assertFalse(Files.exists(base.resolve("TENANT_1")));
+    }
+
     private LocalFileStorage localStorage(Path rootPath) {
+
+        return localStorage(rootPath, null);
+    }
+
+    private LocalFileStorage localStorage(Path rootPath, Path createUnder) {
 
         var storageProps = new Properties();
         storageProps.put(IStorageManager.PROP_STORAGE_KEY, "TEST_STORAGE");
         storageProps.put(LocalFileStorage.CONFIG_ROOT_PATH, rootPath.toString());
+
+        if (createUnder != null)
+            storageProps.put(IStorageManager.PROP_CREATE_UNDER, createUnder.toString());
 
         return new LocalFileStorage("TEST_STORAGE", storageProps);
     }

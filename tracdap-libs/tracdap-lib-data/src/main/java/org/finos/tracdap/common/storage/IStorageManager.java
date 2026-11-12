@@ -22,6 +22,7 @@ import org.finos.tracdap.metadata.StorageLayout;
 public interface IStorageManager {
 
     String PROP_STORAGE_KEY = "TRAC_STORAGE_KEY";
+    String PROP_CREATE_UNDER = "TRAC_STORAGE_CREATE_UNDER";
 
     String defaultLocation();
     String defaultFormat();

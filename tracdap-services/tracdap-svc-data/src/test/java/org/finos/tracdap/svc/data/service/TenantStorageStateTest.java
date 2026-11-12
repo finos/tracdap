@@ -20,6 +20,7 @@ import org.finos.tracdap.common.codec.CodecManager;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
+import org.finos.tracdap.common.storage.IStorageManager;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 
@@ -134,9 +135,63 @@ class TenantStorageStateTest {
         state.shutdown();
     }
 
+    @Test
+    void discoveredLive_createUnder_nestedRootCreated() throws Exception {
+
+        var base = Files.createDirectory(tempDir.resolve("tenant"));
+        var datasetsRoot = base.resolve("TENANT_1").resolve("datasets");
+
+        var state = tenantState(tenantConfig(datasetsRoot), true, base.toString());
+
+        Assertions.assertTrue(Files.isDirectory(datasetsRoot));
+        Assertions.assertNotNull(state.getStorageManager().getFileStorage("datasets"));
+
+        state.shutdown();
+    }
+
+    @Test
+    void configCreated_createUnder_nestedRootCreated() throws Exception {
+
+        var base = Files.createDirectory(tempDir.resolve("tenant"));
+        Files.createDirectories(base.resolve("TENANT_1").resolve("datasets"));
+
+        var state = tenantState(tenantConfig(base.resolve("TENANT_1").resolve("datasets")), false, base.toString());
+
+        var resultsRoot = base.resolve("TENANT_1").resolve("trac_results");
+        state.configCreated(resourceEntry("trac_results"), localStorage(resultsRoot));
+
+        Assertions.assertTrue(Files.isDirectory(resultsRoot));
+
+        state.shutdown();
+    }
+
+    @Test
+    void discoveredLive_resourceCreateUnderIgnored() {
+
+        // A resource can't name its own create-under folder, only the service can
+        var datasetsRoot = tempDir.resolve("tenant").resolve("TENANT_1").resolve("datasets");
+
+        var resource = localStorage(datasetsRoot).getResource().toBuilder()
+                .putProperties(IStorageManager.PROP_CREATE_UNDER, tempDir.toString());
+
+        var config = TenantConfig.newBuilder()
+                .putProperties("storage.default.location", "datasets")
+                .putProperties("storage.default.format", "ARROW_FILE")
+                .putResources("datasets", resource.build())
+                .build();
+
+        Assertions.assertThrows(EStartup.class, () -> tenantState(config, true));
+        Assertions.assertFalse(Files.exists(tempDir.resolve("tenant")));
+    }
+
     private TenantStorageState tenantState(TenantConfig config, boolean discoveredLive) {
 
-        return new TenantStorageState(pluginManager, configManager, codecManager, elg, config, discoveredLive);
+        return tenantState(config, discoveredLive, null);
+    }
+
+    private TenantStorageState tenantState(TenantConfig config, boolean discoveredLive, String createUnder) {
+
+        return new TenantStorageState(pluginManager, configManager, codecManager, elg, config, discoveredLive, createUnder);
     }
 
     private TenantConfig tenantConfig(Path datasetsRoot) {
