@@ -98,10 +98,15 @@ public class RunModelJob extends RunModelOrFlow implements IJobLogic {
         var modelId = jobConfig.getObjectMappingMap().get(modelKey);
         var modelDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(modelId)).getModel();
 
+        var perOutputAttrs = new HashMap<String, List<TagUpdate>>();
+
+        for (var output : runModel.getPerOutputAttrsMap().entrySet())
+            perOutputAttrs.put(output.getKey(), output.getValue().getAttrsList());
+
         return processResult(
                 jobResult,
                 modelDef.getOutputsMap(),
                 runModel.getOutputAttrsList(),
-                Map.of(), resultIds);
+                perOutputAttrs, resultIds);
     }
 }

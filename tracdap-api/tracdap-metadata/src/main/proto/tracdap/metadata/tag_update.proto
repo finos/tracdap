@@ -137,3 +137,22 @@ message TagUpdate {
    */
   optional metadata.Value value = 3;
 }
+
+
+/**
+ * A list of tag updates, where updates are grouped by a key.
+ *
+ * Protobuf map values can't be repeated, so a map from a key to its tag updates
+ * uses this message as the value. For example, the tags for each output of a job
+ * are held as a map from output name to a tag update list.
+ *
+ * @see RunModelJob
+ * @see RunFlowJob
+ */
+message TagUpdateList {
+
+  /**
+   * Tag updates for the key this list belongs to
+   */
+  repeated TagUpdate attrs = 1;
+}

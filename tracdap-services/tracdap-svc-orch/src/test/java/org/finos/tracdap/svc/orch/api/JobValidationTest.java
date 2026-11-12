@@ -459,6 +459,135 @@ public class JobValidationTest {
         Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
     }
 
+    @Test
+    public void runModel_perOutputAttrsOk() {
+
+        var jobRequest = runModelRequest("enriched_output", "name", "Enriched output");
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void runModel_perOutputAttrsReserved() {
+
+        var jobRequest = runModelRequest("enriched_output", "trac_job_output", "not_allowed");
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void runModel_perOutputAttrsUnknownOutput() {
+
+        var jobRequest = runModelRequest("unknown_output", "name", "Unknown output");
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    @Test
+    public void runFlow_perOutputAttrsOk() {
+
+        var jobRequest = runFlowRequest("sample_output_data", "name", "Sample output");
+        var jobStatus = orchClient.validateJob(jobRequest);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void runFlow_perOutputAttrsUnknownOutput() {
+
+        var jobRequest = runFlowRequest("unknown_output", "name", "Unknown output");
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.FAILED_PRECONDITION, e.getStatus().getCode());
+    }
+
+    private static TagUpdateList perOutputAttr(String attrName, String value) {
+
+        return TagUpdateList.newBuilder()
+                .addAttrs(TagUpdate.newBuilder()
+                        .setAttrName(attrName)
+                        .setValue(MetadataCodec.encodeValue(value)))
+                .build();
+    }
+
+    private JobRequest runModelRequest(String outputName, String attrName, String value) {
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder()
+                .setModel(modelSelector)
+                .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                .putInputs("basic_input", basicDataSelector)
+                .putPerOutputAttrs(outputName, perOutputAttr(attrName, value)))
+                .build();
+
+        return JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+    }
+
+    private JobRequest runFlowRequest(String outputName, String attrName, String value) {
+
+        var createFlowRequest = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.FLOW)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.FLOW)
+                        .setFlow(SampleData.SAMPLE_FLOW))
+                .build();
+
+        var flowSelector = MetadataUtil.selectorFor(metaClient.createObject(createFlowRequest));
+
+        var model1 = createFlowModel(
+                "acme.models.test_model.Model1",
+                Map.of("param_1", BasicType.FLOAT),
+                Map.of("basic_data_input", SampleData.BASIC_TABLE_SCHEMA),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var model2 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_2", BasicType.STRING),
+                Map.of("alt_data_input", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                List.of());
+
+        var model3 = createFlowModel(
+                "acme.models.test_model.Model2",
+                Map.of("param_1", BasicType.FLOAT, "param_2", BasicType.STRING),
+                Map.of("enriched_basic_data", SampleData.BASIC_TABLE_SCHEMA_V2, "enriched_alt_data", SampleData.ALT_TABLE_SCHEMA),
+                Map.of("sample_output_data", SampleData.BASIC_TABLE_SCHEMA_V2),
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(RunFlowJob.newBuilder()
+                .setFlow(flowSelector)
+                .putModels("model_1", model1)
+                .putModels("model_2", model2)
+                .putModels("model_3", model3)
+                .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                .putParameters("param_2", MetadataCodec.encodeValue("test_value"))
+                .putInputs("basic_data_input", basicDataSelector)
+                .putInputs("alt_data_input", altDataSelector)
+                .putPerOutputAttrs(outputName, perOutputAttr(attrName, value)))
+                .build();
+
+        return JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+    }
+
     private TagSelector createFlowModel(
             String entryPoint,
             Map<String, BasicType> paramTypes,

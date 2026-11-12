@@ -28,7 +28,6 @@ import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.metadata.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
@@ -123,14 +122,24 @@ public class RunFlowJob extends RunModelOrFlow implements IJobLogic {
         var flowId = jobConfig.getObjectMappingMap().get(flowKey);
         var flowDef = jobConfig.getObjectsMap().get(MetadataUtil.objectKey(flowId)).getFlow();
 
-        var perNodeAttrs = flowDef.getNodesMap().entrySet().stream()
-                .filter(entry -> entry.getValue().getNodeType() == FlowNodeType.OUTPUT_NODE)
-                .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getNodeAttrsList()));
+        var perOutputAttrs = new HashMap<String, List<TagUpdate>>();
+
+        for (var node : flowDef.getNodesMap().entrySet()) {
+            if (node.getValue().getNodeType() == FlowNodeType.OUTPUT_NODE)
+                perOutputAttrs.put(node.getKey(), new ArrayList<>(node.getValue().getNodeAttrsList()));
+        }
+
+        // The job's tags for an output follow the output node's tags, so they take precedence
+        for (var output : runFlow.getPerOutputAttrsMap().entrySet()) {
+            perOutputAttrs
+                    .computeIfAbsent(output.getKey(), key -> new ArrayList<>())
+                    .addAll(output.getValue().getAttrsList());
+        }
 
         return processResult(
                 jobResult,
                 flowDef.getOutputsMap(),
                 runFlow.getOutputAttrsList(),
-                perNodeAttrs, resultIds);
+                perOutputAttrs, resultIds);
     }
 }

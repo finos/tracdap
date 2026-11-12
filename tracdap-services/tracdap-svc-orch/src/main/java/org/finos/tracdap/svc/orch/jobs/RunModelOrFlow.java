@@ -132,7 +132,7 @@ public abstract class RunModelOrFlow {
         var storageDef = jobResult.getObjectsOrThrow(storageKey);
         var storageAttrs = jobResult.getAttrsOrDefault(storageKey, JobResultAttrs.getDefaultInstance()).toBuilder();
 
-        // Add user attrs (job level and flow node attrs)
+        // Add user attrs (job level, then the attrs for each output)
 
         outputAttrs.addAllAttrs(jobAttrs);
 

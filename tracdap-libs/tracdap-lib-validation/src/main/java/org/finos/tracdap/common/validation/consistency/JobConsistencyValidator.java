@@ -56,6 +56,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RMJ_OUTPUTS;
     private static final Descriptors.FieldDescriptor RMJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RMJ_RESOURCES;
+    private static final Descriptors.FieldDescriptor RMJ_PER_OUTPUT_ATTRS;
 
     private static final Descriptors.Descriptor RUN_FLOW_JOB;
     private static final Descriptors.FieldDescriptor RFJ_FLOW;
@@ -66,6 +67,7 @@ public class JobConsistencyValidator {
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
     private static final Descriptors.FieldDescriptor RFJ_EXPORT_STORAGE_ACCESS;
+    private static final Descriptors.FieldDescriptor RFJ_PER_OUTPUT_ATTRS;
 
     private static final Descriptors.Descriptor IMPORT_DATA_JOB;
     private static final Descriptors.FieldDescriptor IDJ_CAPTURES;
@@ -89,6 +91,7 @@ public class JobConsistencyValidator {
         RMJ_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.OUTPUTS_FIELD_NUMBER);
         RMJ_PRIOR_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.PRIOROUTPUTS_FIELD_NUMBER);
         RMJ_RESOURCES = field(RUN_MODEL_JOB, RunModelJob.RESOURCES_FIELD_NUMBER);
+        RMJ_PER_OUTPUT_ATTRS = field(RUN_MODEL_JOB, RunModelJob.PEROUTPUTATTRS_FIELD_NUMBER);
 
         RUN_FLOW_JOB = RunFlowJob.getDescriptor();
         RFJ_FLOW = field(RUN_FLOW_JOB, RunFlowJob.FLOW_FIELD_NUMBER);
@@ -99,6 +102,7 @@ public class JobConsistencyValidator {
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
         RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
         RFJ_EXPORT_STORAGE_ACCESS = field(RUN_FLOW_JOB, RunFlowJob.EXPORTSTORAGEACCESS_FIELD_NUMBER);
+        RFJ_PER_OUTPUT_ATTRS = field(RUN_FLOW_JOB, RunFlowJob.PEROUTPUTATTRS_FIELD_NUMBER);
 
         IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
         IDJ_CAPTURES = field(IMPORT_DATA_JOB, ImportDataJob.CAPTURES_FIELD_NUMBER);
@@ -167,6 +171,10 @@ public class JobConsistencyValidator {
         ctx.pushMap(RMJ_OUTPUTS, RunModelJob::getOutputsMap)
                 .pop();
 
+        ctx.pushMap(RMJ_PER_OUTPUT_ATTRS, RunModelJob::getPerOutputAttrsMap)
+                .apply(JobConsistencyValidator::runModelPerOutputAttrs, Map.class, modelDef.getOutputsMap())
+                .pop();
+
         return ctx;
     }
 
@@ -215,6 +223,10 @@ public class JobConsistencyValidator {
         // As for runModel, these are allocated later and can take any schema / type needed
         ctx.pushMap(RFJ_OUTPUTS, RunFlowJob::getOutputsMap)
                 .apply(JobConsistencyValidator::runFlowOutputs, Map.class, graph)
+                .pop();
+
+        ctx.pushMap(RFJ_PER_OUTPUT_ATTRS, RunFlowJob::getPerOutputAttrsMap)
+                .apply(JobConsistencyValidator::runFlowPerOutputAttrs, Map.class, graph)
                 .pop();
 
         ctx = runFlowExportStorage(job, graph, ctx);
@@ -475,6 +487,24 @@ public class JobConsistencyValidator {
         }
 
         return ctx;
+    }
+
+    private static ValidationContext runFlowPerOutputAttrs(Map<String, TagUpdateList> perOutputAttrs, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
+
+        var outputNodes = graph.nodes().values().stream()
+                .filter(node -> node.payload().flowNode().getNodeType() == FlowNodeType.OUTPUT_NODE)
+                .collect(Collectors.toMap(n -> n.nodeId().name(), n -> n));
+
+        return alignedMapValidation(
+                "output", (outputName, attrs, outputNode, itemCtx) -> itemCtx, true,
+                perOutputAttrs, outputNodes, ctx);
+    }
+
+    private static ValidationContext runModelPerOutputAttrs(Map<String, TagUpdateList> perOutputAttrs, Map<String, ModelOutputSchema> modelOutputs, ValidationContext ctx) {
+
+        return alignedMapValidation(
+                "output", (outputName, attrs, outputSchema, itemCtx) -> itemCtx, true,
+                perOutputAttrs, modelOutputs, ctx);
     }
 
     private static ValidationContext runFlowResources(Map<String, String> resourceMapping, GraphSection<NodeMetadata> graph, ValidationContext ctx) {
