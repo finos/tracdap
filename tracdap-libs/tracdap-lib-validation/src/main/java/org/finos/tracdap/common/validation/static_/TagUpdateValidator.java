@@ -37,6 +37,9 @@ public class TagUpdateValidator {
     private static final Descriptors.FieldDescriptor TU_ATTR_NAME;
     private static final Descriptors.FieldDescriptor TU_VALUE;
 
+    private static final Descriptors.Descriptor TAG_UPDATE_LIST;
+    private static final Descriptors.FieldDescriptor TUL_ATTRS;
+
     private static final Descriptors.Descriptor VALUE;
     private static final Descriptors.OneofDescriptor V_VALUE;
 
@@ -46,6 +49,9 @@ public class TagUpdateValidator {
         TU_ATTR_NAME = ValidatorUtils.field(TAG_UPDATE, TagUpdate.ATTRNAME_FIELD_NUMBER);
         TU_OPERATION = ValidatorUtils.field(TAG_UPDATE, TagUpdate.OPERATION_FIELD_NUMBER);
         TU_VALUE = ValidatorUtils.field(TAG_UPDATE, TagUpdate.VALUE_FIELD_NUMBER);
+
+        TAG_UPDATE_LIST = TagUpdateList.getDescriptor();
+        TUL_ATTRS = ValidatorUtils.field(TAG_UPDATE_LIST, TagUpdateList.ATTRS_FIELD_NUMBER);
 
         VALUE = Value.getDescriptor();
         V_VALUE = field(VALUE, Value.BOOLEANVALUE_FIELD_NUMBER).getContainingOneof();
@@ -81,6 +87,14 @@ public class TagUpdateValidator {
                 .pop();
 
         return ctx;
+    }
+
+    public static ValidationContext tagUpdateList(TagUpdateList msg, boolean allowReserved, ValidationContext ctx) {
+
+        return ctx.pushRepeated(TUL_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, allowReserved)
+                .pop();
     }
 
     public static ValidationContext reservedAttrs(TagUpdate msg, boolean allowReserved, ValidationContext ctx) {

@@ -63,6 +63,7 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor RMJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RMJ_RESOURCES;
     private static final Descriptors.FieldDescriptor RMJ_OUTPUT_ATTRS;
+    private static final Descriptors.FieldDescriptor RMJ_PER_OUTPUT_ATTRS;
 
     private static final Descriptors.Descriptor RUN_FLOW_JOB;
     private static final Descriptors.FieldDescriptor RFJ_FLOW;
@@ -73,6 +74,7 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor RFJ_PRIOR_OUTPUTS;
     private static final Descriptors.FieldDescriptor RFJ_RESOURCES;
     private static final Descriptors.FieldDescriptor RFJ_OUTPUT_ATTRS;
+    private static final Descriptors.FieldDescriptor RFJ_PER_OUTPUT_ATTRS;
     private static final Descriptors.FieldDescriptor RFJ_EXPORT_STORAGE_ACCESS;
 
     private static final Descriptors.Descriptor IMPORT_DATA_JOB;
@@ -118,6 +120,7 @@ public class JobValidator {
         RMJ_PRIOR_OUTPUTS = field(RUN_MODEL_JOB, RunModelJob.PRIOROUTPUTS_FIELD_NUMBER);
         RMJ_RESOURCES = field(RUN_MODEL_JOB, RunModelJob.RESOURCES_FIELD_NUMBER);
         RMJ_OUTPUT_ATTRS = field(RUN_MODEL_JOB, RunModelJob.OUTPUTATTRS_FIELD_NUMBER);
+        RMJ_PER_OUTPUT_ATTRS = field(RUN_MODEL_JOB, RunModelJob.PEROUTPUTATTRS_FIELD_NUMBER);
 
         RUN_FLOW_JOB = RunFlowJob.getDescriptor();
         RFJ_FLOW = field(RUN_FLOW_JOB, RunFlowJob.FLOW_FIELD_NUMBER);
@@ -128,6 +131,7 @@ public class JobValidator {
         RFJ_PRIOR_OUTPUTS = field(RUN_FLOW_JOB, RunFlowJob.PRIOROUTPUTS_FIELD_NUMBER);
         RFJ_RESOURCES = field(RUN_FLOW_JOB, RunFlowJob.RESOURCES_FIELD_NUMBER);
         RFJ_OUTPUT_ATTRS = field(RUN_FLOW_JOB, RunFlowJob.OUTPUTATTRS_FIELD_NUMBER);
+        RFJ_PER_OUTPUT_ATTRS = field(RUN_FLOW_JOB, RunFlowJob.PEROUTPUTATTRS_FIELD_NUMBER);
         RFJ_EXPORT_STORAGE_ACCESS = field(RUN_FLOW_JOB, RunFlowJob.EXPORTSTORAGEACCESS_FIELD_NUMBER);
 
         IMPORT_DATA_JOB = ImportDataJob.getDescriptor();
@@ -211,8 +215,9 @@ public class JobValidator {
                 .pop();
 
         ctx = runModelOrFlow(ctx, RMJ_PARAMETERS, RMJ_INPUTS, RMJ_OUTPUTS, RMJ_PRIOR_OUTPUTS, RMJ_RESOURCES);
+        ctx = outputAttrs(ctx, RMJ_OUTPUT_ATTRS);
 
-        return outputAttrs(ctx, RMJ_OUTPUT_ATTRS);
+        return perOutputAttrs(ctx, RMJ_PER_OUTPUT_ATTRS);
     }
 
     @Validator
@@ -239,7 +244,9 @@ public class JobValidator {
                 .applyRepeated(CommonValidators::notTracReserved)
                 .pop();
 
-        return outputAttrs(ctx, RFJ_OUTPUT_ATTRS);
+        ctx = outputAttrs(ctx, RFJ_OUTPUT_ATTRS);
+
+        return perOutputAttrs(ctx, RFJ_PER_OUTPUT_ATTRS);
     }
 
     public static ValidationContext runModelOrFlow(
@@ -288,6 +295,15 @@ public class JobValidator {
                 .pop();
 
         return ctx;
+    }
+
+    private static ValidationContext perOutputAttrs(ValidationContext ctx, Descriptors.FieldDescriptor perOutputAttrs) {
+
+        return ctx.pushMap(perOutputAttrs)
+                .applyMapKeys(CommonValidators::identifier)
+                .applyMapKeys(CommonValidators::notTracReserved)
+                .applyMapValues(TagUpdateValidator::tagUpdateList, TagUpdateList.class, false)
+                .pop();
     }
 
     private static ValidationContext outputAttrs(ValidationContext ctx, Descriptors.FieldDescriptor outputAttrs) {

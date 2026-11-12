@@ -164,6 +164,7 @@ message RunModelJob {
   map<string, string> resources = 7;
 
   repeated TagUpdate outputAttrs = 6;
+  map<string, TagUpdateList> perOutputAttrs = 8;
 }
 
 /**
@@ -181,6 +182,7 @@ message RunFlowJob {
   map<string, string> resources = 8;
 
   repeated TagUpdate outputAttrs = 7;
+  map<string, TagUpdateList> perOutputAttrs = 10;
 
   repeated string exportStorageAccess = 9;
 }
