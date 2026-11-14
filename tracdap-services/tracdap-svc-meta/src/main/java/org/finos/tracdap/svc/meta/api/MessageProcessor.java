@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.meta.api;
 
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import org.finos.tracdap.api.internal.ConfigUpdate;
 import org.finos.tracdap.api.internal.InternalMessagingApiGrpc;
@@ -25,14 +26,22 @@ import org.finos.tracdap.api.internal.ReceivedCode;
 import org.finos.tracdap.api.internal.ReceivedStatus;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.IPlatformConfigListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.Executor;
 
 
 public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessagingApiImplBase {
 
-    private final PluginRegistry registry;
+    private static final Logger log = LoggerFactory.getLogger(MessageProcessor.class);
 
-    public MessageProcessor(PluginRegistry registry) {
+    private final PluginRegistry registry;
+    private final Executor listenerExecutor;
+
+    public MessageProcessor(PluginRegistry registry, Executor listenerExecutor) {
         this.registry = registry;
+        this.listenerExecutor = listenerExecutor;
     }
 
     @Override
@@ -51,13 +60,34 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     @Override
     public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
+        // Listeners call back into this service through the loopback client,
+        // so they run outside the primary executor that serves those calls
+        var callCtx = Context.current().fork();
+        var callExecutor = callCtx.fixedContextExecutor(listenerExecutor);
+        callExecutor.execute(() -> platformConfigUpdateOffloaded(request, response));
+    }
 
-        var status = listener != null
-                ? listener.applyConfigUpdate(request)
-                : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
+    public void platformConfigUpdateOffloaded(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        response.onNext(status);
-        response.onCompleted();
+        try {
+
+            var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
+
+            var status = listener != null
+                    ? listener.applyConfigUpdate(request)
+                    : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
+
+            response.onNext(status);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+
+            log.error("Platform config update failed: class = {}, key = {}, {}",
+                    request.getConfigEntry().getConfigClass(),
+                    request.getConfigEntry().getConfigKey(),
+                    e.getMessage(), e);
+
+            response.onError(e);
+        }
     }
 }

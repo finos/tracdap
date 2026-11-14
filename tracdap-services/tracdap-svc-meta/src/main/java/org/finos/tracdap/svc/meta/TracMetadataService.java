@@ -29,6 +29,7 @@ import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.netty.NettyHelpers;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.PlatformConfigReconciler;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
@@ -93,8 +94,10 @@ public class TracMetadataService extends TracServiceBase {
 
     private IMetadataStore metadataStore;
     private ExecutorService executor;
+    private ExecutorService listenerExecutor;
     private Server server;
     private ManagedChannel loopbackChannel;
+    private PlatformConfigReconciler platformConfigReconciler;
 
     public static void main(String[] args) {
 
@@ -162,7 +165,8 @@ public class TracMetadataService extends TracServiceBase {
             registry.addSingleton(GrpcConcern.class, commonConcerns);
             registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, loopbackClient);
 
-            var messageProcessor = new MessageProcessor(registry);
+            listenerExecutor = Executors.newSingleThreadExecutor(NettyHelpers.threadFactory("meta-listener"));
+            var messageProcessor = new MessageProcessor(registry, listenerExecutor);
 
             // Create the main server
             // This setup is thread-per-request using a thread pool executor
@@ -192,6 +196,11 @@ public class TracMetadataService extends TracServiceBase {
             for (var extension : pluginManager.getExtensions())
                 extension.runStartupLogic(registry);
 
+            platformConfigReconciler = new PlatformConfigReconciler(
+                    registry, loopbackClient, commonConcerns,
+                    PlatformConfigReconciler.refreshInterval(ConfigKeys.METADATA_SERVICE_KEY, serviceConfig));
+
+            platformConfigReconciler.start();
         }
         catch (IOException e) {
 
@@ -209,6 +218,9 @@ public class TracMetadataService extends TracServiceBase {
 
         var deadline = Instant.now().plus(shutdownTimeout);
 
+        if (platformConfigReconciler != null)
+            platformConfigReconciler.stop();
+
         var serverDown = shutdownResource("Data service server", deadline, remaining -> {
 
             server.shutdown();
@@ -224,13 +236,19 @@ public class TracMetadataService extends TracServiceBase {
             return executor.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
+        var listenerDown = shutdownResource("Listener thread", deadline, remaining -> {
+
+            listenerExecutor.shutdown();
+            return listenerExecutor.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
+        });
+
         var loopbackDown = shutdownResource("Loopback client channel", deadline, remaining -> {
 
             loopbackChannel.shutdown();
             return loopbackChannel.awaitTermination(remaining.toMillis(), TimeUnit.MILLISECONDS);
         });
 
-        if (serverDown && executorDown && loopbackDown)
+        if (serverDown && executorDown && listenerDown && loopbackDown)
             return 0;
 
         if (!server.isTerminated())

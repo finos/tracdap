@@ -44,6 +44,7 @@ public class ConfigKeys {
     public static final String GATEWAY_ROUTE_NAME = "gateway.route.name";
     public static final String GATEWAY_ROUTE_PREFIX = "gateway.route.prefix";
     public static final String NETWORK_IDLE_TIMEOUT = "network.idleTimeout";
+    public static final String PLATFORM_CONFIG_REFRESH_INTERVAL = "platformConfig.refreshInterval";
 
     // Storage defaults
     public static final String STORAGE_DEFAULT_LOCATION = "storage.default.location";

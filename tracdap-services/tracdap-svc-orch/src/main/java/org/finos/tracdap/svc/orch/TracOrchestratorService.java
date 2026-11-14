@@ -23,6 +23,7 @@ import org.finos.tracdap.api.internal.InternalMessagingProto;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.cache.IJobCacheManager;
 import org.finos.tracdap.common.config.*;
+import org.finos.tracdap.common.service.PlatformConfigReconciler;
 import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.config.TenantConfigMap;
 import org.finos.tracdap.svc.orch.service.JobExecutor;
@@ -83,6 +84,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
     private IBatchExecutor<? extends Serializable> batchExecutor;
     private JobManager jobManager;
+    private PlatformConfigReconciler platformConfigReconciler;
 
     public static void main(String[] args) {
 
@@ -219,6 +221,12 @@ public class TracOrchestratorService extends TracServiceBase {
             this.server.start();
 
             log.info("Orchestrator is listening on port {}", server.getPort());
+
+            platformConfigReconciler = new PlatformConfigReconciler(
+                    registry, metaClient, commonConcerns,
+                    PlatformConfigReconciler.refreshInterval(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, serviceConfig));
+
+            platformConfigReconciler.start();
         }
         catch (IOException e) {
 
@@ -230,6 +238,9 @@ public class TracOrchestratorService extends TracServiceBase {
     protected int doShutdown(Duration shutdownTimeout) {
 
         var deadline = Instant.now().plus(shutdownTimeout);
+
+        if (platformConfigReconciler != null)
+            platformConfigReconciler.stop();
 
         var serverDown = shutdownResource("Orchestrator service server", deadline, remaining -> {
 

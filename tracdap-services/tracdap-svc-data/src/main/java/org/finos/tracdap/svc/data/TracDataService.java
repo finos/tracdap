@@ -33,6 +33,7 @@ import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.exception.EStartup;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.PlatformConfigReconciler;
 import org.finos.tracdap.common.service.TracServiceConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
 import org.finos.tracdap.common.util.RoutingUtils;
@@ -80,6 +81,7 @@ public class TracDataService extends TracServiceBase {
     private ManagedChannel metaClientChanel;
     private ManagedChannel metaBlockingChanel;
     private TenantStorageManager storageManager;
+    private PlatformConfigReconciler platformConfigReconciler;
     private Server server;
 
     public static void main(String[] args) {
@@ -234,6 +236,12 @@ public class TracDataService extends TracServiceBase {
             this.server.start();
 
             log.info("Data service is listening on port {}", server.getPort());
+
+            platformConfigReconciler = new PlatformConfigReconciler(
+                    registry, metaClientBlocking, commonConcerns,
+                    PlatformConfigReconciler.refreshInterval(ConfigKeys.DATA_SERVICE_KEY, serviceConfig));
+
+            platformConfigReconciler.start();
         }
         catch (IOException e) {
 
@@ -317,6 +325,9 @@ public class TracDataService extends TracServiceBase {
     protected int doShutdown(Duration shutdownTimeout) {
 
         var deadline = Instant.now().plus(shutdownTimeout);
+
+        if (platformConfigReconciler != null)
+            platformConfigReconciler.stop();
 
         var serverDown = shutdownResource("Data service server", deadline, remaining -> {
 

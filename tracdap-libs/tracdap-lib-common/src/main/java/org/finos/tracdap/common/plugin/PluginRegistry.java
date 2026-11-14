@@ -20,6 +20,7 @@ package org.finos.tracdap.common.plugin;
 import org.finos.tracdap.common.exception.ETracInternal;
 import org.finos.tracdap.common.exception.EUnexpected;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
@@ -87,6 +88,16 @@ public class PluginRegistry {
         if (!pluginClass.isInstance(instance))
             throw new EUnexpected();
         return pluginClass.cast(instance);
+    }
+
+    public <T> Map<String, T> getNamedInstances(Class<T> pluginClass) {
+        var instances = new HashMap<String, T>();
+        for (var entry : registry.entrySet()) {
+            var key = entry.getKey();
+            if (key.pluginClass().equals(pluginClass) && key.namedKey() != null)
+                instances.put(key.namedKey(), pluginClass.cast(entry.getValue()));
+        }
+        return instances;
     }
 
     private static class Key {
