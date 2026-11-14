@@ -76,13 +76,33 @@ public class MessageProcessor extends InternalMessagingApiGrpc.InternalMessaging
     @Override
     public void platformConfigUpdate(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
+        // Listeners may make blocking calls, they must not run on the primary event loop either
+        var callCtx = Context.current().fork();
+        var callExecutor = callCtx.fixedContextExecutor(offloadExecutor);
+        callExecutor.execute(() -> platformConfigUpdateOffloaded(request, response));
+    }
 
-        var status = listener != null
-                ? listener.applyConfigUpdate(request)
-                : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
+    public void platformConfigUpdateOffloaded(PlatformConfigUpdate request, StreamObserver<ReceivedStatus> response) {
 
-        response.onNext(status);
-        response.onCompleted();
+        try {
+
+            var listener = registry.tryGetNamedInstance(IPlatformConfigListener.class, request.getConfigEntry().getConfigClass());
+
+            var status = listener != null
+                    ? listener.applyConfigUpdate(request)
+                    : ReceivedStatus.newBuilder().setCode(ReceivedCode.IGNORED).build();
+
+            response.onNext(status);
+            response.onCompleted();
+        }
+        catch (Exception e) {
+
+            log.error("Platform config update failed: class = {}, key = {}, {}",
+                    request.getConfigEntry().getConfigClass(),
+                    request.getConfigEntry().getConfigKey(),
+                    e.getMessage(), e);
+
+            response.onError(e);
+        }
     }
 }

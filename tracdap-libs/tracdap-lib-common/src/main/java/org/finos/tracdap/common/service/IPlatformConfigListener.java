@@ -25,6 +25,10 @@ import org.finos.tracdap.api.internal.ReceivedStatus;
  * given configClass, registered into a {@link org.finos.tracdap.common.plugin.PluginRegistry}
  * under that configClass as the named key. Each service's MessageProcessor looks up a listener
  * for the update's configClass and dispatches to it if one is registered.
+ *
+ * <p>The same listener also receives updates from {@link PlatformConfigReconciler}, which replays entries
+ * the listener may already have applied, from its own thread. Applying an update more than once must give
+ * the same state, and updates from the reconciler and from notifications can arrive concurrently.</p>
  */
 public interface IPlatformConfigListener {
 

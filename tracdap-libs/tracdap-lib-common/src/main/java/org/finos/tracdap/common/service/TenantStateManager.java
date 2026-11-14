@@ -33,15 +33,19 @@ import org.finos.tracdap.metadata.ObjectType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public abstract class TenantStateManager<TState extends TenantState> {
+
+    private static final Duration METADATA_CALL_TIMEOUT = Duration.ofSeconds(30);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -54,6 +58,7 @@ public abstract class TenantStateManager<TState extends TenantState> {
     private final InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private final GrpcConcern commonConcerns;
     private final Executor discoveryExecutor;
+    private Duration metadataCallTimeout = METADATA_CALL_TIMEOUT;
 
     protected abstract TState initTenant(String tenantCode, TenantConfig initialConfig, boolean discoveredLive);
 
@@ -83,6 +88,10 @@ public abstract class TenantStateManager<TState extends TenantState> {
         this.metaClient = metaClient;
         this.commonConcerns = commonConcerns;
         this.discoveryExecutor = discoveryExecutor;
+    }
+
+    void setMetadataCallTimeout(Duration timeout) {
+        this.metadataCallTimeout = timeout;
     }
 
     public TState getTenant(String tenantCode) {
@@ -234,8 +243,7 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
     private TState initDiscoveredTenant(String tenantCode) {
 
-        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
-        var client = clientState.configureClient(metaClient);
+        var client = liveMetadataClient();
 
         var liveTenantList = client.listTenants(ListTenantsRequest.getDefaultInstance());
         var tenantExists = liveTenantList.getTenantsList().stream()
@@ -373,10 +381,17 @@ public abstract class TenantStateManager<TState extends TenantState> {
         return ReceivedStatus.newBuilder().setCode(ReceivedCode.OK).build();
     }
 
-    private List<ConfigReadResponse> fetchMetadataConfig(String tenantCode, String configClass) {
+    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub liveMetadataClient() {
 
         var clientState = commonConcerns.prepareClientCall(Context.ROOT);
         var client = clientState.configureClient(metaClient);
+
+        return client.withDeadlineAfter(metadataCallTimeout.toMillis(), TimeUnit.MILLISECONDS);
+    }
+
+    private List<ConfigReadResponse> fetchMetadataConfig(String tenantCode, String configClass) {
+
+        var client = liveMetadataClient();
 
         var listRequest = ConfigListRequest.newBuilder()
                 .setTenant(tenantCode)
@@ -400,8 +415,7 @@ public abstract class TenantStateManager<TState extends TenantState> {
 
     private ConfigReadResponse fetchMetadataConfig(String tenantCode, String configClass, String configKey) {
 
-        var clientState = commonConcerns.prepareClientCall(Context.ROOT);
-        var client = clientState.configureClient(metaClient);
+        var client = liveMetadataClient();
 
         var readRequest = ConfigReadRequest.newBuilder()
                 .setTenant(tenantCode)

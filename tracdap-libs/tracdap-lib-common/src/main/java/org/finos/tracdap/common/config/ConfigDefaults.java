@@ -30,6 +30,7 @@ public class ConfigDefaults {
     // For now, here are some config defaults!
 
     public static final int NETWORK_IDLE_TIMEOUT = 30;  // seconds
+    public static final int PLATFORM_CONFIG_REFRESH_INTERVAL = 60;  // seconds
 
     public static final String STORAGE_DEFAULT_FORMAT = "ARROW_FILE";
     public static final StorageLayout STORAGE_DEFAULT_LAYOUT = StorageLayout.DATE_SNAP_LAYOUT;

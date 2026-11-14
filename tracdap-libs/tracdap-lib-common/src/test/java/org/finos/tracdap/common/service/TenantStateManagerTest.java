@@ -219,6 +219,40 @@ class TenantStateManagerTest {
         Assertions.assertNotNull(manager.getTenant("NEW_TENANT"));
     }
 
+    @Test
+    void discoveryTimeout_freesDiscoveryForRetry() {
+
+        var manager = new TestManager(executor);
+        manager.setMetadataCallTimeout(Duration.ofMillis(200));
+        manager.init();
+
+        metadataApi.tenants.add("NEW_TENANT");
+
+        var gate = new CountDownLatch(1);
+        metadataApi.listTenantsGate = gate;
+        var callsBefore = metadataApi.listTenantsCalls.get();
+
+        // While listTenants never answers, a later miss can only list again once the first discovery has timed out
+        waitFor(() -> {
+            Assertions.assertThrows(ETenantNotFound.class, () -> manager.getTenant("NEW_TENANT"));
+            return metadataApi.listTenantsCalls.get() >= callsBefore + 2;
+        });
+
+        metadataApi.listTenantsGate = null;
+        gate.countDown();
+
+        waitFor(() -> {
+            try {
+                return manager.getTenant("NEW_TENANT") != null;
+            }
+            catch (ETenantNotFound e) {
+                return false;
+            }
+        });
+
+        Assertions.assertEquals(1, manager.initCount("NEW_TENANT"));
+    }
+
     private static ConfigUpdate resourceUpdate(String tenant) {
 
         return ConfigUpdate.newBuilder()
