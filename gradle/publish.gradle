@@ -60,5 +60,5 @@ def publishModule(Project project) {
 }
 
 ext {
-    publishModule = { Project project -> publishModule(project) }
+    publishModule = { Project project -> this.publishModule(project) }
 }

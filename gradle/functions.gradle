@@ -138,8 +138,8 @@ def enableBuildTimePlugins(List<String> filters, boolean optional = false) {
 
 ext {
     addVersionInfo = { SourceSet sourceSet, String name -> this.addVersionInfo(sourceSet, name) }
-    getVersionFromGit = { -> getVersionFromGit() }
+    getVersionFromGit = { -> this.getVersionFromGit() }
     isFeatureEnabled = { String key -> this.isFeatureEnabled(key) }
-    enableBuildTimePlugins = { List<String> filters, boolean optional = false -> enableBuildTimePlugins(filters, optional) }
+    enableBuildTimePlugins = { List<String> filters, boolean optional = false -> this.enableBuildTimePlugins(filters, optional) }
     OPTIONAL = true
 }
