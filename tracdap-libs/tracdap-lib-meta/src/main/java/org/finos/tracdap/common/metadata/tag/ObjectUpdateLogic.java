@@ -27,6 +27,7 @@ import org.finos.tracdap.metadata.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 
 public class ObjectUpdateLogic {
@@ -86,6 +87,7 @@ public class ObjectUpdateLogic {
                 .setDefinition(definition)
                 .build();
 
+        newTag = dropVersionScopedAttrs(newTag);
         newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for updated objects
@@ -97,6 +99,21 @@ public class ObjectUpdateLogic {
         newTag = TagUpdateLogic.applyTagUpdates(newTag, updateAttrs);
 
         return newTag;
+    }
+
+    private static Tag dropVersionScopedAttrs(Tag tag) {
+
+        var scopedAttrs = tag.getAttrsMap().keySet().stream()
+                .filter(attrName -> MetadataConstants.VERSION_SCOPED_ATTRS.matcher(attrName).matches())
+                .collect(Collectors.toList());
+
+        if (scopedAttrs.isEmpty())
+            return tag;
+
+        var newTag = tag.toBuilder();
+        scopedAttrs.forEach(newTag::removeAttrs);
+
+        return newTag.build();
     }
 
     public static Tag buildNewTag(
@@ -177,6 +194,7 @@ public class ObjectUpdateLogic {
             case FILE: return structuredFileAttrs(tracObject.getFile());
             case MODEL: return structuredModelAttrs(tracObject.getModel());
             case JOB: return structuredJobAttrs(tracObject.getJob());
+            case CUSTOM: return structuredCustomAttrs(tracObject.getCustom());
 
             default:
                 return List.of();
@@ -319,6 +337,30 @@ public class ObjectUpdateLogic {
                 .setValue(MetadataCodec.encodeValue(tracJob.getJobType().name()))
                 .build());
 
+        if (tracJob.hasContext())
+            jobAttrs.addAll(jobContextAttrs(tracJob.getContext()));
+
         return jobAttrs;
+    }
+
+    private static List<TagUpdate> jobContextAttrs(TagSelector context) {
+
+        return List.of(
+                TagUpdate.newBuilder()
+                        .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)
+                        .setValue(MetadataCodec.encodeValue(context.getObjectId()))
+                        .build(),
+                TagUpdate.newBuilder()
+                        .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)
+                        .setValue(MetadataCodec.encodeValue(context.getObjectVersion()))
+                        .build());
+    }
+
+    public static List<TagUpdate> structuredCustomAttrs(CustomDefinition tracCustom) {
+
+        return List.of(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_CUSTOM_SCHEMA_TYPE_ATTR)
+                .setValue(MetadataCodec.encodeValue(tracCustom.getCustomSchemaType()))
+                .build());
     }
 }

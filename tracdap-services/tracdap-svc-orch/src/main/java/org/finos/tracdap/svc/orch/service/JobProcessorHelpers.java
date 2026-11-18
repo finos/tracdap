@@ -93,7 +93,10 @@ public class JobProcessorHelpers {
     JobState loadMetadata(JobState jobState) {
 
         var jobLogic = JobLogic.forJobType(jobState.jobType);
-        var selectors = jobLogic.requiredMetadata(jobState.definition);
+        var selectors = new ArrayList<>(jobLogic.requiredMetadata(jobState.definition));
+
+        if (jobState.definition.hasContext())
+            selectors.add(jobState.definition.getContext());
 
         if (selectors.isEmpty()) {
             log.info("No additional metadata required");
@@ -342,12 +345,29 @@ public class JobProcessorHelpers {
 
         var tenantConfig = tenantState.getTenantConfig(jobState.tenant);
 
+        var definition = jobState.definition;
+        var objectMapping = new HashMap<>(jobState.metadata.getObjectMapping());
+        var objects = new HashMap<>(jobState.metadata.getObjects());
+        var tags = new HashMap<>(jobState.metadata.getTags());
+
+        // The job context is recorded by the platform, the runtime does not see it
+
+        if (definition.hasContext()) {
+
+            var contextKey = MetadataUtil.objectKey(definition.getContext());
+            objectMapping.remove(contextKey);
+            objects.remove(contextKey);
+            tags.remove(contextKey);
+
+            definition = definition.toBuilder().clearContext().build();
+        }
+
         var jobConfig = JobConfig.newBuilder()
                 .setJobId(jobState.jobId)
-                .setJob(jobState.definition)
-                .putAllObjectMapping(jobState.metadata.getObjectMapping())
-                .putAllObjects(jobState.metadata.getObjects())
-                .putAllTags(jobState.metadata.getTags())
+                .setJob(definition)
+                .putAllObjectMapping(objectMapping)
+                .putAllObjects(objects)
+                .putAllTags(tags)
                 .setResultId(jobState.resultId)
                 .addAllPreallocatedIds(jobState.preallocatedIds);
 
@@ -645,6 +665,19 @@ public class JobProcessorHelpers {
             attrs.addAttrs(TagUpdate.newBuilder()
                     .setAttrName(TRAC_JOB_TYPE_ATTR)
                     .setValue(MetadataCodec.encodeValue(jobState.jobType.name())));
+
+            if (jobState.definition != null && jobState.definition.hasContext()) {
+
+                var context = jobState.definition.getContext();
+
+                attrs.addAttrs(TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_CONTEXT_ATTR)
+                        .setValue(MetadataCodec.encodeValue(context.getObjectId())));
+
+                attrs.addAttrs(TagUpdate.newBuilder()
+                        .setAttrName(TRAC_JOB_CONTEXT_VERSION_ATTR)
+                        .setValue(MetadataCodec.encodeValue(context.getObjectVersion())));
+            }
 
             if (objectId.getObjectVersion() == MetadataConstants.OBJECT_FIRST_VERSION) {
 

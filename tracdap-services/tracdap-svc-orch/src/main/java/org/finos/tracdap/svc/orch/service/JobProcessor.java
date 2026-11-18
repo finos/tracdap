@@ -34,6 +34,8 @@ import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IJobValidationHook;
+import org.finos.tracdap.common.service.JobValidation;
 import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.JobResult;
@@ -61,6 +63,7 @@ public class JobProcessor {
     private final Logger log = LoggerFactory.getLogger(getClass());
 
     private final GrpcConcern commonConcerns;
+    private final PluginRegistry registry;
 
     private final InternalMetadataApiBlockingStub metaClient;
     private final TracStorageApiGrpc.TracStorageApiBlockingStub storageClient;
@@ -79,6 +82,7 @@ public class JobProcessor {
             PluginRegistry registry) {
 
         this.commonConcerns = commonConcerns;
+        this.registry = registry;
 
         this.metaClient = registry.getSingleton(InternalMetadataApiBlockingStub.class);
         this.storageClient = registry.getSingleton(TracStorageApiGrpc.TracStorageApiBlockingStub.class);
@@ -145,6 +149,13 @@ public class JobProcessor {
 
             // Semantic validation (job consistency)
             validator.validateConsistency(newState.definition, newState.metadata, newState.resources);
+
+            var hook = registry.trySingleton(IJobValidationHook.class);
+
+            if (hook != null)
+                hook.validate(new JobValidation(
+                        newState.tenant, newState.definition,
+                        newState.metadata, newState.userMetadata));
 
             // Apply any transformations specific to the job type
             // Including this step during validation will catch more errors before jobs are submitted

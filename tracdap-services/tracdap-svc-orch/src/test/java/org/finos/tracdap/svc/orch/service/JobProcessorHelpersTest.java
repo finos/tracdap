@@ -22,11 +22,15 @@ import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.ResourceBundle;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PluginConfig;
+import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.meta.SampleMetadata;
 
@@ -36,8 +40,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
 import org.mockito.Mockito;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class JobProcessorHelpersTest {
@@ -49,8 +59,16 @@ public class JobProcessorHelpersTest {
     private TagHeader logFileId;
     private TagHeader logStorageId;
 
+    private static final TagHeader MODEL_ID = SampleMetadata.newHeader(ObjectType.MODEL);
+    private static final TagHeader CONTEXT_ID = SampleMetadata.newHeader(ObjectType.CUSTOM);
+    private static final TagSelector MODEL_SELECTOR = MetadataUtil.selectorFor(MODEL_ID);
+    private static final TagSelector CONTEXT_SELECTOR = MetadataUtil.selectorFor(CONTEXT_ID);
+
     @BeforeEach
     void setup() {
+
+        var tenantState = Mockito.mock(TenantConfigManager.class);
+        Mockito.when(tenantState.getTenantConfig(Mockito.anyString())).thenReturn(TenantConfig.getDefaultInstance());
 
         var registry = new PluginRegistry();
         registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class,
@@ -59,7 +77,7 @@ public class JobProcessorHelpersTest {
 
         var commonConcerns = Mockito.mock(GrpcConcern.class, Answers.CALLS_REAL_METHODS);
 
-        helpers = new JobProcessorHelpers(PluginConfig.getDefaultInstance(), null, commonConcerns, registry);
+        helpers = new JobProcessorHelpers(PluginConfig.getDefaultInstance(), tenantState, commonConcerns, registry);
 
         jobId = SampleMetadata.newHeader(ObjectType.JOB);
         resultId = SampleMetadata.newHeader(ObjectType.RESULT);
@@ -110,6 +128,37 @@ public class JobProcessorHelpersTest {
         Assertions.assertEquals(resultId, jobState.jobResult.getResultId());
 
         assertLogRegistered(jobState);
+    }
+
+    @Test
+    void processJobResult_failedResultContextOnLog() {
+
+        var contextId = SampleMetadata.newHeader(ObjectType.CUSTOM);
+
+        var runtimeResult = runtimeResult(JobStatusCode.FAILED, "Model failed", true);
+        var jobState = jobState(JobStatusCode.FAILED, "Executor message", runtimeResult);
+        jobState.runtimeStatus = executorStatus(JobStatusCode.FAILED);
+        jobState.definition = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setContext(MetadataUtil.selectorFor(contextId))
+                .build();
+
+        helpers.processJobResult(jobState);
+
+        assertLogRegistered(jobState);
+
+        for (var objectId : List.of(logFileId, logStorageId)) {
+
+            var attrs = jobState.jobResult.getAttrsOrThrow(MetadataUtil.objectKey(objectId)).getAttrsList();
+
+            Assertions.assertTrue(attrs.stream().anyMatch(attr ->
+                    attr.getAttrName().equals(MetadataConstants.TRAC_JOB_CONTEXT_ATTR) &&
+                    MetadataCodec.decodeStringValue(attr.getValue()).equals(contextId.getObjectId())));
+
+            Assertions.assertTrue(attrs.stream().anyMatch(attr ->
+                    attr.getAttrName().equals(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR) &&
+                    MetadataCodec.decodeIntegerValue(attr.getValue()) == contextId.getObjectVersion()));
+        }
     }
 
     @Test
@@ -303,6 +352,64 @@ public class JobProcessorHelpersTest {
         Assertions.assertFalse(Character.isHighSurrogate(kept.charAt(kept.length() - 1)));
     }
 
+    @Test
+    void buildJobConfig_contextNotSentToRuntime() {
+
+        var jobState = configJobState(CONTEXT_SELECTOR);
+        var newState = helpers.buildJobConfig(jobState);
+
+        var jobConfig = newState.jobConfig;
+        var contextKey = MetadataUtil.objectKey(CONTEXT_ID);
+        var modelKey = MetadataUtil.objectKey(MODEL_ID);
+
+        Assertions.assertFalse(jobConfig.getJob().hasContext());
+        Assertions.assertFalse(jobConfig.containsObjectMapping(MetadataUtil.objectKey(CONTEXT_SELECTOR)));
+        Assertions.assertFalse(jobConfig.containsObjects(contextKey));
+        Assertions.assertFalse(jobConfig.containsTags(contextKey));
+
+        Assertions.assertEquals(MODEL_ID, jobConfig.getObjectMappingOrThrow(MetadataUtil.objectKey(MODEL_SELECTOR)));
+        Assertions.assertTrue(jobConfig.containsObjects(modelKey));
+        Assertions.assertTrue(jobConfig.containsTags(modelKey));
+        Assertions.assertEquals(jobState.definition.getRunModel(), jobConfig.getJob().getRunModel());
+
+        // The job state keeps the context, it is needed to stamp the job outputs
+        Assertions.assertEquals(CONTEXT_SELECTOR, newState.definition.getContext());
+        Assertions.assertTrue(newState.metadata.hasObject(CONTEXT_SELECTOR));
+    }
+
+    @Test
+    void buildJobConfig_noContextUnchanged() {
+
+        var jobState = configJobState(null);
+        var newState = helpers.buildJobConfig(jobState);
+
+        Assertions.assertEquals(jobState.definition, newState.jobConfig.getJob());
+        Assertions.assertEquals(jobState.metadata.getObjects(), newState.jobConfig.getObjectsMap());
+        Assertions.assertEquals(jobState.metadata.getObjectMapping(), newState.jobConfig.getObjectMappingMap());
+    }
+
+    @Test
+    void jobState_contextKeptThroughCache() throws Exception {
+
+        var jobState = helpers.buildJobConfig(configJobState(CONTEXT_SELECTOR));
+
+        var buffer = new ByteArrayOutputStream();
+
+        try (var out = new ObjectOutputStream(buffer)) {
+            out.writeObject(jobState);
+        }
+
+        JobState restored;
+
+        try (var in = new ObjectInputStream(new ByteArrayInputStream(buffer.toByteArray()))) {
+            restored = (JobState) in.readObject();
+        }
+
+        // The bundle is rebuilt from the job config, without the context, the definition keeps it
+        Assertions.assertEquals(CONTEXT_SELECTOR, restored.definition.getContext());
+        Assertions.assertFalse(restored.metadata.hasObject(CONTEXT_SELECTOR));
+    }
+
     private void assertLogRegistered(JobState jobState) {
 
         var jobResult = jobState.jobResult;
@@ -383,5 +490,49 @@ public class JobProcessorHelpersTest {
 
     private static int utf8Length(String value) {
         return value.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private JobState configJobState(TagSelector context) {
+
+        var definition = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder().setModel(MODEL_SELECTOR));
+
+        if (context != null)
+            definition.setContext(context);
+
+        var objects = new HashMap<String, ObjectDefinition>();
+        var tags = new HashMap<String, Tag>();
+        var mapping = new HashMap<String, TagHeader>();
+
+        addObject(MODEL_SELECTOR, MODEL_ID, ObjectType.MODEL, mapping, objects, tags);
+
+        if (context != null)
+            addObject(context, CONTEXT_ID, ObjectType.CUSTOM, mapping, objects, tags);
+
+        var jobId = SampleMetadata.newHeader(ObjectType.JOB);
+
+        var jobState = new JobState();
+        jobState.tenant = SampleMetadata.TEST_TENANT;
+        jobState.jobId = jobId;
+        jobState.jobKey = MetadataUtil.objectKey(jobId);
+        jobState.jobType = JobType.RUN_MODEL;
+        jobState.definition = definition.build();
+        jobState.resultId = SampleMetadata.newHeader(ObjectType.RESULT);
+        jobState.metadata = new MetadataBundle(mapping, objects, tags);
+        jobState.resources = ResourceBundle.empty();
+
+        return jobState;
+    }
+
+    private static void addObject(
+            TagSelector selector, TagHeader header, ObjectType objectType,
+            Map<String, TagHeader> mapping, Map<String, ObjectDefinition> objects, Map<String, Tag> tags) {
+
+        var objectKey = MetadataUtil.objectKey(header);
+
+        mapping.put(MetadataUtil.objectKey(selector), header);
+        objects.put(objectKey, ObjectDefinition.newBuilder().setObjectType(objectType).build());
+        tags.put(objectKey, Tag.newBuilder().setHeader(header).build());
     }
 }

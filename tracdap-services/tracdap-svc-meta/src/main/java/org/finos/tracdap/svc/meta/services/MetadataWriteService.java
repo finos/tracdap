@@ -28,6 +28,9 @@ import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
+import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IMetadataWriteHook;
+import org.finos.tracdap.common.service.ObjectWrite;
 import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
@@ -42,11 +45,13 @@ public class MetadataWriteService {
 
     private final Validator validator = new Validator();
     private final IMetadataStore metadataStore;
+    private final PluginRegistry registry;
     private final BundleLoader bundleLoader;
     private final UuidFactory objectIdFactory;
 
-    public MetadataWriteService(IMetadataStore metadataStore) {
+    public MetadataWriteService(IMetadataStore metadataStore, PluginRegistry registry) {
         this.metadataStore = metadataStore;
+        this.registry = registry;
         this.bundleLoader = new BundleLoader(metadataStore);
         this.objectIdFactory = new UuidFactory();
     }
@@ -67,7 +72,7 @@ public class MetadataWriteService {
         var userMetadata = UserMetadata.get(Context.current());
         var references = bundleLoader.loadReferenceBundle(tenant, request);
 
-        var preallocatedObjects = processPreallocatedObjects(List.of(request), references, requestMetadata, userMetadata);
+        var preallocatedObjects = processPreallocatedObjects(tenant, List.of(request), false, references, requestMetadata, userMetadata);
 
         metadataStore.savePreallocatedObjects(tenant, preallocatedObjects);
 
@@ -81,7 +86,7 @@ public class MetadataWriteService {
         var userMetadata = UserMetadata.get(Context.current());
         var references = bundleLoader.loadReferenceBundle(tenant, request);
 
-        var newObjects = processNewObjects(List.of(request), references, requestMetadata, userMetadata);
+        var newObjects = processNewObjects(tenant, List.of(request), false, references, requestMetadata, userMetadata);
 
         metadataStore.saveNewObjects(tenant, newObjects);
 
@@ -95,7 +100,7 @@ public class MetadataWriteService {
         var userMetadata = UserMetadata.get(Context.current());
         var references = bundleLoader.loadReferenceBundle(tenant, request);
 
-        var newVersions = processNewVersions(tenant, List.of(request), references, requestMetadata, userMetadata);
+        var newVersions = processNewVersions(tenant, List.of(request), false, references, requestMetadata, userMetadata);
 
         metadataStore.saveNewVersions(tenant, newVersions);
 
@@ -125,9 +130,9 @@ public class MetadataWriteService {
         var references = bundleLoader.loadReferenceBundle(tenant, request, requestMetadata);
 
         var preallocatedIds = processPreallocatedIds(request.getPreallocateIdsList());
-        var preallocatedObjects = processPreallocatedObjects(request.getCreatePreallocatedObjectsList(), references, requestMetadata, userMetadata);
-        var newObjects = processNewObjects(request.getCreateObjectsList(), references, requestMetadata, userMetadata);
-        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), references, requestMetadata, userMetadata);
+        var preallocatedObjects = processPreallocatedObjects(tenant, request.getCreatePreallocatedObjectsList(), true, references, requestMetadata, userMetadata);
+        var newObjects = processNewObjects(tenant, request.getCreateObjectsList(), true, references, requestMetadata, userMetadata);
+        var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), true, references, requestMetadata, userMetadata);
         var newTags = processNewTags(tenant, request.getUpdateTagsList(), requestMetadata, userMetadata);
 
         var batchUpdate = new MetadataBatchUpdate(
@@ -170,12 +175,18 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processPreallocatedObjects(
-            List<MetadataWriteRequest> requests, MetadataBundle references,
+            String tenant, List<MetadataWriteRequest> requests, boolean inBatch, MetadataBundle references,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var preallocatedObjects = new ArrayList<Tag>(requests.size());
+        var hook = registry.trySingleton(IMetadataWriteHook.class);
 
         for (var request : requests) {
+
+            if (hook != null)
+                hook.validateObject(objectWrite(
+                        tenant, ObjectWrite.Operation.CREATE_PREALLOCATED, inBatch,
+                        request, null, userMetadata));
 
             var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
 
@@ -190,12 +201,18 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processNewObjects(
-            List<MetadataWriteRequest> requests, MetadataBundle references,
+            String tenant, List<MetadataWriteRequest> requests, boolean inBatch, MetadataBundle references,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         var newObjects = new ArrayList<Tag>(requests.size());
+        var hook = registry.trySingleton(IMetadataWriteHook.class);
 
         for (var request : requests) {
+
+            if (hook != null)
+                hook.validateObject(objectWrite(
+                        tenant, ObjectWrite.Operation.CREATE, inBatch,
+                        request, null, userMetadata));
 
             var objectId = objectIdFactory.allocate();
 
@@ -210,7 +227,7 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processNewVersions(
-            String tenant, List<MetadataWriteRequest> requests, MetadataBundle references,
+            String tenant, List<MetadataWriteRequest> requests, boolean inBatch, MetadataBundle references,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         // Do not query the DAL if there are no requests
@@ -221,6 +238,7 @@ public class MetadataWriteService {
         var priorVersions = metadataStore.loadPriorObjects(tenant, priorIds);
 
         var newVersions = new ArrayList<Tag>(requests.size());
+        var hook = registry.trySingleton(IMetadataWriteHook.class);
 
         for (var i = 0; i < requests.size(); i++) {
 
@@ -244,6 +262,11 @@ public class MetadataWriteService {
                     request.getDefinition(),
                     priorVersion.getDefinition());
 
+            if (hook != null)
+                hook.validateObject(objectWrite(
+                        tenant, ObjectWrite.Operation.UPDATE, inBatch,
+                        request, priorVersion.getDefinition(), userMetadata));
+
             var newObject = ObjectUpdateLogic.buildNewVersion(
                     priorVersion, request.getDefinition(), request.getTagUpdatesList(),
                     references, requestMetadata, userMetadata);
@@ -252,6 +275,16 @@ public class MetadataWriteService {
         }
 
         return newVersions;
+    }
+
+    private ObjectWrite objectWrite(
+            String tenant, ObjectWrite.Operation operation, boolean inBatch,
+            MetadataWriteRequest request, ObjectDefinition priorDefinition,
+            UserMetadata userMetadata) {
+
+        return new ObjectWrite(
+                tenant, request.getObjectType(), operation, inBatch,
+                priorDefinition, request.getDefinition(), userMetadata);
     }
 
     private List<Tag> processNewTags(
