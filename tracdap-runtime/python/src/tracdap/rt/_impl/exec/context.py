@@ -925,6 +925,7 @@ class TracContextErrorReporter:
 
     _VALID_IDENTIFIER = re.compile("^[a-zA-Z_]\\w*$",)
     _RESERVED_IDENTIFIER = re.compile("^(trac_|_)\\w*")
+    _CONTROLLED_IDENTIFIER = re.compile("^ctl_", re.IGNORECASE)
 
     def __init__(self, log: logging.Logger, checkout_directory: pathlib.Path):
 
@@ -1013,7 +1014,7 @@ class TracContextValidator(TracContextErrorReporter):
 
     def check_attr_name_not_reserved(self, attribute_name: str):
 
-        if self._RESERVED_IDENTIFIER.match(attribute_name):
+        if self._RESERVED_IDENTIFIER.match(attribute_name) or self._CONTROLLED_IDENTIFIER.match(attribute_name):
             self._report_error(f"Attribute name {attribute_name} is a reserved identifier")
 
     def check_item_not_available_in_context(self, item_name: str, item_type: str):

@@ -20,12 +20,14 @@ package org.finos.tracdap.svc.meta.test;
 import org.finos.tracdap.common.exception.EConsistencyValidation;
 import org.finos.tracdap.common.service.IMetadataWriteHook;
 import org.finos.tracdap.common.service.ObjectWrite;
+import org.finos.tracdap.common.service.TagWrite;
 import org.finos.tracdap.metadata.ObjectType;
 
 import com.google.protobuf.ByteString;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 
 public class TestMetadataWriteHook implements IMetadataWriteHook {
@@ -33,7 +35,13 @@ public class TestMetadataWriteHook implements IMetadataWriteHook {
     public static final ByteString REFUSED_DATA = ByteString.copyFromUtf8("test_refused_object");
     public static final String REFUSED_MESSAGE = "Refused by the test metadata write hook";
 
+    public static final String REFUSED_TAG_ATTR = "test_refused_tag_attr";
+
     public static final List<ObjectWrite> WRITES = new CopyOnWriteArrayList<>();
+    public static final List<TagWrite> TAG_WRITES = new CopyOnWriteArrayList<>();
+
+    // Runs inside validateTag, before anything in the write is saved
+    public static volatile Consumer<TagWrite> tagWriteCallback = null;
 
     @Override
     public void validateObject(ObjectWrite write) {
@@ -45,5 +53,19 @@ public class TestMetadataWriteHook implements IMetadataWriteHook {
 
             throw new EConsistencyValidation(REFUSED_MESSAGE);
         }
+    }
+
+    @Override
+    public void validateTag(TagWrite write) {
+
+        TAG_WRITES.add(write);
+
+        var callback = tagWriteCallback;
+
+        if (callback != null)
+            callback.accept(write);
+
+        if (write.tagUpdates().stream().anyMatch(update -> update.getAttrName().equals(REFUSED_TAG_ATTR)))
+            throw new EConsistencyValidation(REFUSED_MESSAGE);
     }
 }

@@ -81,6 +81,7 @@ public class JdbcIntegration implements BeforeAllCallback, BeforeEachCallback, A
         if (testInstance.isPresent()) {
             var testCase = (IMetadataStoreTest) testInstance.get();
             testCase.setStore(dal);
+            testCase.setDataSource(source, dialect);
         }
     }
 

@@ -18,9 +18,9 @@
 package org.finos.tracdap.common.service;
 
 /**
- * Extension point for metadata object writes, called by the metadata service for every object it creates or
- * updates, on the public and internal APIs, before anything in the request is saved. Registered as a singleton in the
- * {@link org.finos.tracdap.common.plugin.PluginRegistry} during extension startup.
+ * Extension point for metadata writes, called by the metadata service for every object it creates or updates and
+ * every tag it writes, on the public and internal APIs, before anything in the request is saved. Registered as a
+ * singleton in the {@link org.finos.tracdap.common.plugin.PluginRegistry} during extension startup.
  *
  * <p>The orchestrator's own writes (job definitions and job results) are included. A refusal of a job result fails
  * a job that has already run.</p>
@@ -31,5 +31,14 @@ public interface IMetadataWriteHook {
      * Rejects an object write by throwing EInputValidation, EVersionValidation or EConsistencyValidation.
      */
     default void validateObject(ObjectWrite write) {
+    }
+
+    /**
+     * Rejects a tag write by throwing EInputValidation, EVersionValidation or EConsistencyValidation.
+     *
+     * <p>Called for every tag write, once for each tag update request and once for a write to all versions of an
+     * object.</p>
+     */
+    default void validateTag(TagWrite write) {
     }
 }

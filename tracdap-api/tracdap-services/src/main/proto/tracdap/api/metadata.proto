@@ -23,6 +23,7 @@ option java_outer_classname = "MetadataServiceProto";
 option java_multiple_files = true;
 
 import "tracdap/metadata/common.proto";
+import "tracdap/metadata/type.proto";
 import "tracdap/metadata/object_id.proto";
 import "tracdap/metadata/object.proto";
 import "tracdap/metadata/tag.proto";
@@ -502,6 +503,36 @@ message MetadataWriteRequest {
      * the requested tag updates will be applied.
      */
     repeated metadata.TagUpdate tagUpdates = 5;
+
+    /**
+     * Whether this is an ordinary or a controlled tag write.
+     *
+     * A controlled write is only available for updateTag, it must contain
+     * exactly one tag update, either CREATE_OR_REPLACE_ATTR or DELETE_ATTR,
+     * and a reason. The attribute name is the bare name of the controlled
+     * attribute, TRAC stores it under a name chosen by the version scope.
+     *
+     * @see metadata.TagControl
+     */
+    metadata.TagControl control = 6;
+
+    /**
+     * Which versions of the object a controlled tag write applies to.
+     *
+     * VERSION_SCOPE_ALL_VERSIONS is only available for controlled writes, the
+     * prior version must be the latest version and tag of the object.
+     *
+     * @see metadata.VersionScope
+     */
+    metadata.VersionScope versionScope = 7;
+
+    /**
+     * The reason for a controlled tag write, required for controlled writes.
+     *
+     * A non-empty string, or a non-empty array of non-empty strings. This
+     * field should be omitted for all other writes.
+     */
+    optional metadata.Value reason = 8;
 };
 
 /**

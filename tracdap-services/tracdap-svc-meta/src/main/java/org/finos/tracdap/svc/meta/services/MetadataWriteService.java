@@ -24,34 +24,47 @@ import org.finos.tracdap.api.MetadataWriteRequest;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataBundle;
+import org.finos.tracdap.common.metadata.MetadataConstants;
+import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.store.MetadataBatchUpdate;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.common.service.IConfigReader;
 import org.finos.tracdap.common.service.IMetadataWriteHook;
 import org.finos.tracdap.common.service.ObjectWrite;
+import org.finos.tracdap.common.service.TagWrite;
+import org.finos.tracdap.common.exception.EInputValidation;
+import org.finos.tracdap.common.exception.EMetadataBadUpdate;
 import org.finos.tracdap.common.exception.EVersionValidation;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.metadata.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 
 public class MetadataWriteService {
 
+    // A write to all versions rewrites the full tag of every version in one transaction
+    static final int ALL_VERSIONS_LIMIT = 1000;
+
     private final Validator validator = new Validator();
     private final IMetadataStore metadataStore;
     private final PluginRegistry registry;
+    private final IConfigReader configReader;
     private final BundleLoader bundleLoader;
     private final UuidFactory objectIdFactory;
 
-    public MetadataWriteService(IMetadataStore metadataStore, PluginRegistry registry) {
+    public MetadataWriteService(IMetadataStore metadataStore, PluginRegistry registry, IConfigReader configReader) {
         this.metadataStore = metadataStore;
         this.registry = registry;
+        this.configReader = configReader;
         this.bundleLoader = new BundleLoader(metadataStore);
         this.objectIdFactory = new UuidFactory();
     }
@@ -113,7 +126,17 @@ public class MetadataWriteService {
         var requestMetadata = RequestMetadata.get(Context.current());
         var userMetadata = UserMetadata.get(Context.current());
 
-        var newTags = processNewTags(tenant, List.of(request), requestMetadata, userMetadata);
+        if (request.getVersionScope() == VersionScope.VERSION_SCOPE_ALL_VERSIONS) {
+
+            var allVersions = processAllVersions(tenant, request, requestMetadata, userMetadata);
+
+            metadataStore.saveNewTags(tenant, allVersions);
+
+            // Versions are saved in ascending order, the request names the latest version
+            return allVersions.get(allVersions.size() - 1).getHeader();
+        }
+
+        var newTags = processNewTags(tenant, List.of(request), false, requestMetadata, userMetadata);
 
         metadataStore.saveNewTags(tenant, newTags);
 
@@ -133,7 +156,7 @@ public class MetadataWriteService {
         var preallocatedObjects = processPreallocatedObjects(tenant, request.getCreatePreallocatedObjectsList(), true, references, requestMetadata, userMetadata);
         var newObjects = processNewObjects(tenant, request.getCreateObjectsList(), true, references, requestMetadata, userMetadata);
         var newVersions = processNewVersions(tenant, request.getUpdateObjectsList(), true, references, requestMetadata, userMetadata);
-        var newTags = processNewTags(tenant, request.getUpdateTagsList(), requestMetadata, userMetadata);
+        var newTags = processNewTags(tenant, request.getUpdateTagsList(), true, requestMetadata, userMetadata);
 
         var batchUpdate = new MetadataBatchUpdate(
                 preallocatedIds, preallocatedObjects,
@@ -236,6 +259,7 @@ public class MetadataWriteService {
 
         var priorIds = requests.stream().map(MetadataWriteRequest::getPriorVersion).collect(Collectors.toList());
         var priorVersions = metadataStore.loadPriorObjects(tenant, priorIds);
+        var latestPriorTags = loadLatestPriorTags(tenant, priorVersions);
 
         var newVersions = new ArrayList<Tag>(requests.size());
         var hook = registry.trySingleton(IMetadataWriteHook.class);
@@ -267,14 +291,47 @@ public class MetadataWriteService {
                         tenant, ObjectWrite.Operation.UPDATE, inBatch,
                         request, priorVersion.getDefinition(), userMetadata));
 
+            var latestPriorTag = latestPriorTags.get(i);
+
             var newObject = ObjectUpdateLogic.buildNewVersion(
-                    priorVersion, request.getDefinition(), request.getTagUpdatesList(),
+                    priorVersion, latestPriorTag, request.getDefinition(), request.getTagUpdatesList(),
                     references, requestMetadata, userMetadata);
 
             newVersions.add(newObject);
         }
 
         return newVersions;
+    }
+
+    // Controlled attributes for all versions come from the latest tag of the prior version
+    // That tag is only loaded when the request names an older tag, the result holds null for every other request
+
+    private Map<Integer, Tag> loadLatestPriorTags(String tenant, List<Tag> priorVersions) {
+
+        var indexes = new ArrayList<Integer>();
+        var selectors = new ArrayList<TagSelector>();
+
+        for (var i = 0; i < priorVersions.size(); i++) {
+
+            var priorHeader = priorVersions.get(i).getHeader();
+
+            if (!priorHeader.getIsLatestTag()) {
+                indexes.add(i);
+                selectors.add(MetadataUtil.selectorFor(priorHeader, false, true));
+            }
+        }
+
+        var latestPriorTags = new HashMap<Integer, Tag>();
+
+        if (selectors.isEmpty())
+            return latestPriorTags;
+
+        var latestTags = metadataStore.loadPriorTags(tenant, selectors);
+
+        for (var i = 0; i < indexes.size(); i++)
+            latestPriorTags.put(indexes.get(i), latestTags.get(i));
+
+        return latestPriorTags;
     }
 
     private ObjectWrite objectWrite(
@@ -288,7 +345,7 @@ public class MetadataWriteService {
     }
 
     private List<Tag> processNewTags(
-            String tenant, List<MetadataWriteRequest> requests,
+            String tenant, List<MetadataWriteRequest> requests, boolean inBatch,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
         // Do not query the DAL if there are no requests
@@ -299,19 +356,122 @@ public class MetadataWriteService {
         var priorTags = metadataStore.loadPriorTags(tenant, priorIds);
 
         var newTags = new ArrayList<Tag>(requests.size());
+        var hook = registry.trySingleton(IMetadataWriteHook.class);
 
         for (var i = 0; i < requests.size(); i++) {
 
             var request = requests.get(i);
             var priorTag = priorTags.get(i);
 
-            var newTag = ObjectUpdateLogic.buildNewTag(
-                    priorTag, request.getTagUpdatesList(),
-                    requestMetadata, userMetadata);
+            if (hook != null)
+                hook.validateTag(tagWrite(tenant, request, priorTag, 0, inBatch, userMetadata));
+
+            var newTag = request.getControl() == TagControl.CONTROLLED
+                    ? ObjectUpdateLogic.buildNewControlledTag(
+                            priorTag, request.getTagUpdates(0), request.getVersionScope(), request.getReason(),
+                            /* requireValue = */ true, requestMetadata, userMetadata)
+                    : ObjectUpdateLogic.buildNewTag(
+                            priorTag, request.getTagUpdatesList(),
+                            requestMetadata, userMetadata);
 
             newTags.add(newTag);
         }
 
         return newTags;
+    }
+
+    private List<Tag> processAllVersions(
+            String tenant, MetadataWriteRequest request,
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
+
+        var priorTag = metadataStore.loadPriorTags(tenant, List.of(request.getPriorVersion())).get(0);
+        var priorHeader = priorTag.getHeader();
+
+        if (!priorHeader.getIsLatestObject()) {
+
+            var err = String.format(
+                    "Cannot write a tag to all versions from a superseded object: prior version [%d] is not the latest version of [%s]",
+                    priorHeader.getObjectVersion(), priorHeader.getObjectId());
+
+            throw new EVersionValidation(err);
+        }
+
+        var latestVersion = priorHeader.getObjectVersion();
+
+        if (latestVersion > ALL_VERSIONS_LIMIT) {
+
+            var err = String.format(
+                    "A tag write to all versions is limited to objects with at most %d versions: [%s] has %d versions",
+                    ALL_VERSIONS_LIMIT, priorHeader.getObjectId(), latestVersion);
+
+            throw new EInputValidation(err);
+        }
+
+        // The named version is checked for staleness when it is saved, older versions are loaded at their latest tag
+        var priorTags = new ArrayList<Tag>(latestVersion);
+
+        if (latestVersion > MetadataConstants.OBJECT_FIRST_VERSION) {
+
+            var olderVersions = new ArrayList<TagSelector>(latestVersion - 1);
+
+            for (var version = MetadataConstants.OBJECT_FIRST_VERSION; version < latestVersion; version++) {
+                olderVersions.add(TagSelector.newBuilder()
+                        .setObjectType(priorHeader.getObjectType())
+                        .setObjectId(priorHeader.getObjectId())
+                        .setObjectVersion(version)
+                        .setLatestTag(true)
+                        .build());
+            }
+
+            priorTags.addAll(metadataStore.loadObjects(tenant, olderVersions));
+        }
+
+        priorTags.add(priorTag);
+
+        var hook = registry.trySingleton(IMetadataWriteHook.class);
+
+        if (hook != null)
+            hook.validateTag(tagWrite(tenant, request, priorTag, latestVersion, false, userMetadata));
+
+        var update = request.getTagUpdates(0);
+        var storedName = ObjectUpdateLogic.controlledAttrName(update.getAttrName(), request.getVersionScope());
+
+        // A clear is refused only when no version holds the value, the refusal names the latest version
+        // Otherwise every version converges on the clear, versions without the value get the lineage
+        var isClear = update.getOperation() == TagOperation.DELETE_ATTR;
+        var nothingToClear = isClear && priorTags.stream().noneMatch(tag -> tag.containsAttrs(storedName));
+
+        var newTags = new ArrayList<Tag>(priorTags.size());
+
+        for (var tag : priorTags) {
+
+            var requireValue = nothingToClear && tag == priorTag;
+
+            try {
+
+                var newTag = ObjectUpdateLogic.buildNewControlledTag(
+                        tag, update, request.getVersionScope(), request.getReason(),
+                        requireValue, requestMetadata, userMetadata);
+
+                newTags.add(newTag);
+            }
+            catch (EMetadataBadUpdate e) {
+
+                var err = String.format("%s, on object version [%d]", e.getMessage(), tag.getHeader().getObjectVersion());
+                throw new EMetadataBadUpdate(err, e);
+            }
+        }
+
+        return newTags;
+    }
+
+    private TagWrite tagWrite(
+            String tenant, MetadataWriteRequest request, Tag priorTag,
+            int latestObjectVersion, boolean inBatch, UserMetadata userMetadata) {
+
+        return new TagWrite(
+                tenant, request.getObjectType(), priorTag,
+                request.getControl(), request.getVersionScope(), request.getTagUpdatesList(),
+                latestObjectVersion, inBatch, userMetadata, configReader);
     }
 }

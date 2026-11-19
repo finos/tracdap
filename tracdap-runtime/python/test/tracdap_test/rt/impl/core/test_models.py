@@ -235,12 +235,41 @@ class ImportModelTest(unittest.TestCase):
         repositories = repos.RepositoryManager(sys_config)
         loader = models.ModelLoader(repositories, self.scratch_dir)
 
-        for attr_name in ["trac_model_entry_point", "_hidden_attr"]:
+        for attr_name in ["trac_model_entry_point", "_hidden_attr", "ctl_this_approved", "CTL_all_preferred_version"]:
 
             model_class = sample_model_with_attrs(api.A(attr_name, "value"))
 
             self.assertRaises(ex.EModelValidation, lambda: loader.scan_model_attrs(model_class))
             self.assertRaises(ex.EModelValidation, lambda: loader.scan_model(meta.ModelDefinition(), model_class))
+
+    def test_scan_model_controlled_prefix_allowed_for_other_names(self):
+
+        # Only attribute names are reserved for controlled attributes
+        # Parameter, input, output and field names keep their existing rules
+
+        class ControlledPrefixNames(api.TracModel):
+
+            def define_parameters(self) -> tp.Dict[str, meta.ModelParameter]:
+                return api.define_parameters(api.P("ctl_param", api.INTEGER, label="A parameter"))
+
+            def define_inputs(self) -> tp.Dict[str, api.ModelInputSchema]:
+                return {"ctl_input": api.define_input_table(api.F("ctl_field", api.STRING, label="A field"))}
+
+            def define_outputs(self) -> tp.Dict[str, api.ModelOutputSchema]:
+                return {"CTL_output": api.define_output_table(api.F("ctl_field", api.STRING, label="A field"))}
+
+            def run_model(self, ctx: api.TracContext):
+                pass
+
+        sys_config = config.RuntimeConfig()
+        repositories = repos.RepositoryManager(sys_config)
+        loader = models.ModelLoader(repositories, self.scratch_dir)
+
+        model_def = loader.scan_model(meta.ModelDefinition(), ControlledPrefixNames)
+
+        self.assertIn("ctl_param", model_def.parameters)
+        self.assertIn("ctl_input", model_def.inputs)
+        self.assertIn("CTL_output", model_def.outputs)
 
     def test_scan_model_attrs_duplicate(self):
 

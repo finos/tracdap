@@ -26,6 +26,10 @@ import org.finos.tracdap.common.validation.core.Validator;
 import org.finos.tracdap.common.validation.core.ValidatorUtils;
 import org.finos.tracdap.metadata.*;
 
+import java.util.List;
+
+import static org.finos.tracdap.common.validation.ValidationConstants.CONTROLLED_REASON_ITEMS_LIMIT;
+import static org.finos.tracdap.common.validation.ValidationConstants.CONTROLLED_REASON_LENGTH_LIMIT;
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
 
 
@@ -42,6 +46,10 @@ public class TagUpdateValidator {
 
     private static final Descriptors.Descriptor VALUE;
     private static final Descriptors.OneofDescriptor V_VALUE;
+
+    private static final List<TagOperation> CONTROLLED_OPERATIONS = List.of(
+            TagOperation.CREATE_OR_REPLACE_ATTR,
+            TagOperation.DELETE_ATTR);
 
     static {
 
@@ -99,6 +107,20 @@ public class TagUpdateValidator {
 
     public static ValidationContext reservedAttrs(TagUpdate msg, boolean allowReserved, ValidationContext ctx) {
 
+        // Controlled attributes are written only by controlled tag writes, which send a bare attribute name
+        // Their stored names are refused on every route, whatever the API trust level
+
+        var isControlled = MetadataConstants.CONTROLLED_IDENTIFIER.matcher(msg.getAttrName());
+
+        if (isControlled.matches()) {
+
+            var err = String.format(
+                    "Attribute name [%s] is reserved for controlled attributes",
+                    msg.getAttrName());
+
+            return ctx.error(err);
+        }
+
         if (allowReserved)
             return ctx;
 
@@ -109,6 +131,89 @@ public class TagUpdateValidator {
             var err = String.format(
                     "Attribute name [%s] is a reserved identifier",
                     msg.getAttrName());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext controlledTagUpdate(TagUpdate msg, ValidationContext ctx) {
+
+        if (!CONTROLLED_OPERATIONS.contains(msg.getOperation())) {
+
+            var err = String.format(
+                    "Operation [%s] is not allowed for a controlled tag write (allowed operations are %s)",
+                    msg.getOperation().name(), CONTROLLED_OPERATIONS);
+
+            return ctx.error(err);
+        }
+
+        if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(msg.getAttrName()).matches()) {
+
+            var err = String.format(
+                    "Attribute name [%s] is a reserved identifier",
+                    msg.getAttrName());
+
+            return ctx.error(err);
+        }
+
+        if (msg.getAttrName().contains("__")) {
+
+            var err = String.format(
+                    "Attribute name [%s] cannot contain a double underscore in a controlled tag write",
+                    msg.getAttrName());
+
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    public static ValidationContext controlledReason(Value msg, ValidationContext ctx) {
+
+        if (TypeSystem.isPrimitive(msg) && TypeSystem.basicType(msg) == BasicType.STRING)
+            return reasonText(msg.getStringValue(), ctx);
+
+        if (TypeSystem.basicType(msg) == BasicType.ARRAY &&
+            msg.getType().getArrayType().getBasicType() == BasicType.STRING) {
+
+            var items = msg.getArrayValue().getItemsList();
+
+            if (items.isEmpty())
+                return ctx.error("The reason for a controlled tag write cannot be empty");
+
+            if (items.size() > CONTROLLED_REASON_ITEMS_LIMIT) {
+
+                var err = String.format(
+                        "The reason for a controlled tag write has too many items (limit is %d)",
+                        CONTROLLED_REASON_ITEMS_LIMIT);
+
+                return ctx.error(err);
+            }
+
+            for (var item : items) {
+                ctx = reasonText(item.getStringValue(), ctx);
+                if (ctx.failed())
+                    return ctx;
+            }
+
+            return ctx;
+        }
+
+        return ctx.error("The reason for a controlled tag write must be a string or an array of strings");
+    }
+
+    private static ValidationContext reasonText(String reason, ValidationContext ctx) {
+
+        if (reason.isEmpty())
+            return ctx.error("The reason for a controlled tag write cannot be empty");
+
+        if (reason.codePointCount(0, reason.length()) > CONTROLLED_REASON_LENGTH_LIMIT) {
+
+            var err = String.format(
+                    "The reason for a controlled tag write exceeds the length limit (%d characters)",
+                    CONTROLLED_REASON_LENGTH_LIMIT);
 
             return ctx.error(err);
         }

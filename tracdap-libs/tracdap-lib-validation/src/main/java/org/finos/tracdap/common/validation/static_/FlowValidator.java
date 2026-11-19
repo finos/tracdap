@@ -217,6 +217,7 @@ public class FlowValidator {
         ctx = ctx.pushRepeated(FN_NODE_ATTRS)
                 .apply(CommonValidators.onlyIf(isOutputNode, isOutputNodeQualifier))
                 .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, false)
                 .pop();
 
         ctx = ctx.pushMap(FN_NODE_PROPS)

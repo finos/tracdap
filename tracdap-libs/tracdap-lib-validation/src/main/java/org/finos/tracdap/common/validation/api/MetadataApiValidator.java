@@ -19,6 +19,7 @@ package org.finos.tracdap.common.validation.api;
 
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.core.ValidationFunction;
 import org.finos.tracdap.common.validation.core.ValidationType;
@@ -47,6 +48,9 @@ public class MetadataApiValidator {
     private static final Descriptors.FieldDescriptor MWR_PRIOR_VERSION;
     private static final Descriptors.FieldDescriptor MWR_DEFINITION;
     private static final Descriptors.FieldDescriptor MWR_ATTRS;
+    private static final Descriptors.FieldDescriptor MWR_CONTROL;
+    private static final Descriptors.FieldDescriptor MWR_VERSION_SCOPE;
+    private static final Descriptors.FieldDescriptor MWR_REASON;
 
     private static final Descriptors.Descriptor METADATA_WRITE_BATCH_REQUEST;
     private static final Descriptors.FieldDescriptor MWBR_TENANT;
@@ -83,6 +87,9 @@ public class MetadataApiValidator {
         MWR_PRIOR_VERSION = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.PRIORVERSION_FIELD_NUMBER);
         MWR_DEFINITION = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.DEFINITION_FIELD_NUMBER);
         MWR_ATTRS = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.TAGUPDATES_FIELD_NUMBER);
+        MWR_CONTROL = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.CONTROL_FIELD_NUMBER);
+        MWR_VERSION_SCOPE = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.VERSIONSCOPE_FIELD_NUMBER);
+        MWR_REASON = field(METADATA_WRITE_REQUEST, MetadataWriteRequest.REASON_FIELD_NUMBER);
 
         METADATA_READ_REQUEST = MetadataReadRequest.getDescriptor();
         MRR_TENANT = field(METADATA_READ_REQUEST, MetadataReadRequest.TENANT_FIELD_NUMBER);
@@ -121,6 +128,7 @@ public class MetadataApiValidator {
     static ValidationContext createObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, String expectedTenant) {
 
         ctx = createOrUpdate(ctx, false, apiTrust, expectedTenant);
+        ctx = ordinaryWrite(ctx);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -144,6 +152,7 @@ public class MetadataApiValidator {
     static ValidationContext updateObject(MetadataWriteRequest msg, ValidationContext ctx, boolean apiTrust, String expectedTenant) {
 
         ctx = createOrUpdate(ctx, true, apiTrust, expectedTenant);
+        ctx = ordinaryWrite(ctx);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::required)
@@ -183,6 +192,12 @@ public class MetadataApiValidator {
                 .apply(CommonValidators::omitted)
                 .pop();
 
+        // Controlled tag writes are only available as a single updateTag call, never as an item in a batch
+        if (expectedTenant == null)
+            ctx = tagControl(msg, ctx);
+        else
+            ctx = ordinaryWrite(ctx);
+
         return ctx;
     }
 
@@ -194,6 +209,7 @@ public class MetadataApiValidator {
     private static ValidationContext preallocateId(MetadataWriteRequest msg, ValidationContext ctx, String expectedTenant) {
 
         ctx = createOrUpdate(ctx, false, INTERNAL_API, expectedTenant);
+        ctx = ordinaryWrite(ctx);
 
         ctx = ctx.push(MWR_PRIOR_VERSION)
                 .apply(CommonValidators::omitted)
@@ -214,6 +230,7 @@ public class MetadataApiValidator {
     private static ValidationContext createPreallocatedObject(MetadataWriteRequest msg, ValidationContext ctx, String expectedTenantd) {
 
         ctx = createOrUpdate(ctx, false, INTERNAL_API, expectedTenantd);
+        ctx = ordinaryWrite(ctx);
 
         // Do not use the regular tag selector validator (ObjectIdValidator::tagSelector)
         // The regular validator will enforce object and tag version > 0
@@ -315,6 +332,86 @@ public class MetadataApiValidator {
                 // Only allow reserved attrs for requests on the internal API
                 .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, (apiTrust == INTERNAL_API))
                 .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext ordinaryWrite(ValidationContext ctx) {
+
+        ctx = ctx.push(MWR_CONTROL)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(MWR_VERSION_SCOPE)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        ctx = ctx.push(MWR_REASON)
+                .apply(CommonValidators::omitted)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext tagControl(MetadataWriteRequest msg, ValidationContext ctx) {
+
+        var controlled = msg.getControl() == TagControl.CONTROLLED;
+        var controlledQualifier = String.format("%s == %s", MWR_CONTROL.getName(), TagControl.CONTROLLED.name());
+
+        ctx = ctx.push(MWR_CONTROL)
+                .apply(CommonValidators::optional)
+                .apply(CommonValidators::recognizedEnum, TagControl.class)
+                .pop();
+
+        ctx = ctx.push(MWR_VERSION_SCOPE)
+                .apply(CommonValidators.onlyIf(controlled, controlledQualifier))
+                .apply(CommonValidators::recognizedEnum, VersionScope.class)
+                .pop();
+
+        ctx = ctx.push(MWR_REASON)
+                .apply(CommonValidators.ifAndOnlyIf(controlled, controlledQualifier))
+                .apply(TypeSystemValidator::value, Value.class)
+                .apply(TagUpdateValidator::controlledReason, Value.class)
+                .pop();
+
+        if (!controlled)
+            return ctx;
+
+        ctx = ctx.push(MWR_OBJECT_TYPE)
+                .apply(MetadataApiValidator::controlledObjectType, ObjectType.class)
+                .pop();
+
+        ctx = ctx.pushRepeated(MWR_ATTRS)
+                .apply(MetadataApiValidator::singleTagUpdate)
+                .applyRepeated(TagUpdateValidator::controlledTagUpdate, TagUpdate.class)
+                .pop();
+
+        return ctx;
+    }
+
+    private static ValidationContext controlledObjectType(ObjectType objectType, ValidationContext ctx) {
+
+        if (ValidationConstants.CONFIG_OBJECT_TYPES.contains(objectType)) {
+
+            var err = String.format("Controlled tag writes are not available for [%s] objects", objectType.name());
+            return ctx.error(err);
+        }
+
+        return ctx;
+    }
+
+    private static ValidationContext singleTagUpdate(ValidationContext ctx) {
+
+        var nItems = ctx.parentMsg().getRepeatedFieldCount(ctx.field());
+
+        if (nItems != 1) {
+
+            var err = String.format(
+                    "A controlled tag write must contain exactly one item in [%s] (found %d)",
+                    ctx.fieldName(), nItems);
+
+            return ctx.error(err);
+        }
 
         return ctx;
     }

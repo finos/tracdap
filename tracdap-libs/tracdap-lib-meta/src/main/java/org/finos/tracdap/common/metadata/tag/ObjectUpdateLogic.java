@@ -71,6 +71,19 @@ public class ObjectUpdateLogic {
             Tag priorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates,
             MetadataBundle references, RequestMetadata requestMetadata, UserMetadata userMetadata) {
 
+        return buildNewVersion(priorTag, null, definition, tagUpdates, references, requestMetadata, userMetadata);
+    }
+
+    /**
+     * Build a new object version from the prior tag.
+     *
+     * <p>Controlled attributes for all versions are taken from latestPriorTag, the latest tag of the prior version,
+     * when the prior tag is not the latest. If latestPriorTag is null they are copied from the prior tag.</p>
+     */
+    public static Tag buildNewVersion(
+            Tag priorTag, Tag latestPriorTag, ObjectDefinition definition, List<TagUpdate> tagUpdates,
+            MetadataBundle references, RequestMetadata requestMetadata, UserMetadata userMetadata) {
+
         var oldHeader = priorTag.getHeader();
 
         var newHeader = oldHeader.toBuilder()
@@ -88,6 +101,10 @@ public class ObjectUpdateLogic {
                 .build();
 
         newTag = dropVersionScopedAttrs(newTag);
+
+        if (latestPriorTag != null)
+            newTag = refreshAllVersionsAttrs(newTag, latestPriorTag);
+
         newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
 
         // Apply the common controlled trac_ tags for updated objects
@@ -116,6 +133,21 @@ public class ObjectUpdateLogic {
         return newTag.build();
     }
 
+    private static Tag refreshAllVersionsAttrs(Tag tag, Tag latestPriorTag) {
+
+        var newTag = tag.toBuilder();
+
+        tag.getAttrsMap().keySet().stream()
+                .filter(attrName -> MetadataConstants.CONTROLLED_ALL_VERSIONS_ATTRS.matcher(attrName).matches())
+                .forEach(newTag::removeAttrs);
+
+        latestPriorTag.getAttrsMap().entrySet().stream()
+                .filter(attr -> MetadataConstants.CONTROLLED_ALL_VERSIONS_ATTRS.matcher(attr.getKey()).matches())
+                .forEach(attr -> newTag.putAttrs(attr.getKey(), attr.getValue()));
+
+        return newTag.build();
+    }
+
     public static Tag buildNewTag(
             Tag priorTag, List<TagUpdate> tagUpdates,
             RequestMetadata requestMetadata, UserMetadata userMetadata) {
@@ -139,6 +171,70 @@ public class ObjectUpdateLogic {
         newTag = TagUpdateLogic.applyTagUpdates(newTag, tagUpdates);
 
         return newTag;
+    }
+
+    /**
+     * Build a new tag for a controlled tag write, which sets or clears one controlled attribute.
+     *
+     * <p>The attribute is stored under the prefix for its version scope, with lineage attributes for the reason, the
+     * user and the time. A clear removes the value and rewrites the lineage. If requireValue is set, a clear of an
+     * attribute with no value is refused, otherwise only the lineage is written.</p>
+     */
+    public static Tag buildNewControlledTag(
+            Tag priorTag, TagUpdate update, VersionScope versionScope, Value reason, boolean requireValue,
+            RequestMetadata requestMetadata, UserMetadata userMetadata) {
+
+        var storedName = controlledAttrName(update.getAttrName(), versionScope);
+
+        var oldHeader = priorTag.getHeader();
+
+        var newHeader = oldHeader.toBuilder()
+                .setTagVersion(oldHeader.getTagVersion() + 1)
+                .setTagTimestamp(MetadataCodec.encodeDatetime(requestMetadata.requestTimestamp()))
+                .setIsLatestTag(true)
+                .build();
+
+        var newTag = priorTag.toBuilder()
+                .setHeader(newHeader)
+                .build();
+
+        var valueUpdate = update.toBuilder()
+                .setAttrName(storedName)
+                .build();
+
+        var isClear = update.getOperation() == TagOperation.DELETE_ATTR;
+
+        if (!isClear || requireValue || newTag.containsAttrs(storedName))
+            newTag = TagUpdateLogic.applyTagUpdates(newTag, List.of(valueUpdate));
+
+        var lineage = List.of(
+                lineageAttr(storedName + MetadataConstants.CONTROLLED_REASON_SUFFIX, reason),
+                lineageAttr(storedName + MetadataConstants.CONTROLLED_USER_ID_SUFFIX,
+                        MetadataCodec.encodeValue(userMetadata.userId())),
+                lineageAttr(storedName + MetadataConstants.CONTROLLED_USER_NAME_SUFFIX,
+                        MetadataCodec.encodeValue(userMetadata.userName())),
+                lineageAttr(storedName + MetadataConstants.CONTROLLED_TIME_SUFFIX,
+                        MetadataCodec.encodeValue(requestMetadata.requestTimestamp())));
+
+        return TagUpdateLogic.applyTagUpdates(newTag, lineage);
+    }
+
+    public static String controlledAttrName(String attrName, VersionScope versionScope) {
+
+        var prefix = versionScope == VersionScope.VERSION_SCOPE_ALL_VERSIONS
+                ? MetadataConstants.CONTROLLED_ALL_VERSIONS_PREFIX
+                : MetadataConstants.CONTROLLED_THIS_VERSION_PREFIX;
+
+        return prefix + attrName;
+    }
+
+    private static TagUpdate lineageAttr(String attrName, Value value) {
+
+        return TagUpdate.newBuilder()
+                .setOperation(TagOperation.CREATE_OR_REPLACE_ATTR)
+                .setAttrName(attrName)
+                .setValue(value)
+                .build();
     }
 
     private static List<TagUpdate> commonCreateAttrs(RequestMetadata requestMetadata, UserMetadata userMetadata) {

@@ -101,6 +101,56 @@ enum TagOperation {
 
 
 /**
+ * Whether a tag write sets an ordinary attribute or a controlled attribute.
+ *
+ * A controlled attribute is written by its own controlled request, which sets
+ * or clears exactly one attribute and gives a reason. TRAC records who made
+ * the change, when and why alongside the attribute, and keeps that record when
+ * the attribute is cleared. Controlled attributes cannot be written by
+ * ordinary tag updates.
+ *
+ * @see MetadataWriteRequest
+ */
+enum TagControl {
+
+  /**
+   * An ordinary tag write, the default.
+   */
+  CONTROL_NONE = 0;
+
+  /**
+   * A controlled write of a single attribute, with a reason.
+   */
+  CONTROLLED = 1;
+}
+
+
+/**
+ * Which versions of an object a controlled tag write applies to.
+ *
+ * @see MetadataWriteRequest
+ */
+enum VersionScope {
+
+  /**
+   * The write applies to the version it names, the default.
+   *
+   * A controlled attribute written for this version only is not carried
+   * over to new versions of the object.
+   */
+  VERSION_SCOPE_THIS_VERSION = 0;
+
+  /**
+   * The write applies to every version of the object, in one transaction.
+   *
+   * New versions of the object carry the attribute over from the latest tag
+   * of the prior version. Only available for controlled writes.
+   */
+  VERSION_SCOPE_ALL_VERSIONS = 1;
+}
+
+
+/**
  * A tag update is a request for a single update operation on a tag.
  *
  * Tag updates can be supplied to TRAC via an API call to request updates to a
