@@ -21,12 +21,14 @@ import org.finos.tracdap.api.*;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.service.ObjectWrite;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.RunModelJob;
 import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
+import org.finos.tracdap.svc.orch.test.TestJobHooks;
 import org.finos.tracdap.test.helpers.GitHelpers;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -160,6 +162,7 @@ public class JobContextTest {
         Helpers.checkJobOutputAttrs(metaClient, TEST_TENANT, outputTag, "round_trip_output", Set.of(), CONTEXT_ATTRS);
 
         checkLogFileContext(jobTag, contextV1);
+        checkOrchestratorWritesHooked(jobId, contextV1);
 
         outputV1 = outputTag.getHeader();
     }
@@ -279,6 +282,27 @@ public class JobContextTest {
                 context.getObjectVersion(),
                 MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)),
                 MetadataUtil.objectKey(tag.getHeader()));
+    }
+
+    private static void checkOrchestratorWritesHooked(TagHeader jobId, TagHeader context) {
+
+        // The metadata write hook registered for this suite sees the orchestrator's own writes, and lets them through
+
+        var jobWrites = TestJobHooks.OBJECT_WRITES.stream()
+                .filter(write -> write.objectType() == ObjectType.JOB)
+                .filter(write -> write.definition().getJob().getContext().equals(contextSelector(context)))
+                .collect(Collectors.toList());
+
+        Assertions.assertFalse(jobWrites.isEmpty(), "Job definition write");
+        Assertions.assertTrue(jobWrites.stream().allMatch(write -> write.operation() == ObjectWrite.Operation.CREATE && !write.inBatch()));
+
+        var resultWrites = TestJobHooks.OBJECT_WRITES.stream()
+                .filter(write -> write.objectType() == ObjectType.RESULT)
+                .filter(write -> write.definition().getResult().getJobId().getObjectId().equals(jobId.getObjectId()))
+                .collect(Collectors.toList());
+
+        Assertions.assertEquals(1, resultWrites.size(), "Result batch write");
+        Assertions.assertTrue(resultWrites.get(0).inBatch());
     }
 
     private static void checkLogFileContext(org.finos.tracdap.metadata.Tag jobTag, TagHeader context) {
