@@ -119,9 +119,19 @@ public class Helpers {
             String tenant, Tag outputTag, String outputName,
             Set<String> outputAttrs) {
 
+        checkJobOutputAttrs(metaClient, tenant, outputTag, outputName, outputAttrs, Set.of());
+    }
+
+    // Common attrs are expected on both the output and its storage object, e.g. the job context
+    public static void checkJobOutputAttrs(
+            TracMetadataApiGrpc.TracMetadataApiBlockingStub metaClient,
+            String tenant, Tag outputTag, String outputName,
+            Set<String> outputAttrs, Set<String> commonAttrs) {
+
         var outputDef = outputTag.getDefinition();
 
         var expectedOutputAttrs = new HashSet<>(JOB_OUTPUT_COMMON_ATTRS);
+        expectedOutputAttrs.addAll(commonAttrs);
         expectedOutputAttrs.addAll(STRUCTURED_ATTRS.get(outputDef.getObjectType()));
         expectedOutputAttrs.add("trac_job_output");
         expectedOutputAttrs.addAll(outputAttrs);
@@ -139,6 +149,7 @@ public class Helpers {
                 .build());
 
         var expectedStorageAttrs = new HashSet<>(JOB_OUTPUT_COMMON_ATTRS);
+        expectedStorageAttrs.addAll(commonAttrs);
         expectedStorageAttrs.add("trac_storage_object");
 
         Assertions.assertEquals(expectedStorageAttrs, storageTag.getAttrsMap().keySet());

@@ -25,6 +25,7 @@ import io.grpc.protobuf.ProtoUtils;
 import org.finos.tracdap.api.*;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.UuidFactory;
 import org.finos.tracdap.common.metadata.TypeSystem;
@@ -34,6 +35,7 @@ import org.finos.tracdap.svc.admin.TracAdminService;
 import org.finos.tracdap.svc.data.TracDataService;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.orch.TracOrchestratorService;
+import org.finos.tracdap.svc.orch.test.TestJobHooks;
 import org.finos.tracdap.test.data.SampleData;
 import org.finos.tracdap.test.helpers.PlatformTest;
 
@@ -45,6 +47,7 @@ import org.junit.jupiter.api.extension.RegisterExtension;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 
@@ -2215,5 +2218,245 @@ public class JobValidationTest {
         Assertions.assertTrue(
                 errors.stream().anyMatch(error -> error.startsWith("Mime type does not match (expected [text/markdown], got [text/plain])")),
                 "Expected the MIME type error, got " + errors);
+    }
+
+    // -----------------------------------------------------------------------------------------------------------------
+    // JOB CONTEXT
+    // -----------------------------------------------------------------------------------------------------------------
+
+    private static TagHeader createContextObject(ByteString customData) {
+
+        return metaClient.createObject(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.CUSTOM)
+                        .setCustom(CustomDefinition.newBuilder()
+                                .setCustomSchemaType("test_job_context")
+                                .setCustomSchemaVersion(1)
+                                .setCustomData(customData)))
+                .build());
+    }
+
+    private static TagSelector contextSelector(TagHeader contextId) {
+
+        return TagSelector.newBuilder()
+                .setObjectType(ObjectType.CUSTOM)
+                .setObjectId(contextId.getObjectId())
+                .setObjectVersion(contextId.getObjectVersion())
+                .setLatestTag(true)
+                .build();
+    }
+
+    private JobDefinition.Builder contextRunModelJob(String modelKey) {
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                List.of(TagUpdate.newBuilder()
+                        .setAttrName("model_key")
+                        .setValue(MetadataCodec.encodeValue(modelKey))
+                        .build()));
+
+        return JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder()
+                        .setModel(modelSelector)
+                        .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                        .putInputs("basic_input", basicDataSelector));
+    }
+
+    private static JobRequest contextRequest(JobDefinition.Builder job) {
+
+        return JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+    }
+
+    @Test
+    public void context_runModelOk() {
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+        var job = contextRunModelJob("context_run_model_ok").setContext(contextSelector(contextId));
+
+        var jobStatus = orchClient.validateJob(contextRequest(job));
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+
+        // The hook sees the job with its context, and the context object in the bundle
+        var validation = TestJobHooks.VALIDATIONS.stream()
+                .filter(v -> v.definition().getContext().getObjectId().equals(contextId.getObjectId()))
+                .findFirst()
+                .orElseThrow();
+
+        Assertions.assertEquals(TEST_TENANT, validation.tenant());
+        Assertions.assertTrue(validation.metadata().hasObject(job.getContext()));
+        Assertions.assertTrue(validation.metadata().hasObject(job.getRunModel().getModel()));
+        Assertions.assertNotNull(validation.userMetadata());
+    }
+
+    @Test
+    public void context_importModelOk() {
+
+        // Import model without a prior model requires no other metadata
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(ImportModelJob.newBuilder()
+                        .setLanguage("python")
+                        .setRepository("UNIT_TEST_REPO")
+                        .setVersion("v1.0.0")
+                        .setPath("src/")
+                        .setEntryPoint("acme.models.test_model.BasicTestModel"))
+                .setContext(contextSelector(contextId));
+
+        var jobStatus = orchClient.validateJob(contextRequest(job));
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void context_importModelPriorModelOk() {
+
+        var priorModelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                List.of(TagUpdate.newBuilder()
+                        .setAttrName("model_key")
+                        .setValue(MetadataCodec.encodeValue("context_import_prior_model"))
+                        .build()));
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(ImportModelJob.newBuilder()
+                        .setLanguage("python")
+                        .setRepository("UNIT_TEST_REPO")
+                        .setVersion("v2.0.0")
+                        .setPath("src/")
+                        .setEntryPoint("acme.models.test_model.BasicTestModel")
+                        .setPriorModel(priorModelSelector))
+                .setContext(contextSelector(contextId));
+
+        var jobStatus = orchClient.validateJob(contextRequest(job));
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+    }
+
+    @Test
+    public void context_notCustom() {
+
+        var job = contextRunModelJob("context_not_custom").setContext(basicDataSelector);
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.INVALID_ARGUMENT, "Wrong object type in [context] selector");
+    }
+
+    @Test
+    public void context_latestObject() {
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+        var job = contextRunModelJob("context_latest_object")
+                .setContext(MetadataUtil.selectorForLatest(contextId));
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.INVALID_ARGUMENT, "The [context] selector must use an explicit [objectVersion]");
+    }
+
+    @Test
+    public void context_objectAsOf() {
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+        var job = contextRunModelJob("context_object_as_of")
+                .setContext(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.CUSTOM)
+                        .setObjectId(contextId.getObjectId())
+                        .setObjectAsOf(contextId.getObjectTimestamp())
+                        .setLatestTag(true));
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.INVALID_ARGUMENT, "The [context] selector must use an explicit [objectVersion]");
+    }
+
+    @Test
+    public void context_missing() {
+
+        var job = contextRunModelJob("context_missing")
+                .setContext(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.CUSTOM)
+                        .setObjectId(UUID.randomUUID().toString())
+                        .setObjectVersion(1)
+                        .setLatestTag(true));
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.FAILED_PRECONDITION, "One or more items used in this job could not be found");
+    }
+
+    @Test
+    public void context_refusedByHook_validateJob() {
+
+        var contextId = createContextObject(TestJobHooks.REFUSED_JOB_CONTEXT);
+        var job = contextRunModelJob("context_refused_validate").setContext(contextSelector(contextId));
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.FAILED_PRECONDITION, TestJobHooks.REFUSED_JOB_MESSAGE);
+    }
+
+    @Test
+    public void context_refusedByHook_submitJobNotSaved() {
+
+        var contextId = createContextObject(TestJobHooks.REFUSED_JOB_CONTEXT);
+        var job = contextRunModelJob("context_refused_submit").setContext(contextSelector(contextId));
+
+        expectInvalid(
+                () -> orchClient.submitJob(contextRequest(job)),
+                Status.Code.FAILED_PRECONDITION, TestJobHooks.REFUSED_JOB_MESSAGE);
+
+        var jobs = metaClient.search(MetadataSearchRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSearchParams(SearchParameters.newBuilder()
+                        .setObjectType(ObjectType.JOB)
+                        .setSearch(SearchExpression.newBuilder()
+                                .setTerm(SearchTerm.newBuilder()
+                                        .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)
+                                        .setAttrType(BasicType.STRING)
+                                        .setOperator(SearchOperator.EQ)
+                                        .setSearchValue(MetadataCodec.encodeValue(contextId.getObjectId())))))
+                .build());
+
+        Assertions.assertEquals(0, jobs.getSearchResultCount());
+    }
+
+    @Test
+    public void context_storedJobInvalid() {
+
+        // Stored jobs are checked by the same validator, a context selected by latest version is refused
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+
+        var job = contextRunModelJob("context_stored_job")
+                .setResultId(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.RESULT)
+                        .setObjectId(UUID.randomUUID().toString())
+                        .setObjectVersion(1)
+                        .setLatestTag(true))
+                .setContext(MetadataUtil.selectorForLatest(contextId));
+
+        expectInvalid(
+                () -> metaClient.createObject(MetadataWriteRequest.newBuilder()
+                        .setTenant(TEST_TENANT)
+                        .setObjectType(ObjectType.JOB)
+                        .setDefinition(ObjectDefinition.newBuilder()
+                                .setObjectType(ObjectType.JOB)
+                                .setJob(job))
+                        .build()),
+                Status.Code.INVALID_ARGUMENT, "The [context] selector must use an explicit [objectVersion]");
     }
 }

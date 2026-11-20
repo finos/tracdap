@@ -107,6 +107,10 @@ message JobDefinition {
   }
 
   TagSelector resultId = 8;
+
+  /// A CUSTOM object the job runs under, at an explicit version
+  /// Recorded on the job and its outputs, it is not used to run the job
+  optional TagSelector context = 9;
 }
 
 /**

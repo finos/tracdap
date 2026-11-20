@@ -64,6 +64,11 @@ public class MetadataConstants {
     // Identifiers starting _ are also reserved by convention, for private / protected / system variables
     public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac(dap)?[_\\-.]|[_\\-.]).*", Pattern.CASE_INSENSITIVE);
 
+    // Platform attributes that belong to one object version, they are not carried over to a new version
+    // Tag-only updates keep them, a new version only has them if the write that creates it sets them again
+    public static final Pattern VERSION_SCOPED_ATTRS = Pattern.compile(
+            "\\A(trac_job_context|trac_job_context_version)\\Z", Pattern.CASE_INSENSITIVE);
+
     public static final String TRAC_CREATE_TIME = "trac_create_time";
     public static final String TRAC_CREATE_USER_ID = "trac_create_user_id";
     public static final String TRAC_CREATE_USER_NAME = "trac_create_user_name";
@@ -77,6 +82,8 @@ public class MetadataConstants {
     public static final String TRAC_JOB_TYPE_ATTR = "trac_job_type";
     public static final String TRAC_JOB_STATUS_ATTR = "trac_job_status";
     public static final String TRAC_JOB_ERROR_MESSAGE_ATTR = "trac_job_error_message";
+    public static final String TRAC_JOB_CONTEXT_ATTR = "trac_job_context";
+    public static final String TRAC_JOB_CONTEXT_VERSION_ATTR = "trac_job_context_version";
 
     public static final String TRAC_SCHEMA_TYPE_ATTR = "trac_schema_type";
     public static final String TRAC_SCHEMA_FIELD_COUNT_ATTR = "trac_schema_field_count";
@@ -89,6 +96,8 @@ public class MetadataConstants {
     public static final String TRAC_FILE_SIZE_ATTR = "trac_file_size";
 
     public static final String TRAC_STORAGE_OBJECT_ATTR = "trac_storage_object";
+
+    public static final String TRAC_CUSTOM_SCHEMA_TYPE_ATTR = "trac_custom_schema_type";
 
     public static final String TRAC_MODEL_LANGUAGE = "trac_model_language";
     public static final String TRAC_MODEL_REPOSITORY = "trac_model_repository";

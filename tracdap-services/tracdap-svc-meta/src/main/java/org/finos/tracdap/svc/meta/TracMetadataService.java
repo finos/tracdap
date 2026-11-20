@@ -141,7 +141,7 @@ public class TracMetadataService extends TracServiceBase {
 
             // Set up services and APIs
             var readService = new MetadataReadService(metadataStore, platformConfig, tenantConfigMap);
-            var writeService = new MetadataWriteService(metadataStore);
+            var writeService = new MetadataWriteService(metadataStore, registry);
             var searchService = new MetadataSearchService(metadataStore);
             var configReader = new MetadataConfigReader(metadataStore);
             var configService = new ConfigService(metadataStore, registry, configReader, tenantTemplate);
