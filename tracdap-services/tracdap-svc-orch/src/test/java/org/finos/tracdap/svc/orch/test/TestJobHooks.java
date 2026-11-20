@@ -42,6 +42,7 @@ public class TestJobHooks implements IJobValidationHook, IMetadataWriteHook {
     public static final String REFUSED_OBJECT_MESSAGE = "Refused by the test metadata write hook";
 
     public static final List<JobValidation> VALIDATIONS = new CopyOnWriteArrayList<>();
+    public static final List<ObjectWrite> OBJECT_WRITES = new CopyOnWriteArrayList<>();
 
     // Runs inside validateTag in the metadata service, before anything in the write is saved
     public static volatile Consumer<TagWrite> tagWriteCallback = null;
@@ -67,6 +68,8 @@ public class TestJobHooks implements IJobValidationHook, IMetadataWriteHook {
 
     @Override
     public void validateObject(ObjectWrite write) {
+
+        OBJECT_WRITES.add(write);
 
         if (write.objectType() == ObjectType.CUSTOM &&
             write.definition().getCustom().getCustomData().equals(REFUSED_OBJECT)) {

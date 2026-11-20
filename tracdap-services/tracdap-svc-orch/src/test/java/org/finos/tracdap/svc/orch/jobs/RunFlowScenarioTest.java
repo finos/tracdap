@@ -18,6 +18,8 @@
 package org.finos.tracdap.svc.orch.jobs;
 
 import org.finos.tracdap.api.*;
+import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.metadata.RunFlowJob;
@@ -34,6 +36,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.ProtoUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.extension.RegisterExtension;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,6 +63,8 @@ public class RunFlowScenarioTest {
     private static final String MODEL_REPO = "TRAC_LOCAL_REPO";
 
     private static final String MODEL_LOG_LINE = "Scenario model [%s] ran";
+
+    private static final String CONTEXT_SCENARIO = "chain";
 
     private static final Set<JobStatusCode> COMPLETED_STATES = Set.of(
             JobStatusCode.SUCCEEDED, JobStatusCode.FAILED, JobStatusCode.CANCELLED);
@@ -98,15 +103,48 @@ public class RunFlowScenarioTest {
         var inputs = loadInputs(scenario);
 
         if (scenario.outcome() == FlowScenario.Outcome.REJECTED) {
-            checkRejected(scenario, () -> runFlow(scenario, flowId, models, inputs, Map.of()));
+            checkRejected(scenario, () -> runFlow(scenario, flowId, models, inputs, Map.of(), null));
             return;
         }
 
-        var jobId = runFlow(scenario, flowId, models, inputs, Map.of());
+        var jobId = runFlow(scenario, flowId, models, inputs, Map.of(), null);
         var result = checkResult(scenario, jobId, 1);
 
         if (scenario.rerun())
-            checkResult(scenario, runFlow(scenario, flowId, models, inputs, result.getOutputsMap()), 2);
+            checkResult(scenario, runFlow(scenario, flowId, models, inputs, result.getOutputsMap(), null), 2);
+    }
+
+    @Test
+    @Timeout(value = 5, unit = TimeUnit.MINUTES)
+    void scenarioWithContext() throws Exception {
+
+        var scenario = FlowScenario.load(platform.tracRepoDir(), CONTEXT_SCENARIO);
+
+        var contextId = platform.metaClientBlocking().createObject(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setDefinition(ObjectDefinition.newBuilder()
+                        .setObjectType(ObjectType.CUSTOM)
+                        .setCustom(CustomDefinition.newBuilder()
+                                .setCustomSchemaType("test_job_context")
+                                .setCustomSchemaVersion(1)
+                                .setCustomData(ByteString.copyFromUtf8("{}"))))
+                .build());
+
+        var flowId = createFlow(scenario);
+        var models = importModels(scenario);
+        var inputs = loadInputs(scenario);
+
+        // The scenario runs as it does without a context, its job and outputs record the context
+        var jobId = runFlow(scenario, flowId, models, inputs, Map.of(), MetadataUtil.selectorFor(contextId));
+        var result = checkResult(scenario, jobId, 1);
+
+        checkContext(MetadataUtil.selectorForLatest(jobId), contextId);
+
+        for (var output : result.getOutputsMap().values())
+            checkContext(output, contextId);
+
+        checkContext(result.getLogFileId(), contextId);
     }
 
     private TagHeader createFlow(FlowScenario scenario) {
@@ -195,7 +233,7 @@ public class RunFlowScenarioTest {
     private TagHeader runFlow(
             FlowScenario scenario, TagHeader flowId,
             Map<String, TagHeader> models, Map<String, TagHeader> inputs,
-            Map<String, TagSelector> priorOutputs) {
+            Map<String, TagSelector> priorOutputs, TagSelector context) {
 
         var runFlow = RunFlowJob.newBuilder()
                 .setFlow(MetadataUtil.selectorFor(flowId))
@@ -205,11 +243,16 @@ public class RunFlowScenarioTest {
         models.forEach((node, id) -> runFlow.putModels(node, MetadataUtil.selectorFor(id)));
         inputs.forEach((input, id) -> runFlow.putInputs(input, MetadataUtil.selectorFor(id)));
 
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_FLOW)
+                .setRunFlow(runFlow);
+
+        if (context != null)
+            job.setContext(context);
+
         var jobRequest = JobRequest.newBuilder()
                 .setTenant(TEST_TENANT)
-                .setJob(JobDefinition.newBuilder()
-                        .setJobType(JobType.RUN_FLOW)
-                        .setRunFlow(runFlow))
+                .setJob(job)
                 .build();
 
         return Helpers.startJob(platform.orchClientBlocking(), jobRequest).getJobId();
@@ -268,6 +311,26 @@ public class RunFlowScenarioTest {
         checkModelLogLines(scenario, result);
 
         return result;
+    }
+
+    private void checkContext(TagSelector selector, TagHeader contextId) {
+
+        var tag = platform.metaClientBlocking().readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selector)
+                .build());
+
+        var objectKey = MetadataUtil.objectKey(tag.getHeader());
+
+        Assertions.assertEquals(
+                contextId.getObjectId(),
+                MetadataCodec.decodeStringValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)),
+                objectKey);
+
+        Assertions.assertEquals(
+                contextId.getObjectVersion(),
+                MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)),
+                objectKey);
     }
 
     private void checkRejected(FlowScenario scenario, Runnable submit) {
