@@ -306,6 +306,19 @@ public class JobProcessorHelpers {
         jobState.jobId = client.createObject(jobWriteReq);
         jobState.jobKey = MetadataUtil.objectKey(jobState.jobId);
 
+        // The job's own tag goes to the runtime, so models can see the attributes it was created with
+
+        var jobTagRequest = MetadataReadRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setSelector(MetadataUtil.selectorFor(jobState.jobId))
+                .build();
+
+        var jobTag = client.readObject(jobTagRequest).toBuilder()
+                .clearDefinition()
+                .build();
+
+        jobState.metadata.addToBundle(Map.of(), Map.of(), Map.of(jobState.jobKey, jobTag));
+
         return jobState;
     }
 
@@ -364,6 +377,19 @@ public class JobProcessorHelpers {
             tags.remove(contextKey);
 
             definition = definition.toBuilder().clearContext().build();
+        }
+
+        // The job's tag is sent without the context, or the status it had when the job was created
+
+        if (tags.containsKey(jobState.jobKey)) {
+
+            var jobTag = tags.get(jobState.jobKey).toBuilder()
+                    .removeAttrs(TRAC_JOB_CONTEXT_ATTR)
+                    .removeAttrs(TRAC_JOB_CONTEXT_VERSION_ATTR)
+                    .removeAttrs(TRAC_JOB_STATUS_ATTR)
+                    .build();
+
+            tags.put(jobState.jobKey, jobTag);
         }
 
         var jobConfig = JobConfig.newBuilder()

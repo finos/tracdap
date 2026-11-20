@@ -25,6 +25,7 @@ import tracdap.rt.metadata as meta
 import tracdap.rt._impl.core.config_parser as cfg_p  # noqa
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.storage as storage  # noqa
+import tracdap.rt._impl.core.type_system as type_system  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 import tracdap.rt._impl.exec.dev_mode as dev_mode  # noqa
 import tracdap.rt._impl.exec.graph as graph  # noqa
@@ -285,7 +286,7 @@ class GraphBuilderImportExportTest(unittest.TestCase):
         log.configure_logging()
 
     @staticmethod
-    def _build_job(model_type: meta.ModelType = None, storage_access: list = None):
+    def _build_job(model_type: meta.ModelType = None, storage_access: list = None, job_tag_attrs: dict = None):
 
         outputs = {"sample_data": meta.ModelOutputSchema(objectType=meta.ObjectType.DATA, schema=_SCHEMA)}
         objects = {}
@@ -301,8 +302,14 @@ class GraphBuilderImportExportTest(unittest.TestCase):
         job_def = meta.JobDefinition(jobType=meta.JobType.IMPORT_DATA, importData=meta.ImportDataJob(
             model=model_selector, storageAccess=storage_access or []))
 
-        job_config = cfg.JobConfig(
-            jobId=util.new_object_id(meta.ObjectType.JOB), job=job_def, objects=objects)
+        job_id = util.new_object_id(meta.ObjectType.JOB)
+        tags = {}
+
+        if job_tag_attrs is not None:
+            attrs = dict((name, type_system.MetadataCodec.encode_value(value)) for name, value in job_tag_attrs.items())
+            tags[util.object_key(job_id)] = meta.Tag(header=job_id, attrs=attrs)
+
+        job_config = cfg.JobConfig(jobId=job_id, job=job_def, objects=objects, tags=tags)
 
         builder = graph_builder.GraphBuilder(_sys_config(meta.StorageLayout.OBJECT_ID_LAYOUT), job_config)
 
@@ -327,6 +334,26 @@ class GraphBuilderImportExportTest(unittest.TestCase):
 
         self.assertEqual(1, len(model_nodes))
         self.assertEqual(["external_storage"], model_nodes[0].storage_access)
+
+    def test_import_model_job_metadata(self):
+
+        job_graph = self._build_job(meta.ModelType.DATA_IMPORT_MODEL, job_tag_attrs={"name": "Daily import", "batch_size": 10})
+
+        model_nodes = [node for node in job_graph.nodes.values() if isinstance(node, graph.RunModelNode)]
+        job_metadata = model_nodes[0].graph_context.job_metadata
+
+        self.assertEqual(model_nodes[0].graph_context.job_id, job_metadata.objectId)
+        self.assertEqual({"name": "Daily import", "batch_size": 10}, job_metadata.attributes)
+
+    def test_import_model_job_metadata_no_tag(self):
+
+        job_graph = self._build_job(meta.ModelType.DATA_IMPORT_MODEL)
+
+        model_nodes = [node for node in job_graph.nodes.values() if isinstance(node, graph.RunModelNode)]
+        job_metadata = model_nodes[0].graph_context.job_metadata
+
+        self.assertEqual(model_nodes[0].graph_context.job_id, job_metadata.objectId)
+        self.assertEqual({}, job_metadata.attributes)
 
     def test_import_job_standard_model(self):
 

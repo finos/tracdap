@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
 import unittest
 import tempfile
 import pathlib
@@ -167,6 +168,31 @@ class CoreJobsTest(unittest.TestCase):
             with trac_runtime as rt:
                 rt.submit_job(job_config)
                 rt.wait_for_job(job_id)
+
+    def test_dev_mode_job_tag(self):
+
+        job_id, job_config = self._build_run_model_job_config()
+
+        no_job_id = copy.copy(job_config)
+        no_job_id.jobId = None
+
+        for job_id_given, config in [(True, job_config), (False, no_job_id)]:
+            with self.subTest(job_id_given=job_id_given), tempfile.TemporaryDirectory() as tmpdir:
+
+                translator = dev_mode.DevModeTranslator(self.sys_config, None, pathlib.Path(tmpdir))  # No config mgr
+                translated = translator.translate_job_config(config)
+
+                self.assertIsNotNone(translated.jobId)
+                self.assertTrue(translated.jobId.objectId)
+
+                if job_id_given:
+                    self.assertEqual(job_id, translated.jobId)
+
+                job_tag = util.get_job_metadata_tag(translated.jobId, translated)
+
+                self.assertEqual(translated.jobId, job_tag.header)
+                self.assertEqual(True, types.MetadataCodec.decode_value(job_tag.attrs["trac_dev_mode"]))
+                self.assertEqual("local_user", types.MetadataCodec.decode_value(job_tag.attrs["trac_create_user_id"]))
 
     def test_run_model_job_external_schemas(self):
 

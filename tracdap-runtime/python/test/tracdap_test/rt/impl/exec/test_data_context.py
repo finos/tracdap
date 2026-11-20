@@ -49,6 +49,55 @@ _test_import_def = trac.ModelDefinition(
     inputs=test_models.TestImportModel().define_inputs(),
     outputs=test_models.TestImportModel().define_outputs())
 
+_test_export_def = trac.ModelDefinition(
+
+    language="python",
+    repository="trac_integrated",
+    entryPoint=f"{test_models.TestExportModel.__module__}.{test_models.TestExportModel.__name__}",
+
+    parameters=test_models.TestExportModel().define_parameters(),
+    inputs=test_models.TestExportModel().define_inputs(),
+    outputs=test_models.TestExportModel().define_outputs())
+
+
+class TestJobMetadata(unittest.TestCase):
+
+    JOB_ID = _util.new_object_id(trac.ObjectType.JOB)
+
+    def _data_context(self, model_def, model_class, job_metadata):
+
+        return _ctx.TracDataContextImpl(
+            model_def, model_class,
+            dict(), list(), dict(),
+            job_metadata)
+
+    def test_get_job_metadata(self):
+
+        job_metadata = trac.RuntimeMetadata(objectId=self.JOB_ID, attributes={"name": "Quarterly export"})
+
+        models = [
+            (_test_import_def, test_models.TestImportModel),
+            (_test_export_def, test_models.TestExportModel)]
+
+        for model_def, model_class in models:
+            with self.subTest(model_class=model_class.__name__):
+
+                ctx = self._data_context(model_def, model_class, job_metadata)
+                result = ctx.get_job_metadata()
+
+                self.assertEqual(self.JOB_ID, result.objectId)
+                self.assertEqual({"name": "Quarterly export"}, result.attributes)
+
+    def test_get_job_metadata_no_attributes(self):
+
+        job_metadata = trac.RuntimeMetadata(objectId=self.JOB_ID)
+
+        ctx = self._data_context(_test_export_def, test_models.TestExportModel, job_metadata)
+        result = ctx.get_job_metadata()
+
+        self.assertEqual(self.JOB_ID, result.objectId)
+        self.assertEqual({}, result.attributes)
+
 
 @unittest.skip("No backend available for unit testing, integration tests use the storage test suite")
 class TestDataImportExport(unittest.TestCase):
@@ -162,7 +211,8 @@ class TestDataImportExport(unittest.TestCase):
 
         self.ctx = _ctx.TracDataContextImpl(
             _test_import_def, test_models.TestImportModel,
-            local_ctx, dynamic_outputs, storage_map)
+            local_ctx, dynamic_outputs, storage_map,
+            trac.RuntimeMetadata())
 
         self.storage_key = self.TEST_STORAGE_KEY
 

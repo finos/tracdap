@@ -67,7 +67,8 @@ class SourceProvenanceContextTest(unittest.TestCase):
 
         self.ctx = _ctx.TracDataContextImpl(
             _test_import_def, test_models.TestImportModel,
-            self.local_ctx, self.dynamic_outputs, self.storage_map)
+            self.local_ctx, self.dynamic_outputs, self.storage_map,
+            trac.RuntimeMetadata())
 
         self.ctx.add_data_import("my_dataset")
 

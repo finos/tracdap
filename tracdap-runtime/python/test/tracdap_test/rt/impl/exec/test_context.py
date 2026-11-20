@@ -144,6 +144,13 @@ class TracContextTest(unittest.TestCase):
 
         self.ctx = TracContextImpl(_test_model_def, test_models.TestModel, local_ctx)
 
+    def test_no_job_metadata(self):
+
+        # Job metadata is only available to data import and export models, through TracDataContext
+
+        self.assertFalse(hasattr(_api.TracContext, "get_job_metadata"))
+        self.assertFalse(hasattr(self.ctx, "get_job_metadata"))
+
     # Getting params
 
     def test_get_parameter_ok(self):
