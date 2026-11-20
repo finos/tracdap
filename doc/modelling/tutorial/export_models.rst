@@ -89,6 +89,45 @@ The flow can be launched in the same way as in :doc:`chaining`:
     :lineno-start: 76
 
 
+Recording the job
+-----------------
+
+A downstream system that loads exported data often needs to know where it came from, for example to
+link a report back to the job that produced its data. From TRAC 0.12, an export model can read the
+metadata of the job it is running in with
+:py:meth:`get_job_metadata() <tracdap.rt.api.experimental.TracDataContext.get_job_metadata>`.
+It returns a :py:class:`RuntimeMetadata <tracdap.rt.api.RuntimeMetadata>`, the same type
+:py:meth:`get_metadata() <tracdap.rt.api.TracContext.get_metadata>` returns for model inputs.
+Its *objectId* is the ID of the job, and its *attributes* are the attributes the job was
+submitted with, along with the ones TRAC records, such as who submitted the job and when.
+
+The example model adds the job ID and the job's *name* attribute as columns of the data it exports:
+
+.. literalinclude:: ../../../examples/models/python/src/tutorial/data_export.py
+    :name: data_export_py_job_metadata
+    :language: python
+    :class: container
+    :lines: 63 - 73
+    :linenos:
+    :lineno-start: 63
+    :emphasize-lines: 5, 10 - 11
+
+With the job ID, the downstream system can read the rest of the job's record through the TRAC
+metadata API: its definition, its inputs and parameters, and its result once the job completes.
+The export runs part-way through the job, so a system that needs final data should check the
+job's status before it treats the export as complete.
+
+Where the downstream system needs the data file to stay exactly as it is, the job metadata can be
+written to a separate file next to it instead, such as a small JSON manifest holding the job ID,
+the attributes the downstream system uses and the export model's parameters. Write the manifest
+after the data, so a reader that finds the manifest knows the data is already complete.
+
+.. note::
+    Only import and export models can read the job metadata. A regular model's outputs must be
+    the same each time it runs with the same inputs, so its results can't depend on which job
+    it ran in.
+
+
 .. seealso::
     Full source code is available for the
     :example:`Export model example on GitHub <src/tutorial/data_export.py>`.
