@@ -1166,8 +1166,11 @@ public class FlowValidatorTest extends BaseValidatorTest {
     @Test
     void outputNodeAttrs_reserved() {
 
-        for (var attrName : List.of("trac_job_output", "_hidden", "ctl_this_approved", "CTL_all_preferred_version"))
-            expectInvalid(flowWithOutputAttr(attrName));
+        for (var attrName : List.of("trac_job_output", "_hidden"))
+            expectInvalid(flowWithOutputAttr(attrName), "Attribute name [" + attrName + "] is a reserved identifier");
+
+        for (var attrName : List.of("ctl_this_approved", "CTL_all_preferred_version"))
+            expectInvalid(flowWithOutputAttr(attrName), "Attribute name [" + attrName + "] is reserved for controlled attributes");
     }
 
     private static FlowDefinition flowWithOutputAttr(String attrName) {

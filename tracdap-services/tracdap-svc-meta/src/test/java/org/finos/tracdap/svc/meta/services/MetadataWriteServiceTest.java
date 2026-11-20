@@ -61,6 +61,49 @@ class MetadataWriteServiceTest {
     }
 
     @Test
+    void createObject_withoutHook() throws Exception {
+
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setDefinition(SampleMetadata.dummyCustomDef())
+                .build();
+
+        var header = inContext(() -> writeService.createObject(TEST_TENANT, request));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Tag>> saved = ArgumentCaptor.forClass(List.class);
+        Mockito.verify(store).saveNewObjects(ArgumentMatchers.eq(TEST_TENANT), saved.capture());
+
+        assertEquals(1, saved.getValue().size());
+        assertEquals(header, saved.getValue().get(0).getHeader());
+        assertEquals(request.getDefinition(), saved.getValue().get(0).getDefinition());
+    }
+
+    @Test
+    void createPreallocatedObject_withoutHook() throws Exception {
+
+        var preallocatedId = SampleMetadata.newHeader(ObjectType.CUSTOM);
+
+        var request = MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setPriorVersion(MetadataUtil.preallocated(MetadataUtil.selectorFor(preallocatedId)))
+                .setDefinition(SampleMetadata.dummyCustomDef())
+                .build();
+
+        var header = inContext(() -> writeService.createPreallocatedObject(TEST_TENANT, request));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<Tag>> saved = ArgumentCaptor.forClass(List.class);
+        Mockito.verify(store).savePreallocatedObjects(ArgumentMatchers.eq(TEST_TENANT), saved.capture());
+
+        assertEquals(1, saved.getValue().size());
+        assertEquals(preallocatedId.getObjectId(), header.getObjectId());
+        assertEquals(request.getDefinition(), saved.getValue().get(0).getDefinition());
+    }
+
+    @Test
     void updateObject_latestTagNotReread() throws Exception {
 
         var prior = withAllVersionsAttr(createdTag(), 1);

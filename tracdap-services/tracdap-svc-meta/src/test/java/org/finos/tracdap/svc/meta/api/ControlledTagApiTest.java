@@ -21,6 +21,8 @@ import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
+import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
+import org.finos.tracdap.common.validation.ValidationConstants;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.meta.TracMetadataService;
 import org.finos.tracdap.svc.meta.test.TestMetadataWriteHook;
@@ -29,6 +31,7 @@ import org.finos.tracdap.test.meta.SampleMetadata;
 
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.ProtoUtils;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +43,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static org.finos.tracdap.test.meta.SampleMetadata.TEST_TENANT;
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,6 +53,9 @@ abstract class ControlledTagApiTest {
 
     public static final String TRAC_CONFIG_UNIT = "config/trac-unit.yaml";
     public static final String TRAC_CONFIG_ENV_VAR = "TRAC_CONFIG_FILE";
+
+    private static final io.grpc.Metadata.Key<TracErrorDetails> TRAC_ERROR_DETAILS_KEY = io.grpc.Metadata.Key.of(
+            "trac-error-details-bin", ProtoUtils.metadataMarshaller(TracErrorDetails.getDefaultInstance()));
 
     protected TracMetadataApiGrpc.TracMetadataApiBlockingStub publicApi;
     protected InternalMetadataApiGrpc.InternalMetadataApiBlockingStub internalApi;
@@ -324,8 +331,8 @@ abstract class ControlledTagApiTest {
         var two = controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, set("approved_mgc", "approved"), reason("Approved"))
                 .toBuilder().addTagUpdates(set("approved_dq", "approved")).build();
 
-        assertInvalidEverywhere(none);
-        assertInvalidEverywhere(two);
+        assertInvalidEverywhere(none, "A controlled tag write must contain exactly one item in [tagUpdates] (found 0)");
+        assertInvalidEverywhere(two, "A controlled tag write must contain exactly one item in [tagUpdates] (found 2)");
         assertEquals(v1, latestTag(v1).getHeader());
     }
 
@@ -338,11 +345,15 @@ abstract class ControlledTagApiTest {
                 TagOperation.APPEND_ATTR, TagOperation.CREATE_OR_APPEND_ATTR)) {
 
             var update = set("approved_mgc", "approved").toBuilder().setOperation(operation).build();
-            assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("Approved")));
+            assertInvalidEverywhere(
+                    controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("Approved")),
+                    "Operation [" + operation.name() + "] is not allowed for a controlled tag write");
         }
 
         var clearAll = TagUpdate.newBuilder().setOperation(TagOperation.CLEAR_ALL_ATTR).build();
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, clearAll, reason("Approved")));
+        assertInvalidEverywhere(
+                controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, clearAll, reason("Approved")),
+                "Operation [CLEAR_ALL_ATTR] is not allowed for a controlled tag write");
     }
 
     @Test
@@ -352,19 +363,28 @@ abstract class ControlledTagApiTest {
         var update = set("approved_mgc", "approved");
 
         var noReason = controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("x")).toBuilder().clearReason().build();
-        assertInvalidEverywhere(noReason);
+        assertInvalidEverywhere(noReason, "A value is required for [reason] when control == CONTROLLED");
 
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("")));
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, MetadataCodec.encodeArrayValue(List.<String>of(), String.class)));
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, MetadataCodec.encodeArrayValue(List.of("ok", ""), String.class)));
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, MetadataCodec.encodeValue(42)));
+        var empty = "The reason for a controlled tag write cannot be empty";
+        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("")), empty);
+        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, MetadataCodec.encodeArrayValue(List.<String>of(), String.class)), empty);
+        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, MetadataCodec.encodeArrayValue(List.of("ok", ""), String.class)), empty);
 
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("x".repeat(1001))));
-        assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reasonItems(21)));
+        assertInvalidEverywhere(
+                controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, MetadataCodec.encodeValue(42)),
+                "The reason for a controlled tag write must be a string or an array of strings");
+
+        assertInvalidEverywhere(
+                controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("x".repeat(1001))),
+                "The reason for a controlled tag write exceeds the length limit (1000 characters)");
+
+        assertInvalidEverywhere(
+                controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reasonItems(21)),
+                "The reason for a controlled tag write has too many items (limit is 20)");
 
         // Reason on an ordinary write
         var ordinaryWithReason = ordinary(v1, set("description", "x")).toBuilder().setReason(reason("Why")).build();
-        assertInvalidEverywhere(ordinaryWithReason);
+        assertInvalidEverywhere(ordinaryWithReason, "A value cannot be given for [reason] unless control == CONTROLLED");
 
         // At the limits
         var t2 = publicApi.updateTag(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("x".repeat(1000))));
@@ -376,10 +396,49 @@ abstract class ControlledTagApiTest {
 
         var v1 = createObject();
 
-        for (var name : List.of("trac_approved", "TRAC_approved", "_approved", "ctl_this_approved", "CTL_all_approved", "approved__reason", "not-an-identifier")) {
+        var refused = List.of(
+                List.of("trac_approved", "is a reserved identifier"),
+                List.of("TRAC_approved", "is a reserved identifier"),
+                List.of("_approved", "is a reserved identifier"),
+                List.of("ctl_this_approved", "is reserved for controlled attributes"),
+                List.of("CTL_all_approved", "is reserved for controlled attributes"),
+                List.of("approved__reason", "cannot contain a double underscore in a controlled tag write"),
+                List.of("not-an-identifier", "is not a valid identifier"));
 
-            var update = set("placeholder", "approved").toBuilder().setAttrName(name).build();
-            assertInvalidEverywhere(controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("Approved")));
+        for (var item : refused) {
+
+            var update = set("placeholder", "approved").toBuilder().setAttrName(item.get(0)).build();
+
+            assertInvalidEverywhere(
+                    controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("Approved")),
+                    item.get(1));
+        }
+    }
+
+    @Test
+    void validation_attrNameLength() {
+
+        var v1 = createObject();
+
+        // The longest stored name is the this-version prefix, the name and the longest lineage suffix
+        var atLimit = "a".repeat(ValidationConstants.CONTROLLED_ATTR_NAME_LENGTH_LIMIT);
+        var overLimit = atLimit + "a";
+
+        var tooLong = set("placeholder", "approved").toBuilder().setAttrName(overLimit).build();
+
+        assertInvalidEverywhere(
+                controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, tooLong, reason("Approved")),
+                "exceeds the length limit for a controlled tag write (236 characters)");
+
+        for (var versionScope : List.of(VersionScope.VERSION_SCOPE_THIS_VERSION, VersionScope.VERSION_SCOPE_ALL_VERSIONS)) {
+
+            var prior = latestTag(v1).getHeader();
+            var update = set("placeholder", "approved").toBuilder().setAttrName(atLimit).build();
+            var saved = read(publicApi.updateTag(controlled(prior, versionScope, update, reason("Approved"))));
+
+            var storedName = ObjectUpdateLogic.controlledAttrName(atLimit, versionScope);
+            assertTrue(saved.containsAttrs(storedName));
+            assertTrue(saved.containsAttrs(storedName + MetadataConstants.CONTROLLED_USER_NAME_SUFFIX));
         }
     }
 
@@ -391,13 +450,13 @@ abstract class ControlledTagApiTest {
 
         // All versions is only available for controlled writes
         var ordinaryAllVersions = ordinary(v1, update).toBuilder().setVersionScope(VersionScope.VERSION_SCOPE_ALL_VERSIONS).build();
-        assertInvalidEverywhere(ordinaryAllVersions);
+        assertInvalidEverywhere(ordinaryAllVersions, "A value cannot be given for [versionScope] unless control == CONTROLLED");
 
-        var badControl = controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("x")).toBuilder().setControlValue(99).build();
+        var badControl = ordinary(v1, update).toBuilder().setControlValue(99).build();
         var badScope = controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, update, reason("x")).toBuilder().setVersionScopeValue(99).build();
 
-        assertInvalidEverywhere(badControl);
-        assertInvalidEverywhere(badScope);
+        assertInvalidEverywhere(badControl, "Unrecognised value specified for [control]: [99]");
+        assertInvalidEverywhere(badScope, "Unrecognised value specified for [versionScope]: [99]");
     }
 
     @Test
@@ -412,10 +471,10 @@ abstract class ControlledTagApiTest {
         var configId = internalApi.createObject(configRequest);
 
         var request = controlled(configId, VersionScope.VERSION_SCOPE_THIS_VERSION, set("approved_mgc", "approved"), reason("x"));
-        assertInvalidEverywhere(request);
+        assertInvalidEverywhere(request, "Controlled tag writes are not available for [CONFIG] objects");
 
         var allVersions = controlled(configId, VersionScope.VERSION_SCOPE_ALL_VERSIONS, set("approved_mgc", "approved"), reason("x"));
-        assertInvalidEverywhere(allVersions);
+        assertInvalidEverywhere(allVersions, "Controlled tag writes are not available for [CONFIG] objects");
     }
 
     @Test
@@ -426,9 +485,10 @@ abstract class ControlledTagApiTest {
         for (var name : List.of("ctl_this_approved_mgc", "CTL_this_approved_mgc", "ctl_all_preferred_version", "ctl_this_x__user_id")) {
 
             var update = set("placeholder", "x").toBuilder().setAttrName(name).build();
+            var reserved = "Attribute name [" + name + "] is reserved for controlled attributes";
 
             // updateTag on the public and internal APIs
-            assertInvalidEverywhere(ordinary(v1, update));
+            assertInvalidEverywhere(ordinary(v1, update), reserved);
 
             // createObject and updateObject
             var create = MetadataWriteRequest.newBuilder()
@@ -438,8 +498,8 @@ abstract class ControlledTagApiTest {
                     .addTagUpdates(update)
                     .build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.createObject(create));
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.createObject(create));
+            assertInvalid(reserved, () -> publicApi.createObject(create));
+            assertInvalid(reserved, () -> internalApi.createObject(create));
 
             var newVersion = MetadataWriteRequest.newBuilder()
                     .setTenant(TEST_TENANT)
@@ -449,15 +509,15 @@ abstract class ControlledTagApiTest {
                     .addTagUpdates(update)
                     .build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.updateObject(newVersion));
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.updateObject(newVersion));
+            assertInvalid(reserved, () -> publicApi.updateObject(newVersion));
+            assertInvalid(reserved, () -> internalApi.updateObject(newVersion));
 
             // Batch items, including preallocated objects
             var tagBatch = MetadataWriteBatchRequest.newBuilder().setTenant(TEST_TENANT)
                     .addUpdateTags(ordinary(v1, update).toBuilder().clearTenant()).build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.writeBatch(tagBatch));
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.writeBatch(tagBatch));
+            assertInvalid(reserved, () -> publicApi.writeBatch(tagBatch));
+            assertInvalid(reserved, () -> internalApi.writeBatch(tagBatch));
 
             var preallocated = internalApi.preallocateId(MetadataWriteRequest.newBuilder()
                     .setTenant(TEST_TENANT).setObjectType(ObjectType.CUSTOM).build());
@@ -470,20 +530,20 @@ abstract class ControlledTagApiTest {
                     .addTagUpdates(update))
                     .build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.writeBatch(preallocatedBatch));
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.writeBatch(preallocatedBatch));
+            assertInvalid(reserved, () -> publicApi.writeBatch(preallocatedBatch));
+            assertInvalid(reserved, () -> internalApi.writeBatch(preallocatedBatch));
 
             var createBatch = MetadataWriteBatchRequest.newBuilder().setTenant(TEST_TENANT)
                     .addCreateObjects(create.toBuilder().clearTenant()).build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.writeBatch(createBatch));
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.writeBatch(createBatch));
+            assertInvalid(reserved, () -> publicApi.writeBatch(createBatch));
+            assertInvalid(reserved, () -> internalApi.writeBatch(createBatch));
 
             var versionBatch = MetadataWriteBatchRequest.newBuilder().setTenant(TEST_TENANT)
                     .addUpdateObjects(newVersion.toBuilder().clearTenant()).build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.writeBatch(versionBatch));
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.writeBatch(versionBatch));
+            assertInvalid(reserved, () -> publicApi.writeBatch(versionBatch));
+            assertInvalid(reserved, () -> internalApi.writeBatch(versionBatch));
 
             var preallocatedSingle = MetadataWriteRequest.newBuilder()
                     .setTenant(TEST_TENANT)
@@ -493,7 +553,7 @@ abstract class ControlledTagApiTest {
                     .addTagUpdates(update)
                     .build();
 
-            assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.createPreallocatedObject(preallocatedSingle));
+            assertInvalid(reserved, () -> internalApi.createPreallocatedObject(preallocatedSingle));
         }
 
         assertEquals(v1, latestTag(v1).getHeader());
@@ -510,8 +570,8 @@ abstract class ControlledTagApiTest {
                 .setDefinition(SampleMetadata.dummyCustomDef())
                 .build();
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.createObject(create.toBuilder().setControl(TagControl.CONTROLLED).build()));
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.createObject(create.toBuilder().setReason(reason("x")).build()));
+        assertInvalid("A value cannot be given for [control]", () -> publicApi.createObject(create.toBuilder().setControl(TagControl.CONTROLLED).build()));
+        assertInvalid("A value cannot be given for [reason]", () -> internalApi.createObject(create.toBuilder().setReason(reason("x")).build()));
 
         var newVersion = MetadataWriteRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -521,8 +581,8 @@ abstract class ControlledTagApiTest {
                 .setVersionScope(VersionScope.VERSION_SCOPE_ALL_VERSIONS)
                 .build();
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.updateObject(newVersion));
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.updateObject(newVersion));
+        assertInvalid("A value cannot be given for [versionScope]", () -> publicApi.updateObject(newVersion));
+        assertInvalid("A value cannot be given for [versionScope]", () -> internalApi.updateObject(newVersion));
 
         // Preallocation requests
         var preallocate = MetadataWriteRequest.newBuilder()
@@ -531,7 +591,7 @@ abstract class ControlledTagApiTest {
                 .setControl(TagControl.CONTROLLED)
                 .build();
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.preallocateId(preallocate));
+        assertInvalid("A value cannot be given for [control]", () -> internalApi.preallocateId(preallocate));
 
         var preallocated = internalApi.preallocateId(preallocate.toBuilder().clearControl().build());
 
@@ -543,25 +603,24 @@ abstract class ControlledTagApiTest {
                 .setVersionScope(VersionScope.VERSION_SCOPE_ALL_VERSIONS)
                 .build();
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.createPreallocatedObject(createPreallocated));
+        assertInvalid("A value cannot be given for [versionScope]", () -> internalApi.createPreallocatedObject(createPreallocated));
 
         var preallocatedBatch = MetadataWriteBatchRequest.newBuilder().setTenant(TEST_TENANT)
                 .addCreatePreallocatedObjects(createPreallocated.toBuilder().clearTenant().clearVersionScope().setReason(reason("x")))
                 .build();
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.writeBatch(preallocatedBatch));
+        assertInvalid("A value cannot be given for [reason]", () -> internalApi.writeBatch(preallocatedBatch));
 
         // A controlled write is never an item in a batch
         var controlledItem = controlled(v1, VersionScope.VERSION_SCOPE_THIS_VERSION, set("approved_mgc", "approved"), reason("x"));
         var batch = MetadataWriteBatchRequest.newBuilder().setTenant(TEST_TENANT)
                 .addUpdateTags(controlledItem.toBuilder().clearTenant()).build();
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.writeBatch(batch));
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.writeBatch(batch));
+        assertInvalid("A value cannot be given for [control]", () -> publicApi.writeBatch(batch));
+        assertInvalid("A value cannot be given for [control]", () -> internalApi.writeBatch(batch));
 
         assertEquals(v1, latestTag(v1).getHeader());
     }
-
 
     // -----------------------------------------------------------------------------------------------------------------
     // ALL VERSIONS
@@ -842,6 +901,23 @@ abstract class ControlledTagApiTest {
         assertEquals(1, latestTag(v2, 1).getHeader().getTagVersion());
     }
 
+    @Test
+    void hook_batchItemRefusalSavesNothing() {
+
+        var a = createObject();
+        var b = createObject();
+
+        var batch = MetadataWriteBatchRequest.newBuilder().setTenant(TEST_TENANT)
+                .addUpdateTags(ordinary(a, set("description", "a")).toBuilder().clearTenant())
+                .addUpdateTags(ordinary(b, set(TestMetadataWriteHook.REFUSED_TAG_ATTR, "x")).toBuilder().clearTenant())
+                .build();
+
+        assertCode(Status.Code.FAILED_PRECONDITION, () -> publicApi.writeBatch(batch));
+
+        assertEquals(a, latestTag(a).getHeader());
+        assertEquals(b, latestTag(b).getHeader());
+    }
+
 
     // -----------------------------------------------------------------------------------------------------------------
     // HELPERS
@@ -969,10 +1045,29 @@ abstract class ControlledTagApiTest {
         assertEquals(MetadataCodec.decodeDatetime(tag.getHeader().getTagTimestamp()), time);
     }
 
-    private void assertInvalidEverywhere(MetadataWriteRequest request) {
+    private void assertInvalidEverywhere(MetadataWriteRequest request, String expectedMessage) {
 
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> publicApi.updateTag(request));
-        assertCode(Status.Code.INVALID_ARGUMENT, () -> internalApi.updateTag(request));
+        assertInvalid(expectedMessage, () -> publicApi.updateTag(request));
+        assertInvalid(expectedMessage, () -> internalApi.updateTag(request));
+    }
+
+    private static void assertInvalid(String expectedMessage, Runnable call) {
+
+        var error = assertThrows(StatusRuntimeException.class, call::run);
+        assertEquals(Status.Code.INVALID_ARGUMENT, error.getStatus().getCode(), error.getStatus().getDescription());
+
+        var trailers = error.getTrailers();
+        var details = trailers != null ? trailers.get(TRAC_ERROR_DETAILS_KEY) : null;
+
+        var messages = details != null
+                ? details.getItemsList().stream().map(TracErrorItem::getDetail).collect(Collectors.toList())
+                : new ArrayList<String>();
+
+        messages.add(error.getStatus().getDescription());
+
+        assertTrue(
+                messages.stream().anyMatch(message -> message != null && message.contains(expectedMessage)),
+                String.format("Expected an error containing [%s], got %s", expectedMessage, messages));
     }
 
     private static void assertCode(Status.Code code, Runnable call) {

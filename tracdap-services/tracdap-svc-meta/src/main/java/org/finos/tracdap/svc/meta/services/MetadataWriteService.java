@@ -407,7 +407,10 @@ public class MetadataWriteService {
             throw new EInputValidation(err);
         }
 
-        // The named version is checked for staleness when it is saved, older versions are loaded at their latest tag
+        // Older versions are loaded at their latest tag, every tag is saved as the next tag version of the one loaded,
+        // so a tag written on any version in the meantime makes the save fail as stale
+        // A new version saved in the meantime is not part of this write, it keeps the value it copied from its prior
+        // version and the next write to all versions converges it
         var priorTags = new ArrayList<Tag>(latestVersion);
 
         if (latestVersion > MetadataConstants.OBJECT_FIRST_VERSION) {

@@ -91,6 +91,12 @@ public class ValidationConstants {
     public static final int CONTROLLED_REASON_LENGTH_LIMIT = 1000;
     public static final int CONTROLLED_REASON_ITEMS_LIMIT = 20;
 
+    // Attribute names are held in a varchar(256) column of the metadata store
+    // A controlled attribute is stored under its version scope prefix, its lineage attributes add a suffix as well
+    public static final int CONTROLLED_ATTR_NAME_LENGTH_LIMIT = 256
+            - MetadataConstants.CONTROLLED_THIS_VERSION_PREFIX.length()
+            - MetadataConstants.CONTROLLED_USER_NAME_SUFFIX.length();
+
     // List of object types that represent config and can be used with the config objects API
     public static final List<ObjectType> CONFIG_OBJECT_TYPES = List.of(
             ObjectType.CONFIG, ObjectType.RESOURCE);

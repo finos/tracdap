@@ -28,6 +28,7 @@ import org.finos.tracdap.metadata.*;
 
 import java.util.List;
 
+import static org.finos.tracdap.common.validation.ValidationConstants.CONTROLLED_ATTR_NAME_LENGTH_LIMIT;
 import static org.finos.tracdap.common.validation.ValidationConstants.CONTROLLED_REASON_ITEMS_LIMIT;
 import static org.finos.tracdap.common.validation.ValidationConstants.CONTROLLED_REASON_LENGTH_LIMIT;
 import static org.finos.tracdap.common.validation.core.ValidatorUtils.field;
@@ -163,6 +164,15 @@ public class TagUpdateValidator {
             var err = String.format(
                     "Attribute name [%s] cannot contain a double underscore in a controlled tag write",
                     msg.getAttrName());
+
+            return ctx.error(err);
+        }
+
+        if (msg.getAttrName().length() > CONTROLLED_ATTR_NAME_LENGTH_LIMIT) {
+
+            var err = String.format(
+                    "Attribute name [%s] exceeds the length limit for a controlled tag write (%d characters)",
+                    msg.getAttrName(), CONTROLLED_ATTR_NAME_LENGTH_LIMIT);
 
             return ctx.error(err);
         }
