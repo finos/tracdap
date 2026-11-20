@@ -46,7 +46,7 @@ can create directories, check for existing files and write files as streams:
     :name: data_export_py_run_model
     :language: python
     :class: container
-    :lines: 36 - 70
+    :lines: 36 - 73
     :linenos:
     :lineno-start: 36
 
@@ -84,9 +84,9 @@ The flow can be launched in the same way as in :doc:`chaining`:
     :name: data_export_py_launch
     :language: python
     :class: container
-    :lines: 73 - 75
+    :lines: 76 - 78
     :linenos:
-    :lineno-start: 73
+    :lineno-start: 76
 
 
 .. seealso::

@@ -20,6 +20,7 @@ import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.file_formats as _file_formats
 import tracdap.rt._impl.core.placement as _placement
 import tracdap.rt._impl.core.resources as _resources
+import tracdap.rt.api as _api
 import tracdap.rt.metadata as _meta
 import tracdap.rt.config as _cfg
 
@@ -165,6 +166,8 @@ class GraphContext:
     ctx_namespace: NodeNamespace
 
     sys_config: _cfg.RuntimeConfig
+
+    job_metadata: _api.RuntimeMetadata
 
 
 @_dc.dataclass(frozen=True)

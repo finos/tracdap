@@ -247,6 +247,22 @@ class TracDataContext(TracContext):
     def set_schema(self, dataset_key: str, schema: SchemaDefinition):
         pass
 
+    @_abc.abstractmethod
+    def get_job_metadata(self) -> RuntimeMetadata:
+
+        """
+        Get the TRAC metadata for the job this model is running in.
+
+        The object ID is the ID of the job. The attributes are the attributes of the job,
+        including those it was submitted with. They do not include the job status, which
+        changes while the job runs.
+
+        :return: Runtime metadata for the current job
+        :rtype: :py:class:`RuntimeMetadata <tracdap.rt.api.RuntimeMetadata>`
+        """
+
+        pass
+
 
 class TracDataImport(TracModel):
 

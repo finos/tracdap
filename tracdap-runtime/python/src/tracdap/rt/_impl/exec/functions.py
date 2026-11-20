@@ -692,6 +692,7 @@ class RunModelFunc(NodeFunction[Bundle[_data.DataView]]):
             trac_ctx = _ctx.TracDataContextImpl(
                 self.node.model_def, self.model_class,
                 local_ctx, dynamic_outputs, self.resources,
+                self.node.graph_context.job_metadata,
                 self.log_provider, self.checkout_directory)
         else:
             trac_ctx = _ctx.TracContextImpl(

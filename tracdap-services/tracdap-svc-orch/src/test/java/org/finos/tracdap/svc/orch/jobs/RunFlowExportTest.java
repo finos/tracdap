@@ -53,6 +53,7 @@ public class RunFlowExportTest {
     private static final String E2E_TENANTS = "config/trac-e2e-tenants.yaml";
     private static final String LOANS_INPUT_PATH = "examples/models/python/data/inputs/loan_final313_100_shortform.csv";
     private static final String EXTERNAL_STORAGE_KEY = "TEST_EXTERNAL_STORAGE";
+    private static final String EXPORT_JOB_NAME = "Run flow export e2e test";
 
     @RegisterExtension
     public static final PlatformTest platform = PlatformTest.forConfig(E2E_CONFIG, List.of(E2E_TENANTS))
@@ -244,6 +245,9 @@ public class RunFlowExportTest {
                 .addJobAttrs(TagUpdate.newBuilder()
                         .setAttrName("e2e_test_job")
                         .setValue(MetadataCodec.encodeValue("run_flow_export:run_flow")))
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("name")
+                        .setValue(MetadataCodec.encodeValue(EXPORT_JOB_NAME)))
                 .build();
 
         jobId_runFlow = Helpers.startJob(orchClient, jobRequest).getJobId();
@@ -299,5 +303,13 @@ public class RunFlowExportTest {
         Assertions.assertTrue(exportedLines[0].contains("region"));
         Assertions.assertTrue(exportedLines[0].contains("gross_profit"));
         Assertions.assertTrue(exportedContent.contains("run_flow_export e2e test"));
+
+        // The export model reads the job's ID and attributes from its job metadata
+
+        var header = List.of(exportedLines[0].strip().split(","));
+        var firstRow = List.of(exportedLines[1].strip().split(","));
+
+        Assertions.assertEquals(jobId_runFlow.getObjectId(), firstRow.get(header.indexOf("job_id")));
+        Assertions.assertEquals(EXPORT_JOB_NAME, firstRow.get(header.indexOf("job_name")));
     }
 }

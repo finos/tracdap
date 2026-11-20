@@ -17,6 +17,7 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteBatchResponse;
@@ -424,6 +425,98 @@ public class JobProcessorHelpersTest {
     }
 
     @Test
+    void saveJobDefinition_jobTagReadBack() {
+
+        var jobState = definitionJobState();
+        var savedJobId = SampleMetadata.newHeader(ObjectType.JOB);
+        var savedJobTag = jobTag(savedJobId, Map.of("job_tag", "quarterly_export"));
+
+        Mockito.when(metaClient.preallocateId(ArgumentMatchers.any())).thenReturn(SampleMetadata.newHeader(ObjectType.RESULT));
+        Mockito.when(metaClient.createObject(ArgumentMatchers.any())).thenReturn(savedJobId);
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any())).thenReturn(savedJobTag.toBuilder()
+                .setDefinition(ObjectDefinition.newBuilder().setObjectType(ObjectType.JOB))
+                .build());
+
+        var newState = helpers.saveJobDefinition(jobState);
+
+        // The tag is read for the exact header created, not the latest tag
+        var readRequest = ArgumentCaptor.forClass(MetadataReadRequest.class);
+        Mockito.verify(metaClient).readObject(readRequest.capture());
+        Assertions.assertEquals(SampleMetadata.TEST_TENANT, readRequest.getValue().getTenant());
+        Assertions.assertEquals(MetadataUtil.selectorFor(savedJobId), readRequest.getValue().getSelector());
+
+        var bundledTag = newState.metadata.getTags().get(MetadataUtil.objectKey(savedJobId));
+        Assertions.assertEquals(savedJobTag, bundledTag);
+        Assertions.assertFalse(bundledTag.hasDefinition());
+    }
+
+    @Test
+    void saveJobDefinition_jobTagReadFails() {
+
+        var jobState = definitionJobState();
+
+        Mockito.when(metaClient.preallocateId(ArgumentMatchers.any())).thenReturn(SampleMetadata.newHeader(ObjectType.RESULT));
+        Mockito.when(metaClient.createObject(ArgumentMatchers.any())).thenReturn(SampleMetadata.newHeader(ObjectType.JOB));
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any())).thenThrow(Status.UNAVAILABLE.asRuntimeException());
+
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> helpers.saveJobDefinition(jobState));
+        Assertions.assertEquals(Status.Code.UNAVAILABLE, error.getStatus().getCode());
+    }
+
+    @Test
+    void buildJobConfig_jobTagSentToRuntime() {
+
+        var jobState = configJobState(CONTEXT_SELECTOR);
+        var jobTag = jobTag(jobState.jobId, Map.of("job_tag", "quarterly_export"));
+
+        jobState.metadata.addToBundle(Map.of(), Map.of(), Map.of(jobState.jobKey, jobTag));
+
+        var jobConfig = helpers.buildJobConfig(jobState).jobConfig;
+        var sentTag = jobConfig.getTagsOrThrow(jobState.jobKey);
+
+        // Attributes the job was created with are sent, its context and initial status are not
+        Assertions.assertEquals(jobState.jobId, sentTag.getHeader());
+        Assertions.assertEquals("quarterly_export", MetadataCodec.decodeStringValue(sentTag.getAttrsOrThrow("job_tag")));
+        Assertions.assertEquals("RUN_MODEL", MetadataCodec.decodeStringValue(sentTag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_TYPE_ATTR)));
+        Assertions.assertEquals("Test User", MetadataCodec.decodeStringValue(sentTag.getAttrsOrThrow(MetadataConstants.TRAC_CREATE_USER_NAME)));
+        Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_STATUS_ATTR));
+        Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_CONTEXT_ATTR));
+        Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR));
+
+        // The job is not an object the job definition refers to
+        Assertions.assertFalse(jobConfig.containsObjectMapping(jobState.jobKey));
+        Assertions.assertFalse(jobConfig.containsObjects(jobState.jobKey));
+    }
+
+    @Test
+    void jobState_jobTagKeptThroughCache() throws Exception {
+
+        var jobState = configJobState(null);
+        jobState.metadata.addToBundle(Map.of(), Map.of(), Map.of(jobState.jobKey, jobTag(jobState.jobId, Map.of("job_tag", "quarterly_export"))));
+
+        var built = helpers.buildJobConfig(jobState);
+        var buffer = new ByteArrayOutputStream();
+
+        try (var out = new ObjectOutputStream(buffer)) {
+            out.writeObject(built);
+        }
+
+        JobState restored;
+
+        try (var in = new ObjectInputStream(new ByteArrayInputStream(buffer.toByteArray()))) {
+            restored = (JobState) in.readObject();
+        }
+
+        Assertions.assertEquals(
+                built.jobConfig.getTagsOrThrow(jobState.jobKey),
+                restored.jobConfig.getTagsOrThrow(jobState.jobKey));
+
+        Assertions.assertEquals(
+                built.jobConfig.getTagsOrThrow(jobState.jobKey),
+                restored.metadata.getTags().get(jobState.jobKey));
+    }
+
+    @Test
     void saveJobResult_ok() {
 
         var jobState = resultJobState();
@@ -542,6 +635,49 @@ public class JobProcessorHelpersTest {
         helpers.processJobResult(jobState);
 
         return jobState;
+    }
+
+    private JobState definitionJobState() {
+
+        var jobState = new JobState();
+        jobState.tenant = SampleMetadata.TEST_TENANT;
+        jobState.jobType = JobType.RUN_MODEL;
+        jobState.tracStatus = JobStatusCode.QUEUED;
+        jobState.definition = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder().setModel(MODEL_SELECTOR))
+                .build();
+        jobState.jobRequest = JobRequest.newBuilder()
+                .setTenant(SampleMetadata.TEST_TENANT)
+                .setJob(jobState.definition)
+                .addJobAttrs(TagUpdate.newBuilder()
+                        .setAttrName("job_tag")
+                        .setValue(MetadataCodec.encodeValue("quarterly_export")))
+                .build();
+        jobState.metadata = MetadataBundle.empty();
+        jobState.clientConfig = new GrpcClientConfig() {
+            @Override
+            public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
+                return clientStub;
+            }
+        };
+
+        return jobState;
+    }
+
+    private static Tag jobTag(TagHeader jobId, Map<String, String> userAttrs) {
+
+        var tag = Tag.newBuilder()
+                .setHeader(jobId)
+                .putAttrs(MetadataConstants.TRAC_JOB_TYPE_ATTR, MetadataCodec.encodeValue("RUN_MODEL"))
+                .putAttrs(MetadataConstants.TRAC_JOB_STATUS_ATTR, MetadataCodec.encodeValue("QUEUED"))
+                .putAttrs(MetadataConstants.TRAC_JOB_CONTEXT_ATTR, MetadataCodec.encodeValue(CONTEXT_ID.getObjectId()))
+                .putAttrs(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR, MetadataCodec.encodeValue(CONTEXT_ID.getObjectVersion()))
+                .putAttrs(MetadataConstants.TRAC_CREATE_USER_NAME, MetadataCodec.encodeValue("Test User"));
+
+        userAttrs.forEach((name, value) -> tag.putAttrs(name, MetadataCodec.encodeValue(value)));
+
+        return tag.build();
     }
 
     private void latestJobTagIs(TagHeader header) {

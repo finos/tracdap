@@ -1285,7 +1285,10 @@ class DevModeTranslator:
 
         job_config = copy.copy(job_config)
 
-        for key, object_id in job_config.objectMapping.items():
+        object_ids = dict(job_config.objectMapping)
+        object_ids[_util.object_key(job_config.jobId)] = job_config.jobId
+
+        for key, object_id in object_ids.items():
             if key not in job_config.tags:
 
                 tag = _meta.Tag(header=object_id)

@@ -51,7 +51,10 @@ class GraphBuilder:
         sys_config = context.sys_config
         job_config = _cfg.JobConfig(context.job_id)
 
-        return GraphBuilder(sys_config, job_config)
+        builder = GraphBuilder(sys_config, job_config)
+        builder._job_metadata = context.job_metadata
+
+        return builder
 
     def __init__(self, sys_config: _cfg.RuntimeConfig, job_config: _cfg.JobConfig):
 
@@ -60,6 +63,9 @@ class GraphBuilder:
 
         self._job_key = _util.object_key(job_config.jobId)
         self._job_namespace = NodeNamespace(self._job_key)
+
+        job_tag = _util.get_job_metadata_tag(job_config.jobId, job_config, optional=True)
+        self._job_metadata = self._runtime_metadata(job_config.jobId, job_tag)
 
         # Dictionary of object type to preallocated IDs
         self._preallocated_ids = dict(
@@ -1016,7 +1022,8 @@ class GraphBuilder:
         context = GraphContext(
             self._job_config.jobId,
             self._job_namespace, namespace,
-            self._sys_config)
+            self._sys_config,
+            self._job_metadata)
 
         model_node = RunModelNode(
             model_id, model_def, model_scope,
@@ -1425,13 +1432,18 @@ class GraphBuilder:
         item_id = _util.get_job_mapping(selector, self._job_config)
         tag = _util.get_job_metadata_tag(selector, self._job_config, optional=True)
 
+        metadata = self._runtime_metadata(item_id, tag)
+
+        return _util.attach_runtime_metadata(obj, metadata)
+
+    @staticmethod
+    def _runtime_metadata(object_id: _meta.TagHeader, tag: _tp.Optional[_meta.Tag]) -> _api.RuntimeMetadata:
+
         attributes = dict() if tag is None else dict(
             (attr_name, _type_system.MetadataCodec.decode_value(attr_value))
             for attr_name, attr_value in tag.attrs.items())
 
-        metadata = _api.RuntimeMetadata(objectId=item_id, attributes=attributes)
-
-        return _util.attach_runtime_metadata(obj, metadata)
+        return _api.RuntimeMetadata(objectId=object_id, attributes=attributes)
 
     def _join_sections(self, *sections: GraphSection, allow_partial_inputs: bool = False):
 

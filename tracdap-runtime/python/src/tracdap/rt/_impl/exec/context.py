@@ -541,6 +541,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
             self, model_def: _meta.ModelDefinition, model_class: _api.TracModel.__class__,
             local_ctx: tp.Dict[str, tp.Any], dynamic_outputs: tp.List[str],
             storage_map: tp.Dict[str, tp.Union[_eapi.TracFileStorage, _eapi.TracDataStorage]],
+            job_metadata: _api.RuntimeMetadata,
             log_provider: _logging.LogProvider = None, checkout_directory: pathlib.Path = None):
 
         super().__init__(model_def, model_class, local_ctx, dynamic_outputs, log_provider, checkout_directory)
@@ -549,6 +550,7 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
         self.__local_ctx = local_ctx
         self.__dynamic_outputs = dynamic_outputs
         self.__storage_map = storage_map
+        self.__job_metadata = job_metadata
         self.__checkout_directory = checkout_directory
 
         self.__val: TracContextValidator = self._TracContextImpl__val  # noqa
@@ -658,6 +660,12 @@ class TracDataContextImpl(TracContextImpl, _eapi.TracDataContext):
 
         # Forward to existing method (these should be swapped round)
         self.put_schema(dataset_name, schema)
+
+    def get_job_metadata(self) -> _api.RuntimeMetadata:
+
+        _val.validate_signature(self.get_job_metadata)
+
+        return self.__job_metadata
 
 
 class TracFileStorageImpl(_eapi.TracFileStorage):

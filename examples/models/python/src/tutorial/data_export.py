@@ -64,10 +64,13 @@ class DataExportExample(trac.TracDataExport):
     def add_export_metadata(dataset_name, dataset, ctx: trac.TracDataContext):
 
         export_comment = ctx.get_parameter("export_comment")
+        job_metadata = ctx.get_job_metadata()
 
         return dataset.assign(
             dataset_name=dataset_name,
-            comments=export_comment)
+            comments=export_comment,
+            job_id=job_metadata.objectId.objectId,
+            job_name=job_metadata.attributes.get("name"))
 
 
 if __name__ == "__main__":
