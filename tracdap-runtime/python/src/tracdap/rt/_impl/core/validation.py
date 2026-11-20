@@ -478,6 +478,7 @@ class StaticValidator:
 
     __identifier_pattern = re.compile("\\A[a-zA-Z_]\\w*\\Z", re.ASCII)
     __reserved_identifier_pattern = re.compile("\\A(_|trac_)", re.ASCII)
+    __controlled_identifier_pattern = re.compile("\\Actl_", re.ASCII | re.IGNORECASE)
     __label_length_limit = 4096
 
     __file_extension_pattern = re.compile('\\A[a-zA-Z0-9]+\\Z')
@@ -562,6 +563,11 @@ class StaticValidator:
 
         cls._valid_identifiers(model_attrs.keys(), "model attribute")
         cls._case_insensitive_duplicates(model_attrs.keys(), "model attribute")
+
+        # Controlled attributes are only set by controlled tag writes on the platform
+        for key in model_attrs.keys():
+            if cls.__controlled_identifier_pattern.match(key):
+                cls._fail(f"Invalid model attribute: [{key}] is a reserved identifier")
 
     @classmethod
     def quick_validate_schema(cls, schema: meta.SchemaDefinition):

@@ -18,6 +18,7 @@
 package org.finos.tracdap.common.metadata.tag;
 
 import org.finos.tracdap.metadata.*;
+import org.finos.tracdap.common.exception.EMetadataBadUpdate;
 import org.finos.tracdap.common.grpc.RequestMetadata;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.common.metadata.MetadataCodec;
@@ -198,6 +199,179 @@ class ObjectUpdateLogicTest {
 
         assertEquals("context_id", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("trac_job_context")));
         assertEquals(1, MetadataCodec.decodeIntegerValue(newTag.getAttrsOrThrow("trac_job_context_version")));
+    }
+
+    @Test
+    void buildNewVersion_dropsThisVersionControlledAttrs() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(attr("business_key", "kept")),
+                null, requestMetadata(), userMetadata());
+
+        priorTag = controlledTag(priorTag, VersionScope.VERSION_SCOPE_THIS_VERSION, attr("approved", "yes"));
+        priorTag = controlledTag(priorTag, VersionScope.VERSION_SCOPE_ALL_VERSIONS, intAttr("preferred_version", 1));
+
+        var newTag = ObjectUpdateLogic.buildNewVersion(
+                priorTag, customDef("acme_widget"), List.of(),
+                null, requestMetadata(), userMetadata());
+
+        assertTrue(newTag.getAttrsMap().keySet().stream().noneMatch(name -> name.startsWith("ctl_this_")));
+        assertTrue(newTag.containsAttrs("ctl_all_preferred_version"));
+        assertTrue(newTag.containsAttrs("ctl_all_preferred_version__reason"));
+        assertTrue(newTag.containsAttrs("business_key"));
+    }
+
+    @Test
+    void buildNewVersion_allVersionsAttrsFromLatestPriorTag() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(attr("business_key", "prior")),
+                null, requestMetadata(), userMetadata());
+
+        priorTag = controlledTag(priorTag, VersionScope.VERSION_SCOPE_ALL_VERSIONS, intAttr("preferred_version", 1));
+
+        var latestPriorTag = ObjectUpdateLogic.buildNewTag(priorTag, List.of(attr("business_key", "latest")), requestMetadata(), userMetadata());
+        latestPriorTag = controlledTag(latestPriorTag, VersionScope.VERSION_SCOPE_ALL_VERSIONS, clear("preferred_version"));
+        latestPriorTag = controlledTag(latestPriorTag, VersionScope.VERSION_SCOPE_ALL_VERSIONS, attr("housekeeping", "keep"));
+
+        var newTag = ObjectUpdateLogic.buildNewVersion(
+                priorTag, latestPriorTag, customDef("acme_widget"), List.of(),
+                null, requestMetadata(), userMetadata());
+
+        // Controlled attributes for all versions come from the latest tag, everything else from the named tag
+        assertFalse(newTag.containsAttrs("ctl_all_preferred_version"));
+        assertEquals(latestPriorTag.getAttrsOrThrow("ctl_all_preferred_version__time"), newTag.getAttrsOrThrow("ctl_all_preferred_version__time"));
+        assertEquals("keep", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("ctl_all_housekeeping")));
+        assertEquals("prior", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("business_key")));
+    }
+
+    @Test
+    void buildNewVersion_noLatestPriorTagUnchanged() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(attr("business_key", "prior")),
+                null, requestMetadata(), userMetadata());
+
+        var request = requestMetadata();
+        var user = userMetadata();
+
+        var withNull = ObjectUpdateLogic.buildNewVersion(priorTag, null, customDef("acme_widget"), List.of(), null, request, user);
+        var original = ObjectUpdateLogic.buildNewVersion(priorTag, customDef("acme_widget"), List.of(), null, request, user);
+
+        assertEquals(original, withNull);
+    }
+
+    @Test
+    void buildNewControlledTag_set() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(),
+                null, requestMetadata(), userMetadata());
+
+        var request = requestMetadata();
+        var user = new UserMetadata("approver", "An Approver");
+
+        var newTag = ObjectUpdateLogic.buildNewControlledTag(
+                priorTag, attr("approved", "yes"), VersionScope.VERSION_SCOPE_THIS_VERSION,
+                MetadataCodec.encodeValue("Approved at MGC"), true, request, user);
+
+        assertEquals(priorTag.getHeader().getTagVersion() + 1, newTag.getHeader().getTagVersion());
+        assertEquals("yes", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("ctl_this_approved")));
+        assertEquals("Approved at MGC", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("ctl_this_approved__reason")));
+        assertEquals("approver", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("ctl_this_approved__user_id")));
+        assertEquals("An Approver", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("ctl_this_approved__user_name")));
+        assertEquals(MetadataCodec.encodeValue(request.requestTimestamp()), newTag.getAttrsOrThrow("ctl_this_approved__time"));
+
+        // Tag-only writes still do not change who wrote the object version
+        assertEquals(priorTag.getAttrsOrThrow(MetadataConstants.TRAC_UPDATE_USER_ID), newTag.getAttrsOrThrow(MetadataConstants.TRAC_UPDATE_USER_ID));
+    }
+
+    @Test
+    void buildNewControlledTag_clear() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(),
+                null, requestMetadata(), userMetadata());
+
+        var setTag = controlledTag(priorTag, VersionScope.VERSION_SCOPE_THIS_VERSION, attr("approved", "yes"));
+
+        var clearTag = ObjectUpdateLogic.buildNewControlledTag(
+                setTag, clear("approved"), VersionScope.VERSION_SCOPE_THIS_VERSION,
+                MetadataCodec.encodeValue("Withdrawn"), true, requestMetadata(), new UserMetadata("other", "Other User"));
+
+        assertFalse(clearTag.containsAttrs("ctl_this_approved"));
+        assertEquals("Withdrawn", MetadataCodec.decodeStringValue(clearTag.getAttrsOrThrow("ctl_this_approved__reason")));
+        assertEquals("other", MetadataCodec.decodeStringValue(clearTag.getAttrsOrThrow("ctl_this_approved__user_id")));
+    }
+
+    @Test
+    void buildNewControlledTag_clearWithNoValue() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(),
+                null, requestMetadata(), userMetadata());
+
+        // Refused when the value is required
+        assertThrows(EMetadataBadUpdate.class, () -> ObjectUpdateLogic.buildNewControlledTag(
+                priorTag, clear("approved"), VersionScope.VERSION_SCOPE_ALL_VERSIONS,
+                MetadataCodec.encodeValue("Withdrawn"), true, requestMetadata(), userMetadata()));
+
+        // Otherwise only the lineage is written
+        var lineageOnly = ObjectUpdateLogic.buildNewControlledTag(
+                priorTag, clear("approved"), VersionScope.VERSION_SCOPE_ALL_VERSIONS,
+                MetadataCodec.encodeValue("Withdrawn"), false, requestMetadata(), userMetadata());
+
+        assertFalse(lineageOnly.containsAttrs("ctl_all_approved"));
+        assertTrue(lineageOnly.containsAttrs("ctl_all_approved__reason"));
+        assertTrue(lineageOnly.containsAttrs("ctl_all_approved__time"));
+    }
+
+    @Test
+    void buildNewControlledTag_typeMismatch() {
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), customDef("acme_widget"), List.of(),
+                null, requestMetadata(), userMetadata());
+
+        var setTag = controlledTag(priorTag, VersionScope.VERSION_SCOPE_ALL_VERSIONS, intAttr("preferred_version", 1));
+
+        assertThrows(EMetadataBadUpdate.class, () -> ObjectUpdateLogic.buildNewControlledTag(
+                setTag, attr("preferred_version", "one"), VersionScope.VERSION_SCOPE_ALL_VERSIONS,
+                MetadataCodec.encodeValue("x"), true, requestMetadata(), userMetadata()));
+    }
+
+    @Test
+    void buildNewVersion_configObjectUnchanged() {
+
+        var configDef = ObjectDefinition.newBuilder()
+                .setObjectType(ObjectType.CONFIG)
+                .setConfig(ConfigDefinition.newBuilder().setConfigType(ConfigType.PROPERTIES))
+                .build();
+
+        var priorTag = ObjectUpdateLogic.buildNewObject(
+                UUID.randomUUID(), configDef, List.of(attr("business_key", "kept")),
+                null, requestMetadata(), userMetadata());
+
+        var newTag = ObjectUpdateLogic.buildNewVersion(
+                priorTag, configDef, List.of(),
+                null, requestMetadata(), userMetadata());
+
+        assertEquals(priorTag.getAttrsMap().keySet(), newTag.getAttrsMap().keySet());
+    }
+
+    private static Tag controlledTag(Tag priorTag, VersionScope versionScope, TagUpdate update) {
+
+        return ObjectUpdateLogic.buildNewControlledTag(
+                priorTag, update, versionScope, MetadataCodec.encodeValue("A reason"),
+                true, requestMetadata(), userMetadata());
+    }
+
+    private static TagUpdate clear(String attrName) {
+
+        return TagUpdate.newBuilder()
+                .setOperation(TagOperation.DELETE_ATTR)
+                .setAttrName(attrName)
+                .build();
     }
 
     private static ObjectDefinition customDef(String schemaType) {

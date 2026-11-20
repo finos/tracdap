@@ -15,6 +15,8 @@
 
 import dataclasses
 import datetime as dt
+import logging
+import pathlib
 import unittest
 import unittest.mock as mock
 
@@ -96,7 +98,7 @@ class SourceProvenanceContextTest(unittest.TestCase):
 
     def test_set_attribute_reserved_name(self):
 
-        for reserved_name in ["trac_model_type", "_hidden_attr"]:
+        for reserved_name in ["trac_model_type", "_hidden_attr", "ctl_this_approved", "CTL_all_preferred_version"]:
 
             self.assertRaises(
                 _ex.ERuntimeValidation,
@@ -104,6 +106,16 @@ class SourceProvenanceContextTest(unittest.TestCase):
 
             attrs = _attrs_by_name(self.local_ctx["my_dataset"])
             self.assertEqual({}, attrs)
+
+    def test_controlled_prefix_allowed_for_table_names(self):
+
+        # Only attribute names are reserved for controlled attributes, table names keep their existing rules
+        storage_val = _ctx.TracStorageValidator(logging.getLogger(__name__), pathlib.Path("."), "test_storage")
+
+        storage_val.check_table_name_not_reserved("ctl_table")
+        storage_val.check_table_name_not_reserved("CTL_table")
+
+        self.assertRaises(_ex.ERuntimeValidation, lambda: storage_val.check_table_name_not_reserved("trac_table"))
 
     def test_set_source_metadata_file_stat_ok(self):
 

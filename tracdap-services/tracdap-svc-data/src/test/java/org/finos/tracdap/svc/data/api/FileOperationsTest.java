@@ -311,7 +311,7 @@ abstract class FileOperationsTest {
     @Test
     void testCreateFile_tagUpdateReserved() {
 
-        var reservedAttrs = List.of("trac_file_attr", "_file_attr", "__file_attr");
+        var reservedAttrs = List.of("trac_file_attr", "_file_attr", "__file_attr", "ctl_this_file_attr", "CTL_all_file_attr");
 
         for (var attrName: reservedAttrs) {
 
@@ -774,7 +774,7 @@ abstract class FileOperationsTest {
         var v1Id = resultOf(createFile);
         var v1Selector = MetadataUtil.selectorFor(v1Id);
 
-        var reservedAttrs = List.of("trac_file_attr", "_file_attr", "__file_attr");
+        var reservedAttrs = List.of("trac_file_attr", "_file_attr", "__file_attr", "ctl_this_file_attr", "CTL_all_file_attr");
 
         for (var attrName: reservedAttrs) {
 

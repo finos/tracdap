@@ -23,12 +23,14 @@ import org.finos.tracdap.common.service.IJobValidationHook;
 import org.finos.tracdap.common.service.IMetadataWriteHook;
 import org.finos.tracdap.common.service.JobValidation;
 import org.finos.tracdap.common.service.ObjectWrite;
+import org.finos.tracdap.common.service.TagWrite;
 import org.finos.tracdap.metadata.ObjectType;
 
 import com.google.protobuf.ByteString;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 
 public class TestJobHooks implements IJobValidationHook, IMetadataWriteHook {
@@ -41,6 +43,9 @@ public class TestJobHooks implements IJobValidationHook, IMetadataWriteHook {
 
     public static final List<JobValidation> VALIDATIONS = new CopyOnWriteArrayList<>();
     public static final List<ObjectWrite> OBJECT_WRITES = new CopyOnWriteArrayList<>();
+
+    // Runs inside validateTag in the metadata service, before anything in the write is saved
+    public static volatile Consumer<TagWrite> tagWriteCallback = null;
 
     @Override
     public void validate(JobValidation validation) {
@@ -71,5 +76,14 @@ public class TestJobHooks implements IJobValidationHook, IMetadataWriteHook {
 
             throw new EConsistencyValidation(REFUSED_OBJECT_MESSAGE);
         }
+    }
+
+    @Override
+    public void validateTag(TagWrite write) {
+
+        var callback = tagWriteCallback;
+
+        if (callback != null)
+            callback.accept(write);
     }
 }

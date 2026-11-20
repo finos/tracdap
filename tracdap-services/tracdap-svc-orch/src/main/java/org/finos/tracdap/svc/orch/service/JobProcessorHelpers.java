@@ -36,6 +36,8 @@ import org.finos.tracdap.config.*;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.orch.jobs.JobLogic;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.AbstractStub;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,8 @@ public class JobProcessorHelpers {
 
     static final int ERROR_MESSAGE_MAX_BYTES = 4000;
     static final String ERROR_MESSAGE_TRUNCATED = "… (truncated)";
+
+    static final int JOB_TAG_WRITE_ATTEMPTS = 3;
 
     // Model types the platform can import, import models run only in local dev mode
     private static final Set<ModelType> IMPORTABLE_MODEL_TYPES = EnumSet.of(
@@ -759,18 +763,9 @@ public class JobProcessorHelpers {
         var preallocated = new ArrayList<MetadataWriteRequest>();
         var newObjects = new ArrayList<MetadataWriteRequest>();
         var newVersions = new ArrayList<MetadataWriteRequest>();
-        var newTags = new ArrayList<MetadataWriteRequest>();
 
         // Update tags on the original job object
         var jobAttrs = jobAttrs(jobResult.getResult());
-
-        var jobWriteReq = MetadataWriteRequest.newBuilder()
-                .setObjectType(ObjectType.JOB)
-                .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))
-                .addAllTagUpdates(jobAttrs)
-                .build();
-
-        newTags.add(jobWriteReq);
 
         // Create the result object
         var resultObj = ObjectDefinition.newBuilder()
@@ -819,21 +814,73 @@ public class JobProcessorHelpers {
         }
 
         // Send metadata updates as a single batch
-        var batchRequest = MetadataWriteBatchRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .addAllCreatePreallocatedObjects(preallocated)
-                .addAllCreateObjects(newObjects)
-                .addAllUpdateObjects(newVersions)
-                .addAllUpdateTags(newTags)
-                .build();
-
         var metadataClient = configureClient(metaClient, jobState);
-        var batchResponse = metadataClient.writeBatch(batchRequest);
+
+        var batchResponse = writeJobTag(jobState, priorJobId -> {
+
+            var jobWriteReq = MetadataWriteRequest.newBuilder()
+                    .setObjectType(ObjectType.JOB)
+                    .setPriorVersion(MetadataUtil.selectorFor(priorJobId))
+                    .addAllTagUpdates(jobAttrs)
+                    .build();
+
+            var batchRequest = MetadataWriteBatchRequest.newBuilder()
+                    .setTenant(jobState.tenant)
+                    .addAllCreatePreallocatedObjects(preallocated)
+                    .addAllCreateObjects(newObjects)
+                    .addAllUpdateObjects(newVersions)
+                    .addUpdateTags(jobWriteReq)
+                    .build();
+
+            return metadataClient.writeBatch(batchRequest);
+        });
 
         log.info("RESULT SAVED: {} object(s) created, {} object(s) updated, {} tag(s) updated",
                 batchResponse.getCreateObjectsCount() + batchResponse.getCreatePreallocatedObjectsCount(),
                 batchResponse.getUpdateObjectsCount(),
                 batchResponse.getUpdateTagsCount());
+    }
+
+    // The orchestrator only writes its own trac_job_* attributes on the job, so they can be resent over a newer tag
+    // Tag writes from other clients are kept, a stale refusal for any other reason is not retried
+
+    <TResult> TResult writeJobTag(JobState jobState, Function<TagHeader, TResult> write) {
+
+        var priorJobId = jobState.jobId;
+
+        for (var attempt = 1; ; attempt++) {
+
+            try {
+                return write.apply(priorJobId);
+            }
+            catch (StatusRuntimeException error) {
+
+                if (error.getStatus().getCode() != Status.Code.ALREADY_EXISTS || attempt >= JOB_TAG_WRITE_ATTEMPTS)
+                    throw error;
+
+                var latestJobId = readLatestJobTag(jobState);
+
+                if (latestJobId.getTagVersion() <= priorJobId.getTagVersion())
+                    throw error;
+
+                log.warn("Job tag has a newer version: [{}] retrying from tag version {} (attempt {} of {})",
+                        jobState.jobKey, latestJobId.getTagVersion(), attempt + 1, JOB_TAG_WRITE_ATTEMPTS);
+
+                priorJobId = latestJobId;
+            }
+        }
+    }
+
+    private TagHeader readLatestJobTag(JobState jobState) {
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(jobState.tenant)
+                .setSelector(MetadataUtil.selectorFor(jobState.jobId, false, true))
+                .build();
+
+        var client = configureClient(metaClient, jobState);
+
+        return client.readObject(readRequest).getHeader();
     }
 
     private List<TagUpdate> jobAttrs(ResultDefinition result) {

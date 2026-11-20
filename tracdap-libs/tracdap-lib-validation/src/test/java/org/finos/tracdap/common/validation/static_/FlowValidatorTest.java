@@ -30,6 +30,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.stream.Collectors;
 
 
@@ -1154,5 +1155,45 @@ public class FlowValidatorTest extends BaseValidatorTest {
                 .build();
 
         expectInvalid(flow, "Flow parameter [input_1] conflicts with a node of type [INPUT_NODE]");
+    }
+
+    @Test
+    void outputNodeAttrs_ok() {
+
+        expectValid(flowWithOutputAttr("business_key"));
+    }
+
+    @Test
+    void outputNodeAttrs_reserved() {
+
+        for (var attrName : List.of("trac_job_output", "_hidden"))
+            expectInvalid(flowWithOutputAttr(attrName), "Attribute name [" + attrName + "] is a reserved identifier");
+
+        for (var attrName : List.of("ctl_this_approved", "CTL_all_preferred_version"))
+            expectInvalid(flowWithOutputAttr(attrName), "Attribute name [" + attrName + "] is reserved for controlled attributes");
+    }
+
+    private static FlowDefinition flowWithOutputAttr(String attrName) {
+
+        var outputAttr = TagUpdate.newBuilder()
+                .setAttrName(attrName)
+                .setValue(MetadataCodec.encodeValue("value"));
+
+        return FlowDefinition.newBuilder()
+                .putNodes("input_1", FlowNode.newBuilder().setNodeType(FlowNodeType.INPUT_NODE).build())
+                .putNodes("model_1", FlowNode.newBuilder().setNodeType(FlowNodeType.MODEL_NODE)
+                    .addInputs("input_1")
+                    .addOutputs("output_1")
+                    .build())
+                .putNodes("output_1", FlowNode.newBuilder().setNodeType(FlowNodeType.OUTPUT_NODE)
+                    .addNodeAttrs(outputAttr)
+                    .build())
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("input_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("model_1").setSocket("input_1")))
+                .addEdges(FlowEdge.newBuilder()
+                        .setSource(FlowSocket.newBuilder().setNode("model_1").setSocket("output_1"))
+                        .setTarget(FlowSocket.newBuilder().setNode("output_1")))
+                .build();
     }
 }

@@ -462,6 +462,16 @@ public class ValidationContextImpl implements ValidationContext {
             if (obj instanceof Descriptors.EnumValueDescriptor) {
 
                 var valueDesc = (Descriptors.EnumValueDescriptor) obj;
+
+                // A number the enum does not define has no Java constant
+                if (valueDesc.getType().findValueByNumber(valueDesc.getNumber()) == null) {
+
+                    var err = String.format("Unrecognised value specified for [%s]: [%d]",
+                            fieldName(), valueDesc.getNumber());
+
+                    return error(err);
+                }
+
                 var enumType = (Class<? extends Enum>) targetClass;
                 var enumVal = Enum.valueOf(enumType, valueDesc.getName());
 

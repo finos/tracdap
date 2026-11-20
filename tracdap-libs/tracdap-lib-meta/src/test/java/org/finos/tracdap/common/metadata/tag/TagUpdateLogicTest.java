@@ -339,6 +339,27 @@ class TagUpdateLogicTest {
     }
 
     @Test
+    void clearAllAttr_controlledAttrsKept() {
+
+        var baseTag = Tag.newBuilder()
+                .putAttrs("attr_1", MetadataCodec.encodeValue(42))
+                .putAttrs("ctl_this_approved", MetadataCodec.encodeValue("approved"))
+                .putAttrs("ctl_this_approved__reason", MetadataCodec.encodeValue("Approved at MGC"))
+                .putAttrs("ctl_all_preferred_version", MetadataCodec.encodeValue(2))
+                .putAttrs("CTL_THIS_UPPER", MetadataCodec.encodeValue("kept"))
+                .build();
+
+        var update1 = TagUpdate.newBuilder()
+                .setOperation(TagOperation.CLEAR_ALL_ATTR)
+                .build();
+
+        var updatedTag = TagUpdateLogic.applyTagUpdates(baseTag, List.of(update1));
+
+        assertEquals(4, updatedTag.getAttrsCount());
+        assertFalse(updatedTag.containsAttrs("attr_1"));
+    }
+
+    @Test
     void createOrReplace_new() {
 
         var baseTag = Tag.newBuilder().build();

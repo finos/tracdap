@@ -17,6 +17,9 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import org.finos.tracdap.api.MetadataReadRequest;
+import org.finos.tracdap.api.MetadataWriteBatchRequest;
+import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
 import org.finos.tracdap.common.config.ConfigManager;
@@ -25,19 +28,27 @@ import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataBundle;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
+import org.finos.tracdap.common.middleware.GrpcClientConfig;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
+import org.finos.tracdap.config.JobConfig;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PluginConfig;
 import org.finos.tracdap.config.TenantConfig;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.meta.SampleMetadata;
 
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.AbstractStub;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 import java.io.ByteArrayInputStream;
@@ -52,6 +63,7 @@ import java.util.Map;
 
 public class JobProcessorHelpersTest {
 
+    private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private JobProcessorHelpers helpers;
 
     private TagHeader jobId;
@@ -70,9 +82,10 @@ public class JobProcessorHelpersTest {
         var tenantState = Mockito.mock(TenantConfigManager.class);
         Mockito.when(tenantState.getTenantConfig(Mockito.anyString())).thenReturn(TenantConfig.getDefaultInstance());
 
+        metaClient = Mockito.mock(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
+
         var registry = new PluginRegistry();
-        registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class,
-                Mockito.mock(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class));
+        registry.addSingleton(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class, metaClient);
         registry.addSingleton(ConfigManager.class, Mockito.mock(ConfigManager.class));
 
         var commonConcerns = Mockito.mock(GrpcConcern.class, Answers.CALLS_REAL_METHODS);
@@ -408,6 +421,140 @@ public class JobProcessorHelpersTest {
         // The bundle is rebuilt from the job config, without the context, the definition keeps it
         Assertions.assertEquals(CONTEXT_SELECTOR, restored.definition.getContext());
         Assertions.assertFalse(restored.metadata.hasObject(CONTEXT_SELECTOR));
+    }
+
+    @Test
+    void saveJobResult_ok() {
+
+        var jobState = resultJobState();
+
+        Mockito.when(metaClient.writeBatch(ArgumentMatchers.any()))
+                .thenReturn(MetadataWriteBatchResponse.getDefaultInstance());
+
+        helpers.saveJobResult(jobState);
+
+        var batch = ArgumentCaptor.forClass(MetadataWriteBatchRequest.class);
+        Mockito.verify(metaClient).writeBatch(batch.capture());
+        Mockito.verify(metaClient, Mockito.never()).readObject(ArgumentMatchers.any());
+
+        Assertions.assertEquals(1, batch.getValue().getUpdateTagsCount());
+        Assertions.assertEquals(MetadataUtil.selectorFor(jobId), batch.getValue().getUpdateTags(0).getPriorVersion());
+    }
+
+    @Test
+    void saveJobResult_staleJobTagRetried() {
+
+        var jobState = resultJobState();
+        var latestJobId = nextTagVersion(jobId);
+
+        Mockito.when(metaClient.writeBatch(ArgumentMatchers.any()))
+                .thenThrow(Status.ALREADY_EXISTS.asRuntimeException())
+                .thenReturn(MetadataWriteBatchResponse.getDefaultInstance());
+
+        latestJobTagIs(latestJobId);
+
+        helpers.saveJobResult(jobState);
+
+        var batch = ArgumentCaptor.forClass(MetadataWriteBatchRequest.class);
+        Mockito.verify(metaClient, Mockito.times(2)).writeBatch(batch.capture());
+
+        var readRequest = ArgumentCaptor.forClass(MetadataReadRequest.class);
+        Mockito.verify(metaClient).readObject(readRequest.capture());
+        Assertions.assertEquals(MetadataUtil.selectorFor(jobId, false, true), readRequest.getValue().getSelector());
+
+        var first = batch.getAllValues().get(0);
+        var second = batch.getAllValues().get(1);
+
+        // Only the job's prior tag changes, the job's updates and every other item are resent as they were
+        Assertions.assertEquals(MetadataUtil.selectorFor(latestJobId), second.getUpdateTags(0).getPriorVersion());
+        Assertions.assertEquals(first.getUpdateTags(0).getTagUpdatesList(), second.getUpdateTags(0).getTagUpdatesList());
+        Assertions.assertEquals(
+                first.toBuilder().clearUpdateTags().build(),
+                second.toBuilder().clearUpdateTags().build());
+    }
+
+    @Test
+    void saveJobResult_alreadyExistsJobTagUnchanged() {
+
+        var jobState = resultJobState();
+
+        Mockito.when(metaClient.writeBatch(ArgumentMatchers.any()))
+                .thenThrow(Status.ALREADY_EXISTS.asRuntimeException());
+
+        latestJobTagIs(jobId);
+
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> helpers.saveJobResult(jobState));
+        Assertions.assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
+
+        Mockito.verify(metaClient, Mockito.times(1)).writeBatch(ArgumentMatchers.any());
+    }
+
+    @Test
+    void saveJobResult_staleJobTagAttemptsLimited() {
+
+        var jobState = resultJobState();
+        var v2 = nextTagVersion(jobId);
+        var v3 = nextTagVersion(v2);
+
+        Mockito.when(metaClient.writeBatch(ArgumentMatchers.any()))
+                .thenThrow(Status.ALREADY_EXISTS.asRuntimeException());
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any()))
+                .thenReturn(Tag.newBuilder().setHeader(v2).build())
+                .thenReturn(Tag.newBuilder().setHeader(v3).build());
+
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> helpers.saveJobResult(jobState));
+        Assertions.assertEquals(Status.Code.ALREADY_EXISTS, error.getStatus().getCode());
+
+        Mockito.verify(metaClient, Mockito.times(JobProcessorHelpers.JOB_TAG_WRITE_ATTEMPTS))
+                .writeBatch(ArgumentMatchers.any());
+    }
+
+    @Test
+    void saveJobResult_otherErrorNotRetried() {
+
+        var jobState = resultJobState();
+
+        Mockito.when(metaClient.writeBatch(ArgumentMatchers.any()))
+                .thenThrow(Status.UNAVAILABLE.asRuntimeException());
+
+        var error = Assertions.assertThrows(StatusRuntimeException.class, () -> helpers.saveJobResult(jobState));
+        Assertions.assertEquals(Status.Code.UNAVAILABLE, error.getStatus().getCode());
+
+        Mockito.verify(metaClient, Mockito.times(1)).writeBatch(ArgumentMatchers.any());
+        Mockito.verify(metaClient, Mockito.never()).readObject(ArgumentMatchers.any());
+    }
+
+    private JobState resultJobState() {
+
+        var runtimeResult = runtimeResult(JobStatusCode.FAILED, "Model failed", true);
+        var jobState = jobState(JobStatusCode.FAILED, "Executor message", runtimeResult);
+        jobState.tenant = SampleMetadata.TEST_TENANT;
+        jobState.runtimeStatus = executorStatus(JobStatusCode.FAILED);
+        jobState.jobConfig = JobConfig.getDefaultInstance();
+        jobState.clientConfig = new GrpcClientConfig() {
+            @Override
+            public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
+                return clientStub;
+            }
+        };
+
+        helpers.processJobResult(jobState);
+
+        return jobState;
+    }
+
+    private void latestJobTagIs(TagHeader header) {
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any()))
+                .thenReturn(Tag.newBuilder().setHeader(header).build());
+    }
+
+    private static TagHeader nextTagVersion(TagHeader header) {
+
+        return header.toBuilder()
+                .setTagVersion(header.getTagVersion() + 1)
+                .build();
     }
 
     private void assertLogRegistered(JobState jobState) {

@@ -125,6 +125,7 @@ public class JdbcUnit implements BeforeAllCallback, BeforeEachCallback, AfterEac
         if (testInstance.isPresent()) {
             var testCase = (IMetadataStoreTest) testInstance.get();
             testCase.setStore(dal);
+            testCase.setDataSource(source, JdbcDialect.H2);
         }
     }
 

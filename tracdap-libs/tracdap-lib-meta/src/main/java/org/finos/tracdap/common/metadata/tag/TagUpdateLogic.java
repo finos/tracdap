@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
+import static org.finos.tracdap.common.metadata.MetadataConstants.CONTROLLED_IDENTIFIER;
 import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_RESERVED_IDENTIFIER;
 
 
@@ -157,7 +158,8 @@ public class TagUpdateLogic {
         for (var attrName : allAttrs) {
 
             // Only clear regular attributes, not TRAC controlled ones
-            if (!TRAC_RESERVED_IDENTIFIER.matcher(attrName).matches())
+            if (!TRAC_RESERVED_IDENTIFIER.matcher(attrName).matches() &&
+                !CONTROLLED_IDENTIFIER.matcher(attrName).matches())
                 working = working.removeAttrs(attrName);
         }
 

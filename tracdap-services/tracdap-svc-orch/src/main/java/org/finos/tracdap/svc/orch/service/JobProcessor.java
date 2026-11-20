@@ -209,17 +209,21 @@ public class JobProcessor {
 
         var newState = jobState.clone();
 
-        var writeRequest = MetadataWriteRequest.newBuilder()
-                .setTenant(jobState.tenant)
-                .setObjectType(ObjectType.JOB)
-                .setPriorVersion(MetadataUtil.selectorFor(jobState.jobId))  // prior version selector
-                .addTagUpdates(TagUpdate.newBuilder()
-                        .setAttrName(TRAC_JOB_STATUS_ATTR)
-                        .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
-                .build();
-
         var userAuth = lifecycle.configureClient(metaClient, jobState);
-        newState.jobId = userAuth.updateTag(writeRequest);
+
+        newState.jobId = lifecycle.writeJobTag(jobState, priorJobId -> {
+
+            var writeRequest = MetadataWriteRequest.newBuilder()
+                    .setTenant(jobState.tenant)
+                    .setObjectType(ObjectType.JOB)
+                    .setPriorVersion(MetadataUtil.selectorFor(priorJobId))  // prior version selector
+                    .addTagUpdates(TagUpdate.newBuilder()
+                            .setAttrName(TRAC_JOB_STATUS_ATTR)
+                            .setValue(MetadataCodec.encodeValue(jobState.tracStatus.name())))
+                    .build();
+
+            return userAuth.updateTag(writeRequest);
+        });
 
         return newState;
     }

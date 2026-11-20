@@ -395,7 +395,7 @@ abstract class DataOperationsTest {
     @Test
     void createDataset_tagUpdateReserved() {
 
-        var reservedAttrs = List.of("trac_data_attr", "_data_attr", "__data_attr");
+        var reservedAttrs = List.of("trac_data_attr", "_data_attr", "__data_attr", "ctl_this_data_attr", "CTL_all_data_attr");
 
         for (var attrName: reservedAttrs) {
 
@@ -756,6 +756,57 @@ abstract class DataOperationsTest {
     }
 
     @Test
+    void updateDataset_controlledAttrs() throws Exception {
+
+        var createDataset = DataApiTestHelpers.clientStreaming(dataClient::createDataset, BASIC_CREATE_DATASET_REQUEST);
+        waitFor(TEST_TIMEOUT, createDataset);
+        var v1Id = resultOf(createDataset);
+
+        // Controlled writes on V1 after the tag the new version is saved from
+        var t2 = Futures.javaFuture(metaClient.updateTag(controlledRequest(v1Id, VersionScope.VERSION_SCOPE_THIS_VERSION, "approved", "yes")));
+        waitFor(TEST_TIMEOUT, t2);
+        var t3 = Futures.javaFuture(metaClient.updateTag(controlledRequest(resultOf(t2), VersionScope.VERSION_SCOPE_ALL_VERSIONS, "preferred_version", "v1")));
+        waitFor(TEST_TIMEOUT, t3);
+
+        var request = BASIC_UPDATE_DATASET_REQUEST.toBuilder()
+                .setPriorVersion(selectorFor(v1Id))
+                .build();
+
+        var updateDataset = DataApiTestHelpers.clientStreaming(dataClient::updateDataset, request);
+        waitFor(TEST_TIMEOUT, updateDataset);
+        var v2Id = resultOf(updateDataset);
+
+        var v2Request = MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(selectorFor(v2Id))
+                .build();
+
+        var v2Read = Futures.javaFuture(metaClient.readObject(v2Request));
+        waitFor(TEST_TIMEOUT, v2Read);
+        var v2Attrs = resultOf(v2Read).getAttrsMap();
+
+        // The new version drops the attribute for one version, and takes the one for all versions from the latest tag
+        Assertions.assertTrue(v2Attrs.keySet().stream().noneMatch(attr -> attr.startsWith("ctl_this_")));
+        Assertions.assertEquals("v1", MetadataCodec.decodeStringValue(v2Attrs.get("ctl_all_preferred_version")));
+        Assertions.assertTrue(v2Attrs.containsKey("ctl_all_preferred_version__reason"));
+    }
+
+    private static MetadataWriteRequest controlledRequest(TagHeader prior, VersionScope versionScope, String attrName, String value) {
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(prior.getObjectType())
+                .setPriorVersion(selectorFor(prior))
+                .setControl(TagControl.CONTROLLED)
+                .setVersionScope(versionScope)
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName(attrName)
+                        .setValue(MetadataCodec.encodeValue(value)))
+                .setReason(MetadataCodec.encodeValue("A reason"))
+                .build();
+    }
+
+    @Test
     void updateDataset_ok_metadata() throws Exception {
 
         // Create V1 dataset
@@ -1094,7 +1145,7 @@ abstract class DataOperationsTest {
         waitFor(TEST_TIMEOUT, createV1);
         var v1Id = resultOf(createV1);
 
-        var reservedAttrs = List.of("trac_data_attr", "_data_attr", "__data_attr");
+        var reservedAttrs = List.of("trac_data_attr", "_data_attr", "__data_attr", "ctl_this_data_attr", "CTL_all_data_attr");
 
         for (var attrName : reservedAttrs) {
 

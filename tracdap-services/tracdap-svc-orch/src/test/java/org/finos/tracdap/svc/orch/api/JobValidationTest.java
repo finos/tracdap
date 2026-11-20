@@ -43,6 +43,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -149,6 +151,74 @@ public class JobValidationTest {
         var response = orchClient.validateJob(request);
 
         Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+    }
+
+    @Test
+    public void importModel_modelAttrsOk() {
+
+        var request = importModelRequest(TagUpdate.newBuilder()
+                .setAttrName("model_family")
+                .setValue(MetadataCodec.encodeValue("credit")));
+
+        var response = orchClient.validateJob(request);
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, response.getStatusCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"trac_model_entry_point", "_hidden", "ctl_this_approved", "CTL_all_preferred_version", "not-an-identifier"})
+    public void importModel_modelAttrsInvalid(String attrName) {
+
+        var request = importModelRequest(TagUpdate.newBuilder()
+                .setAttrName(attrName)
+                .setValue(MetadataCodec.encodeValue("value")));
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void importModel_modelAttrsBadUpdate() {
+
+        // A tag update with no value fails the tag update check
+        var request = importModelRequest(TagUpdate.newBuilder()
+                .setAttrName("model_family"));
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @Test
+    public void importModel_jobAttrsControlled() {
+
+        var request = importModelRequest().toBuilder()
+                .addJobAttrs(TagUpdate.newBuilder()
+                .setAttrName("ctl_this_approved")
+                .setValue(MetadataCodec.encodeValue("value")))
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(request));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    private static JobRequest importModelRequest(TagUpdate.Builder... modelAttrs) {
+
+        var importModel = ImportModelJob.newBuilder()
+                .setLanguage("python")
+                .setRepository("UNIT_TEST_REPO")
+                .setVersion("v1.0.0")
+                .setPath("src/")
+                .setEntryPoint("acme.models.test_model.BasicTestModel");
+
+        for (var attr : modelAttrs)
+            importModel.addModelAttrs(attr);
+
+        return JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                .setJobType(JobType.IMPORT_MODEL)
+                .setImportModel(importModel))
+                .build();
     }
 
     @Test
@@ -475,6 +545,55 @@ public class JobValidationTest {
     public void runModel_perOutputAttrsReserved() {
 
         var jobRequest = runModelRequest("enriched_output", "trac_job_output", "not_allowed");
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ctl_this_approved", "CTL_this_approved", "ctl_all_preferred_version"})
+    public void runModel_perOutputAttrsControlled(String attrName) {
+
+        var jobRequest = runModelRequest("enriched_output", attrName, "not_allowed");
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ctl_this_approved", "CTL_this_approved"})
+    public void runModel_outputAttrsControlled(String attrName) {
+
+        var modelSelector = createBasicModel(
+                SampleData.BASIC_TABLE_SCHEMA,
+                SampleData.BASIC_TABLE_SCHEMA_V2,
+                List.of());
+
+        var job = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setRunModel(RunModelJob.newBuilder()
+                .setModel(modelSelector)
+                .putParameters("param_1", MetadataCodec.encodeValue(11.0))
+                .putInputs("basic_input", basicDataSelector)
+                .addOutputAttrs(TagUpdate.newBuilder()
+                        .setAttrName(attrName)
+                        .setValue(MetadataCodec.encodeValue("not_allowed"))))
+                .build();
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(job)
+                .build();
+
+        var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
+        Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ctl_this_approved", "CTL_this_approved"})
+    public void runFlow_perOutputAttrsControlled(String attrName) {
+
+        var jobRequest = runFlowRequest("sample_output_data", attrName, "not_allowed");
 
         var e = Assertions.assertThrows(StatusRuntimeException.class, () -> orchClient.validateJob(jobRequest));
         Assertions.assertEquals(Status.Code.INVALID_ARGUMENT, e.getStatus().getCode());
@@ -1803,6 +1922,31 @@ public class JobValidationTest {
                         .build());
 
         expectCaptureInvalid(reservedFileAttr, Status.Code.INVALID_ARGUMENT, "trac_capture_file");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"ctl_this_approved", "CTL_this_approved"})
+    public void captureData_controlledAttrs(String attrName) {
+
+        var attr = TagUpdate.newBuilder()
+                .setAttrName(attrName)
+                .setValue(MetadataCodec.encodeValue("forged"));
+
+        var dataAttr = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").addDataAttrs(attr).build());
+
+        expectCaptureInvalid(dataAttr, Status.Code.INVALID_ARGUMENT, "reserved for controlled attributes");
+
+        var fileAttr = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").addFileAttrs(attr).build());
+
+        expectCaptureInvalid(fileAttr, Status.Code.INVALID_ARGUMENT, "reserved for controlled attributes");
+
+        var outputAttr = ImportDataJob.newBuilder()
+                .putCaptures("loans", declaredCapture("loans.csv").build())
+                .addOutputAttrs(attr);
+
+        expectCaptureInvalid(outputAttr, Status.Code.INVALID_ARGUMENT, "reserved for controlled attributes");
     }
 
     @Test

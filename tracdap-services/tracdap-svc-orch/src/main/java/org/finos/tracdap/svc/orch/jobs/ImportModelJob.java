@@ -132,9 +132,10 @@ public class ImportModelJob implements IJobLogic {
         var modelObj = jobResult.getObjectsOrThrow(modelKey);
         var modelAttrs = jobResult.getAttrsOrDefault(modelKey, JobResultAttrs.getDefaultInstance()).toBuilder();
 
-        // Attrs in the job result are defined in model code, they cannot set controlled attrs
+        // Attrs in the job result are defined in model code, they cannot set reserved trac_ or controlled ctl_ attrs
         for (var attr : modelAttrs.getAttrsList()) {
-            if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(attr.getAttrName()).matches())
+            if (MetadataConstants.TRAC_RESERVED_IDENTIFIER.matcher(attr.getAttrName()).matches() ||
+                MetadataConstants.CONTROLLED_IDENTIFIER.matcher(attr.getAttrName()).matches())
                 throw new EJobResult(String.format("Model attribute [%s] is a reserved identifier", attr.getAttrName()));
         }
 

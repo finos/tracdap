@@ -64,10 +64,23 @@ public class MetadataConstants {
     // Identifiers starting _ are also reserved by convention, for private / protected / system variables
     public static final Pattern TRAC_RESERVED_IDENTIFIER = Pattern.compile("\\A(trac(dap)?[_\\-.]|[_\\-.]).*", Pattern.CASE_INSENSITIVE);
 
-    // Platform attributes that belong to one object version, they are not carried over to a new version
+    // Identifiers starting ctl_ are reserved for controlled attributes, which only controlled tag writes can set
+    public static final Pattern CONTROLLED_IDENTIFIER = Pattern.compile("\\Actl_.*", Pattern.CASE_INSENSITIVE);
+
+    // Controlled attributes are stored under a prefix chosen by their version scope, with lineage attributes beside them
+    public static final String CONTROLLED_THIS_VERSION_PREFIX = "ctl_this_";
+    public static final String CONTROLLED_ALL_VERSIONS_PREFIX = "ctl_all_";
+    public static final String CONTROLLED_REASON_SUFFIX = "__reason";
+    public static final String CONTROLLED_USER_ID_SUFFIX = "__user_id";
+    public static final String CONTROLLED_USER_NAME_SUFFIX = "__user_name";
+    public static final String CONTROLLED_TIME_SUFFIX = "__time";
+
+    public static final Pattern CONTROLLED_ALL_VERSIONS_ATTRS = Pattern.compile("\\Actl_all_.*", Pattern.CASE_INSENSITIVE);
+
+    // Attributes that belong to one object version, they are not carried over to a new version
     // Tag-only updates keep them, a new version only has them if the write that creates it sets them again
     public static final Pattern VERSION_SCOPED_ATTRS = Pattern.compile(
-            "\\A(trac_job_context|trac_job_context_version)\\Z", Pattern.CASE_INSENSITIVE);
+            "\\A(trac_job_context|trac_job_context_version|ctl_this_.*)\\Z", Pattern.CASE_INSENSITIVE);
 
     public static final String TRAC_CREATE_TIME = "trac_create_time";
     public static final String TRAC_CREATE_USER_ID = "trac_create_user_id";

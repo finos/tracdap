@@ -18,10 +18,16 @@
 package org.finos.tracdap.common.validation.static_;
 
 import org.finos.tracdap.common.metadata.MetadataCodec;
+import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.TypeSystem;
+import org.finos.tracdap.common.validation.ValidationConstants;
+import org.finos.tracdap.common.validation.core.ValidationContext;
 import org.finos.tracdap.common.validation.test.BaseValidatorTest;
 import org.finos.tracdap.metadata.*;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 
 public class TagUpdateTest extends BaseValidatorTest {
@@ -373,5 +379,58 @@ public class TagUpdateTest extends BaseValidatorTest {
                 .build();
 
         expectInvalid(attr1);
+    }
+
+    @Test
+    void reservedAttrs_controlledNamesRefusedOnEveryRoute() {
+
+        for (var name : List.of("ctl_this_approved", "ctl_all_preferred_version", "CTL_this_x", "ctl_x__reason")) {
+
+            var attr = TagUpdate.newBuilder()
+                    .setAttrName(name)
+                    .setValue(MetadataCodec.encodeValue("some_value"))
+                    .build();
+
+            var publicCtx = TagUpdateValidator.reservedAttrs(attr, false, ValidationContext.forMessage(attr));
+            var internalCtx = TagUpdateValidator.reservedAttrs(attr, true, ValidationContext.forMessage(attr));
+
+            Assertions.assertTrue(publicCtx.failed(), name);
+            Assertions.assertTrue(internalCtx.failed(), name);
+        }
+    }
+
+    @Test
+    void controlledTagUpdate_attrNameLength() {
+
+        var atLimit = TagUpdate.newBuilder()
+                .setAttrName("a".repeat(ValidationConstants.CONTROLLED_ATTR_NAME_LENGTH_LIMIT))
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var overLimit = atLimit.toBuilder()
+                .setAttrName(atLimit.getAttrName() + "a")
+                .build();
+
+        // The longest stored name, the this-version prefix plus the longest lineage suffix, fits the attr_name column
+        var longestStored = MetadataConstants.CONTROLLED_THIS_VERSION_PREFIX + atLimit.getAttrName() + MetadataConstants.CONTROLLED_USER_NAME_SUFFIX;
+        Assertions.assertEquals(256, longestStored.length());
+
+        Assertions.assertFalse(TagUpdateValidator.controlledTagUpdate(atLimit, ValidationContext.forMessage(atLimit)).failed());
+        Assertions.assertTrue(TagUpdateValidator.controlledTagUpdate(overLimit, ValidationContext.forMessage(overLimit)).failed());
+    }
+
+    @Test
+    void reservedAttrs_internalApiStillAllowsTrac() {
+
+        var attr = TagUpdate.newBuilder()
+                .setAttrName("trac_some_attr")
+                .setValue(MetadataCodec.encodeValue("some_value"))
+                .build();
+
+        var internalCtx = TagUpdateValidator.reservedAttrs(attr, true, ValidationContext.forMessage(attr));
+        var publicCtx = TagUpdateValidator.reservedAttrs(attr, false, ValidationContext.forMessage(attr));
+
+        Assertions.assertFalse(internalCtx.failed());
+        Assertions.assertTrue(publicCtx.failed());
     }
 }

@@ -55,6 +55,7 @@ public class JobValidator {
     private static final Descriptors.FieldDescriptor IMJ_PATH;
     private static final Descriptors.FieldDescriptor IMJ_ENTRY_POINT;
     private static final Descriptors.FieldDescriptor IMJ_VERSION;
+    private static final Descriptors.FieldDescriptor IMJ_MODEL_ATTRS;
 
     private static final Descriptors.Descriptor RUN_MODEL_JOB;
     private static final Descriptors.FieldDescriptor RMJ_MODEL;
@@ -113,6 +114,7 @@ public class JobValidator {
         IMJ_PATH = field(IMPORT_MODEL_JOB, ImportModelJob.PATH_FIELD_NUMBER);
         IMJ_ENTRY_POINT = field(IMPORT_MODEL_JOB, ImportModelJob.ENTRYPOINT_FIELD_NUMBER);
         IMJ_VERSION = field(IMPORT_MODEL_JOB, ImportModelJob.VERSION_FIELD_NUMBER);
+        IMJ_MODEL_ATTRS = field(IMPORT_MODEL_JOB, ImportModelJob.MODELATTRS_FIELD_NUMBER);
 
         RUN_MODEL_JOB = RunModelJob.getDescriptor();
         RMJ_MODEL = field(RUN_MODEL_JOB, RunModelJob.MODEL_FIELD_NUMBER);
@@ -211,7 +213,14 @@ public class JobValidator {
     @Validator
     public static ValidationContext importModelJob(ImportModelJob msg, ValidationContext ctx) {
 
-        return ModelValidator.modelDetails(IMJ_LANGUAGE, IMJ_REPOSITORY, IMJ_PATH, IMJ_ENTRY_POINT, IMJ_VERSION, ctx);
+        ctx = ModelValidator.modelDetails(IMJ_LANGUAGE, IMJ_REPOSITORY, IMJ_PATH, IMJ_ENTRY_POINT, IMJ_VERSION, ctx);
+
+        ctx = ctx.pushRepeated(IMJ_MODEL_ATTRS)
+                .applyRepeated(TagUpdateValidator::tagUpdate, TagUpdate.class)
+                .applyRepeated(TagUpdateValidator::reservedAttrs, TagUpdate.class, false)
+                .pop();
+
+        return ctx;
     }
 
     @Validator

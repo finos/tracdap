@@ -20,14 +20,29 @@ package org.finos.tracdap.common.metadata.store;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagHeader;
 import org.finos.tracdap.metadata.TagSelector;
+import org.finos.tracdap.common.db.JdbcDialect;
+import org.finos.tracdap.common.exception.ETrac;
 import org.finos.tracdap.common.exception.EMetadataDuplicate;
 import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.exception.EMetadataWrongType;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.UuidFactory;
+import org.finos.tracdap.common.metadata.store.jdbc.JdbcMetadataStore;
 
+import javax.sql.DataSource;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.finos.tracdap.common.metadata.test.IMetadataStoreTest;
 import org.finos.tracdap.common.metadata.test.JdbcUnit;
@@ -45,9 +60,17 @@ import static org.junit.jupiter.api.Assertions.*;
 abstract class MetadataDalWriteTest implements IMetadataStoreTest {
 
     private IMetadataStore store;
+    private DataSource dataSource;
+    private JdbcDialect dialect;
 
     public void setStore(IMetadataStore store) {
         this.store = store;
+    }
+
+    @Override
+    public void setDataSource(DataSource source, JdbcDialect dialect) {
+        this.dataSource = source;
+        this.dialect = dialect;
     }
 
     @ExtendWith(JdbcUnit.class)
@@ -345,6 +368,150 @@ abstract class MetadataDalWriteTest implements IMetadataStoreTest {
 
         var loadDup2 = store.loadObject(TEST_TENANT, ObjectType.DATA, origId, 1, 2);
         assertEquals(nextTag, loadDup2);
+    }
+
+    @Test
+    void testSaveNewTag_severalVersionsOfOneObject() {
+
+        var v1 = dummyTag(dummyDataDef(), INCLUDE_HEADER);
+        var v2 = tagForNextObject(v1, nextDataDef(v1.getDefinition()), INCLUDE_HEADER);
+        var v3 = tagForNextObject(v2, nextDataDef(v2.getDefinition()), INCLUDE_HEADER);
+        var objectId = UUID.fromString(v1.getHeader().getObjectId());
+
+        store.saveNewObjects(TEST_TENANT, List.of(v1));
+        store.saveNewVersions(TEST_TENANT, List.of(v2));
+        store.saveNewVersions(TEST_TENANT, List.of(v3));
+
+        // One tag on each version, in ascending order, in one save
+        var newTags = List.of(
+                nextTag(v1, UPDATE_TAG_VERSION),
+                nextTag(v2, UPDATE_TAG_VERSION),
+                nextTag(v3, UPDATE_TAG_VERSION));
+
+        store.saveNewTags(TEST_TENANT, newTags);
+
+        for (var version = 1; version <= 3; version++) {
+            var saved = store.loadObject(TEST_TENANT, ObjectType.DATA, objectId, version, 2);
+            assertEquals(2, saved.getHeader().getTagVersion());
+            assertEquals(newTags.get(version - 1).getAttrsMap(), saved.getAttrsMap());
+        }
+
+        // A second save from the same prior tags is refused, nothing is saved
+        var staleTags = List.of(
+                nextTag(nextTag(v1, UPDATE_TAG_VERSION), UPDATE_TAG_VERSION),
+                nextTag(v2, UPDATE_TAG_VERSION));
+
+        assertThrows(EMetadataDuplicate.class, () -> store.saveNewTags(TEST_TENANT, staleTags));
+        assertThrows(EMetadataNotFound.class, () -> store.loadObject(TEST_TENANT, ObjectType.DATA, objectId, 1, 3));
+    }
+
+    @Test
+    void testSaveNewTag_overlappingTransactions() throws Exception {
+
+        var origTag = dummyTag(dummyDataDef(), INCLUDE_HEADER);
+        var nextTag = nextTag(origTag, UPDATE_TAG_VERSION);
+        var objectId = UUID.fromString(origTag.getHeader().getObjectId());
+
+        store.saveNewObjects(TEST_TENANT, List.of(origTag));
+
+        // The first writer saves its tag and is held before commit, with its transaction open
+        var holdNextCommit = new AtomicBoolean(false);
+        var firstAtCommit = new CountDownLatch(1);
+        var releaseFirst = new CountDownLatch(1);
+        var firstStore = new JdbcMetadataStore(dialect, holdAtCommit(dataSource, holdNextCommit, firstAtCommit, releaseFirst));
+        firstStore.start();
+        holdNextCommit.set(true);
+
+        var executor = Executors.newFixedThreadPool(2);
+
+        try {
+
+            var first = executor.submit(() -> firstStore.saveNewTags(TEST_TENANT, List.of(nextTag)));
+            assertTrue(firstAtCommit.await(30, TimeUnit.SECONDS));
+
+            // The second writer saves the same tag version while the first transaction is open
+            var second = executor.submit(() -> store.saveNewTags(TEST_TENANT, List.of(nextTag)));
+
+            // Let the second writer reach the database before the first commits
+            Thread.sleep(500);
+            releaseFirst.countDown();
+
+            assertDoesNotThrow(() -> first.get(30, TimeUnit.SECONDS));
+
+            var error = assertThrows(ExecutionException.class, () -> second.get(30, TimeUnit.SECONDS));
+            assertInstanceOf(EMetadataDuplicate.class, error.getCause(), "Overlapping tag save failed with an unexpected error");
+
+            assertEquals(nextTag.getAttrsMap(), store.loadObject(TEST_TENANT, ObjectType.DATA, objectId, 1, 2).getAttrsMap());
+        }
+        finally {
+            releaseFirst.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void testSaveNewObject_attrNamesDifferingOnlyInCase() {
+
+        var tag = dummyTag(dummyDataDef(), INCLUDE_HEADER).toBuilder()
+                .putAttrs("case_test_attr", MetadataCodec.encodeValue("lower"))
+                .putAttrs("CASE_TEST_ATTR", MetadataCodec.encodeValue("upper"))
+                .build();
+
+        var objectId = UUID.fromString(tag.getHeader().getObjectId());
+
+        // The schema sets no collation, these databases compare attribute names ignoring case by default
+        if (CASE_INSENSITIVE_DIALECTS.contains(dialect)) {
+            assertThrows(ETrac.class, () -> store.saveNewObjects(TEST_TENANT, List.of(tag)));
+        }
+        else {
+            store.saveNewObjects(TEST_TENANT, List.of(tag));
+            var saved = store.loadObject(TEST_TENANT, ObjectType.DATA, objectId, 1, 1);
+            assertEquals("lower", MetadataCodec.decodeStringValue(saved.getAttrsOrThrow("case_test_attr")));
+            assertEquals("upper", MetadataCodec.decodeStringValue(saved.getAttrsOrThrow("CASE_TEST_ATTR")));
+        }
+    }
+
+    private static final List<JdbcDialect> CASE_INSENSITIVE_DIALECTS = List.of(
+            JdbcDialect.MYSQL, JdbcDialect.MARIADB, JdbcDialect.SQLSERVER);
+
+    private static DataSource holdAtCommit(
+            DataSource source, AtomicBoolean holdNextCommit,
+            CountDownLatch atCommit, CountDownLatch release) {
+
+        return (DataSource) Proxy.newProxyInstance(
+                DataSource.class.getClassLoader(), new Class<?>[] {DataSource.class},
+                (proxy, method, args) -> {
+
+                    var result = invoke(source, method, args);
+
+                    if (!method.getName().equals("getConnection"))
+                        return result;
+
+                    var conn = (Connection) result;
+
+                    return Proxy.newProxyInstance(
+                            Connection.class.getClassLoader(), new Class<?>[] {Connection.class},
+                            (connProxy, connMethod, connArgs) -> {
+
+                                if (connMethod.getName().equals("commit") && holdNextCommit.compareAndSet(true, false)) {
+                                    atCommit.countDown();
+                                    if (!release.await(30, TimeUnit.SECONDS))
+                                        throw new SQLException("Test writer was not released");
+                                }
+
+                                return invoke(conn, connMethod, connArgs);
+                            });
+                });
+    }
+
+    private static Object invoke(Object target, Method method, Object[] args) throws Throwable {
+
+        try {
+            return method.invoke(target, args);
+        }
+        catch (InvocationTargetException e) {
+            throw e.getCause();
+        }
     }
 
     @Test

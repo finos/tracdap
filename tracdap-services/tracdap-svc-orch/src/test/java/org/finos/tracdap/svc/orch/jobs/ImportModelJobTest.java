@@ -99,7 +99,7 @@ public class ImportModelJobTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"trac_model_entry_point", "_hidden_attr", "TRAC_CREATE_USER_ID", "tracdap_internal"})
+    @ValueSource(strings = {"trac_model_entry_point", "_hidden_attr", "TRAC_CREATE_USER_ID", "tracdap_internal", "ctl_this_approved", "CTL_all_preferred_version"})
     void modelAttrs_reserved(String attrName) {
 
         Assertions.assertThrows(EJobResult.class, () -> processResult(List.of(attr(attrName, "value")), List.of()));

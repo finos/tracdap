@@ -17,10 +17,16 @@
 
 package org.finos.tracdap.common.metadata.test;
 
+import org.finos.tracdap.common.db.JdbcDialect;
 import org.finos.tracdap.common.metadata.store.IMetadataStore;
+
+import javax.sql.DataSource;
 
 
 public interface IMetadataStoreTest {
 
     void setStore(IMetadataStore store);
+
+    // For tests that need their own connections to the same database
+    default void setDataSource(DataSource source, JdbcDialect dialect) {}
 }

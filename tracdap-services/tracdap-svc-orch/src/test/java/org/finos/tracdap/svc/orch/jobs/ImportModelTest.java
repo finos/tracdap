@@ -189,6 +189,78 @@ public abstract class ImportModelTest {
     }
 
     @Test
+    void importModelAsNewVersion_controlledAttrs() throws Exception {
+
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository(useTracRepo())
+                .setPath("examples/models/python/src")
+                .setEntryPoint("tutorial.schema_files.PnlAggregationSchemas")
+                .setVersion(GitHelpers.getPriorCommit())
+                .build();
+
+        var modelV1Tag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, List.of(), List.of());
+        var modelV1Header = modelV1Tag.getHeader();
+        var metaClient = platform.metaClientBlocking();
+
+        // Controlled writes on version 1, after the tag the new version is imported from
+        var t2 = metaClient.updateTag(controlledRequest(modelV1Header, VersionScope.VERSION_SCOPE_THIS_VERSION, "approved"));
+        metaClient.updateTag(controlledRequest(t2, VersionScope.VERSION_SCOPE_ALL_VERSIONS, "preferred_version"));
+
+        var orchClient = platform.orchClientBlocking();
+
+        var importModelV2 = ImportModelJob.newBuilder()
+                .setLanguage(modelStub.getLanguage())
+                .setRepository(modelStub.getRepository())
+                .setPath(modelStub.getPath())
+                .setEntryPoint(modelStub.getEntryPoint())
+                .setVersion(GitHelpers.getCurrentCommit())
+                .setPriorModel(MetadataUtil.selectorFor(modelV1Header))
+                .build();
+
+        var jobV2Request = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.IMPORT_MODEL)
+                        .setImportModel(importModelV2))
+                .build();
+
+        var jobV2Id = Helpers.startJob(orchClient, jobV2Request).getJobId();
+        Helpers.waitForJob(orchClient, TEST_TENANT, jobV2Id);
+
+        var modelV2Tag = metaClient.readObject(MetadataReadRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setSelector(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.MODEL)
+                        .setObjectId(modelV1Header.getObjectId())
+                        .setObjectVersion(2)
+                        .setLatestTag(true))
+                .build());
+
+        var attrs = modelV2Tag.getAttrsMap();
+
+        // The new version drops the attribute for one version, and takes the one for all versions from the latest tag
+        Assertions.assertTrue(attrs.keySet().stream().noneMatch(attr -> attr.startsWith("ctl_this_")));
+        Assertions.assertEquals("yes", MetadataCodec.decodeStringValue(attrs.get("ctl_all_preferred_version")));
+        Assertions.assertTrue(attrs.containsKey("ctl_all_preferred_version__reason"));
+    }
+
+    private static MetadataWriteRequest controlledRequest(TagHeader prior, VersionScope versionScope, String attrName) {
+
+        return MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.MODEL)
+                .setPriorVersion(MetadataUtil.selectorFor(prior))
+                .setControl(TagControl.CONTROLLED)
+                .setVersionScope(versionScope)
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName(attrName)
+                        .setValue(MetadataCodec.encodeValue("yes")))
+                .setReason(MetadataCodec.encodeValue("A reason"))
+                .build();
+    }
+
+    @Test
     void importModelSameCommitRejected() throws Exception {
 
         log.info("Running IMPORT_MODEL new-version job with same commit — expecting failure...");
