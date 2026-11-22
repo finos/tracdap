@@ -60,6 +60,7 @@ class ConfigKeys:
     RESULT_STORAGE_LOCATION = "result.storage.location"
     RESULT_STORAGE_PATH = "result.storage.path"
     RESULT_FORMAT = "result.format"
+    RESULT_PROGRESS_PATH = "result.progress.path"
 
 
 

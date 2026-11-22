@@ -184,7 +184,7 @@ class JobLogProvider(LogProvider):
         return JobLogger(base_logger, *self.__handlers)
 
 
-def job_log_provider(target: _tp.BinaryIO) -> JobLogProvider:
+def job_log_provider(target: _tp.BinaryIO, extra_handlers: _tp.Iterable[Handler] = ()) -> JobLogProvider:
 
     stream = _io.TextIOWrapper(target, newline="\r\n")
     formatter = PlainFormatter()
@@ -192,4 +192,4 @@ def job_log_provider(target: _tp.BinaryIO) -> JobLogProvider:
     handler = StreamHandler(stream)
     handler.setFormatter(formatter)
 
-    return JobLogProvider(handler)
+    return JobLogProvider(handler, *extra_handlers)

@@ -19,6 +19,7 @@ import math
 import pathlib
 import shutil
 import tempfile
+import threading
 import typing as tp
 import unittest
 
@@ -39,6 +40,7 @@ import tracdap.rt._impl.core.type_system as types  # noqa
 import tracdap.rt._impl.core.util as util  # noqa
 
 import tracdap_test.flow_scenarios.models as scenario_models
+import tracdap_test.rt.progress_switch as progress_switch
 
 
 CATALOGUE_DIR = pathlib.Path(scenario_models.__file__).parent
@@ -178,6 +180,7 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
     RESULT_STORAGE_KEY = "scenario_data"
     RESULT_STORAGE_PATH = "results/trac_job_result.json"
+    RESULT_PROGRESS_PATH = "results/trac_job_progress.json"
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -188,10 +191,11 @@ class FlowScenarioDevModeTest(unittest.TestCase):
     def test_scenarios(self):
 
         for scenario_name in _scenario_names():
-            with self.subTest(scenario_name):
-                self._run_scenario(scenario_name)
+            for progress_enabled in [False, True]:
+                with self.subTest(scenario_name, progress_enabled=progress_enabled):
+                    self._run_scenario(scenario_name, progress_enabled)
 
-    def _run_scenario(self, scenario_name: str):
+    def _run_scenario(self, scenario_name: str, progress_enabled: bool = False):
 
         scenario_dir = SCENARIOS_DIR.joinpath(scenario_name)
         expected = _read_yaml(scenario_dir.joinpath("expected.yaml"))
@@ -223,7 +227,7 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
             for run in range(1, runs + 1):
 
-                job_config, job_result, job_error = self._run_job(tmp_dir, scenario_dir, job_spec)
+                job_config, job_result, job_error = self._run_job(tmp_dir, scenario_dir, job_spec, progress_enabled)
 
                 if expected["outcome"] == "REJECTED":
                     self.assertIsNone(job_result, "Expected the job to be rejected")
@@ -237,6 +241,9 @@ class FlowScenarioDevModeTest(unittest.TestCase):
                 self._check_result(job_result, job_error, expected, expected_version=run)
                 self._check_output_values(tmp_dir, scenario_dir, job_spec, job_result, expected)
                 self._check_model_log_lines(tmp_dir, job_spec, job_result, expected)
+
+                if progress_enabled:
+                    self._check_model_steps(tmp_dir, job_spec, expected)
 
     def test_type_only_not_inferred(self):
 
@@ -284,7 +291,16 @@ class FlowScenarioDevModeTest(unittest.TestCase):
         self.assertEqual("Multiple models use input [accounts] but expect different schemas", errors[0])
         self.assertEqual(errors[0], errors[1])
 
-    def _run_job(self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path, job_spec: dict) \
+    def _run_job(self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path, job_spec: dict, progress_enabled: bool = False) \
+            -> tp.Tuple[tp.Optional[cfg.JobConfig], tp.Optional[cfg.JobResult], tp.Optional[Exception]]:
+
+        if not progress_enabled:
+            with progress_switch.progress_disabled():
+                return self._run_job_(tmp_dir, scenario_dir, job_spec, False)
+
+        return self._run_job_(tmp_dir, scenario_dir, job_spec, True)
+
+    def _run_job_(self, tmp_dir: pathlib.Path, scenario_dir: pathlib.Path, job_spec: dict, progress_enabled: bool) \
             -> tp.Tuple[tp.Optional[cfg.JobConfig], tp.Optional[cfg.JobResult], tp.Optional[Exception]]:
 
         storage_dir = tmp_dir.joinpath("data")
@@ -335,6 +351,9 @@ class FlowScenarioDevModeTest(unittest.TestCase):
             translated_config.properties[cfg_p.ConfigKeys.RESULT_STORAGE_PATH] = self.RESULT_STORAGE_PATH
             translated_config.properties[cfg_p.ConfigKeys.RESULT_FORMAT] = "JSON"
 
+            if progress_enabled:
+                translated_config.properties[cfg_p.ConfigKeys.RESULT_PROGRESS_PATH] = self.RESULT_PROGRESS_PATH
+
             job_error = None
             rt.submit_job(translated_config)
 
@@ -343,10 +362,32 @@ class FlowScenarioDevModeTest(unittest.TestCase):
             except ex.ETrac as e:
                 job_error = e
 
+        # The progress writer makes its final write after the job is finalized
+        for thread in threading.enumerate():
+            if thread.name == "progress":
+                thread.join(10)
+
         result_path = storage_dir.joinpath(self.RESULT_STORAGE_PATH)
         job_result = cfg_p.ConfigParser(cfg.JobResult).parse(json.loads(result_path.read_text()))
 
         return translated_config, job_result, job_error
+
+    def _read_progress(self, tmp_dir: pathlib.Path) -> meta.JobProgress:
+
+        progress_path = tmp_dir.joinpath("data", self.RESULT_PROGRESS_PATH)
+        return cfg_p.ConfigParser(meta.JobProgress).parse(json.loads(progress_path.read_text()))
+
+    def _check_model_steps(self, tmp_dir: pathlib.Path, job_spec: dict, expected: dict):
+
+        model_steps = {
+            step.stepName: step.statusCode for step in self._read_progress(tmp_dir).steps
+            if step.stepType == meta.JobStepType.STEP_MODEL}
+
+        ran = expected.get("ran", list(job_spec["models"].keys()))
+        self.assertTrue(set(ran) <= set(model_steps.keys()), f"Model steps {sorted(model_steps)}, expected {sorted(ran)}")
+
+        if expected["outcome"] == "SUCCEEDED":
+            self.assertEqual({name: meta.JobStepStatusCode.STEP_SUCCEEDED for name in ran}, model_steps)
 
     def _output_socket(self, output_name: str, flow_def: dict, job_spec: dict) -> meta.ModelOutputSchema:
 
@@ -481,13 +522,7 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
     def _check_model_log_lines(self, tmp_dir: pathlib.Path, job_spec: dict, job_result: cfg.JobResult, expected: dict):
 
-        log_file_id = next(oid for oid in job_result.objectIds if oid.objectId == job_result.result.logFileId.objectId)
-        log_file = job_result.objects[util.object_key(log_file_id)].file
-        storage_id = next(oid for oid in job_result.objectIds if oid.objectId == log_file.storageId.objectId)
-        storage_def = job_result.objects[util.object_key(storage_id)].storage
-        storage_copy = storage_def.dataItems[log_file.dataItem].incarnations[0].copies[0]
-
-        job_log = tmp_dir.joinpath("data", storage_copy.storagePath).read_text()
+        job_log = self._read_saved_log(tmp_dir, job_result)
 
         ran = expected.get("ran", list(job_spec["models"].keys()))
         classes_run = {self._model_class(ep) for node, ep in job_spec["models"].items() if node in ran}
@@ -498,6 +533,17 @@ class FlowScenarioDevModeTest(unittest.TestCase):
 
         for model_class_name in classes_not_run:
             self.assertNotIn(scenario_models.MODEL_LOG_LINE.format(model_class_name), job_log)
+
+    @staticmethod
+    def _read_saved_log(tmp_dir: pathlib.Path, job_result: cfg.JobResult) -> str:
+
+        log_file_id = next(oid for oid in job_result.objectIds if oid.objectId == job_result.result.logFileId.objectId)
+        log_file = job_result.objects[util.object_key(log_file_id)].file
+        storage_id = next(oid for oid in job_result.objectIds if oid.objectId == log_file.storageId.objectId)
+        storage_def = job_result.objects[util.object_key(storage_id)].storage
+        storage_copy = storage_def.dataItems[log_file.dataItem].incarnations[0].copies[0]
+
+        return tmp_dir.joinpath("data", storage_copy.storagePath).read_text()
 
     @staticmethod
     def _model_class(entry_point: str) -> str:

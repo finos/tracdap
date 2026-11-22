@@ -56,6 +56,7 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 public class JobProcessorHelpers {
 
     public static final String RESULT_PATH_TEMPLATE = "%d/%s/%s/trac_job_result.json";
+    public static final String PROGRESS_PATH_TEMPLATE = "%d/%s/%s/trac_job_progress.json";
     public static final String CAPTURE_MAX_SIZE_CONFIG_KEY = "captureMaxSize";
 
     static final int ERROR_MESSAGE_MAX_BYTES = 4000;
@@ -407,13 +408,15 @@ public class JobProcessorHelpers {
                 ConfigKeys.RESULT_STORAGE_LOCATION,
                 ConfigDefaults.RESULT_STORAGE_LOCATION);
 
-        var resultPath = buildResultPath(jobState);
+        var resultPath = buildResultPath(jobState, RESULT_PATH_TEMPLATE);
+        var progressPath = buildResultPath(jobState, PROGRESS_PATH_TEMPLATE);
 
         jobConfig.putProperties(ConfigKeys.RESULT_ENABLED, Boolean.TRUE.toString());
         jobConfig.putProperties(ConfigKeys.RESULT_LOGS_ENABLED, Boolean.TRUE.toString());
         jobConfig.putProperties(ConfigKeys.RESULT_STORAGE_LOCATION, resultLocation);
         jobConfig.putProperties(ConfigKeys.RESULT_STORAGE_PATH, resultPath);
         jobConfig.putProperties(ConfigKeys.RESULT_FORMAT, ConfigFormat.JSON.toString());
+        jobConfig.putProperties(ConfigKeys.RESULT_PROGRESS_PATH, progressPath);
 
         var sysConfig = RuntimeConfig.newBuilder();
         sysConfig.putAllProperties(tenantConfig.getPropertiesMap());
@@ -430,12 +433,12 @@ public class JobProcessorHelpers {
         return newState;
     }
 
-    private String buildResultPath(JobState jobState) {
+    private String buildResultPath(JobState jobState, String pathTemplate) {
 
         var jobTimestamp = MetadataCodec.decodeDatetime(jobState.jobId.getObjectTimestamp());
 
         return String.format(
-                RESULT_PATH_TEMPLATE,
+                pathTemplate,
                 jobTimestamp.getYear(),
                 MetadataCodec.ISO_DATE_FORMAT.format(jobTimestamp.toLocalDate()),
                 jobState.jobKey);

@@ -354,6 +354,8 @@ class LoadDataNode(Node[_data.DataItem]):
     spec_id: _tp.Optional[NodeId[_data.DataSpec]] = None
     spec: _tp.Optional[_data.DataSpec] = None
 
+    step_name: str = ""
+
     def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         deps = dict()
         if self.spec_id is not None:
@@ -437,6 +439,8 @@ class SaveDataNode(Node[_data.DataSpec]):
     spec_id: _tp.Optional[NodeId[_data.DataSpec]] = None
     spec: _tp.Optional[_data.DataSpec] = None
 
+    step_name: str = ""
+
     def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         deps = {self.data_item_id: DependencyType.HARD}
         if self.spec_id is not None:
@@ -469,6 +473,8 @@ class RunModelNode(Node[Bundle[_data.DataView]]):
     storage_access: _tp.Optional[_tp.List[str]] = None
 
     graph_context: _tp.Optional[GraphContext] = None
+
+    step_name: str = ""
 
     def _node_dependencies(self) -> _tp.Dict[NodeId, DependencyType]:
         return {dep_id: DependencyType.HARD for dep_id in [*self.resource_ids, *self.parameter_ids, *self.input_ids]}

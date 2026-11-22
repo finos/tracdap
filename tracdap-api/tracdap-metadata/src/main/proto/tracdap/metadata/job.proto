@@ -155,6 +155,91 @@ message PlacementRecord {
 }
 
 /**
+ * Type of a step in a running job
+ */
+enum JobStepType {
+  JOB_STEP_TYPE_NOT_SET = 0;
+  STEP_MODEL = 1;       // run a model, named by its flow node in a flow
+  STEP_LOAD = 2;        // load an input, or the dataset for a placement
+  STEP_SAVE = 3;        // save an output, or a dataset or file for a capture
+  STEP_CAPTURE = 4;     // read an external file for a capture
+  STEP_DECODE = 5;      // decode a captured file into a dataset
+  STEP_PREPARE = 6;     // encode a dataset for a placement
+  STEP_PLACE = 7;       // write a placement to external storage
+}
+
+/**
+ * Status of a step in a running job
+ */
+enum JobStepStatusCode {
+  JOB_STEP_STATUS_CODE_NOT_SET = 0;
+  STEP_RUNNING = 1;
+  STEP_SUCCEEDED = 2;
+  STEP_FAILED = 3;
+  STEP_SKIPPED = 4;     // not run, because a step it depends on failed
+}
+
+/**
+ * Source of an entry in the job log
+ */
+enum JobLogSource {
+  JOB_LOG_SOURCE_NOT_SET = 0;
+  LOG_SOURCE_MODEL = 1;
+  LOG_SOURCE_STEP = 2;
+  LOG_SOURCE_ENGINE = 3;
+}
+
+/**
+ * Progress of a running job, as reported while it runs
+ */
+message JobProgress {
+
+  /// Steps that have started; a step that hasn't started yet has no entry
+  repeated JobStepStatus steps = 1;
+
+  /// Recent entries from the job log, oldest first
+  repeated JobLogEntry logEntries = 2;
+
+  /// Entries the job has logged of the kinds kept in logEntries, including any no longer kept
+  int64 totalLogEntries = 3;
+
+  DatetimeValue updateTime = 4;
+}
+
+/**
+ * Status of one step in a running job
+ */
+message JobStepStatus {
+
+  JobStepType stepType = 1;
+  string stepName = 2;
+
+  JobStepStatusCode statusCode = 3;
+
+  optional DatetimeValue startTime = 4;
+  optional DatetimeValue endTime = 5;
+}
+
+/**
+ * One entry from the job log
+ */
+message JobLogEntry {
+
+  DatetimeValue timestamp = 1;
+
+  /// Log level name, e.g. INFO, WARNING, ERROR
+  string level = 2;
+
+  JobLogSource source = 3;
+
+  /// The step the entry was logged for, if any
+  optional JobStepType stepType = 4;
+  optional string stepName = 5;
+
+  string message = 6;
+}
+
+/**
  * Specification for a RuN_MODEL job
  */
 message RunModelJob {

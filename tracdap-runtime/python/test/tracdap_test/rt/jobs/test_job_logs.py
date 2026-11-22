@@ -16,10 +16,14 @@
 import dataclasses as dc
 import json
 import pathlib
+import subprocess as sp
 import tempfile
+import threading
 import typing as tp
 import unittest
 import unittest.mock as mock
+
+import yaml
 
 import tracdap.rt.config as cfg
 import tracdap.rt.exceptions as ex
@@ -42,18 +46,32 @@ _LOANS_SCHEMA = meta.SchemaDefinition(
         meta.FieldSchema("id", 0, meta.BasicType.INTEGER),
         meta.FieldSchema("amount", 1, meta.BasicType.DECIMAL)]))
 
+_ACCOUNTS_SCHEMA = meta.SchemaDefinition(
+    schemaType=meta.SchemaType.TABLE,
+    partType=meta.PartType.PART_ROOT,
+    table=meta.TableSchema([
+        meta.FieldSchema("id", 0, meta.BasicType.STRING, businessKey=True),
+        meta.FieldSchema("region", 1, meta.BasicType.STRING, categorical=True),
+        meta.FieldSchema("amount", 2, meta.BasicType.FLOAT)]))
+
+_REPO_ROOT = pathlib.Path(__file__).parents[6]
+_SCENARIO_MODELS = _REPO_ROOT.joinpath("tracdap-runtime/python/test/tracdap_test/flow_scenarios")
+
 
 class JobLogTestBase(unittest.TestCase):
 
     """
-    Run jobs through the runtime with job results and job logs enabled, as on the platform
+    Run jobs through the runtime with job results, job logs and job progress enabled, as on the platform
 
-    The job result is read back from result storage, for both succeeded and failed jobs.
+    The job result and progress snapshot are read back from result storage, for both succeeded and failed jobs.
     Saving the job log can be made to fail with fail_log_save().
+    Run-model jobs use the flow scenario models, loaded from a local repo through the shim as on the platform.
     """
 
     RESULT_STORAGE_KEY = "test_data"
     RESULT_STORAGE_PATH = "results/trac_job_result.json"
+    RESULT_PROGRESS_PATH = "results/{}/trac_job_progress.json"
+    SCENARIO_REPO_KEY = "scenario_repo"
 
     tmp_dir: pathlib.Path
 
@@ -87,12 +105,17 @@ class JobLogTestBase(unittest.TestCase):
                 resourceType=meta.ResourceType.EXTERNAL_STORAGE, protocol="LOCAL",
                 properties={"rootPath": str(self.tmp_dir.joinpath(storage_key))})
 
+        sys_config.resources[self.SCENARIO_REPO_KEY] = meta.ResourceDefinition(
+            resourceType=meta.ResourceType.MODEL_REPOSITORY, protocol="local",
+            properties={"repoUrl": str(_REPO_ROOT)})
+
         return sys_config
 
     def _run_job(
             self, job_def: meta.JobDefinition,
             objects: dict = None, mapping: dict = None,
-            preallocated_ids: tp.List[meta.TagHeader] = None) \
+            preallocated_ids: tp.List[meta.TagHeader] = None,
+            logs_enabled: bool = True, progress_enabled: bool = True) \
             -> tp.Tuple[cfg.JobResult, tp.Optional[Exception]]:
 
         job_id = util.new_object_id(meta.ObjectType.JOB)
@@ -104,10 +127,14 @@ class JobLogTestBase(unittest.TestCase):
             preallocatedIds=preallocated_ids or [])
 
         job_config.properties[cfg_p.ConfigKeys.RESULT_ENABLED] = "true"
-        job_config.properties[cfg_p.ConfigKeys.RESULT_LOGS_ENABLED] = "true"
+        job_config.properties[cfg_p.ConfigKeys.RESULT_LOGS_ENABLED] = str(logs_enabled).lower()
         job_config.properties[cfg_p.ConfigKeys.RESULT_STORAGE_LOCATION] = self.RESULT_STORAGE_KEY
         job_config.properties[cfg_p.ConfigKeys.RESULT_STORAGE_PATH] = self.RESULT_STORAGE_PATH
         job_config.properties[cfg_p.ConfigKeys.RESULT_FORMAT] = "JSON"
+
+        if progress_enabled:
+            job_config.properties[cfg_p.ConfigKeys.RESULT_PROGRESS_PATH] = \
+                self.RESULT_PROGRESS_PATH.format(util.object_key(job_id))
 
         trac_runtime = runtime.TracRuntime(self._sys_config(), scratch_dir=self.tmp_dir.joinpath("scratch"))
         trac_runtime.pre_start()
@@ -121,7 +148,17 @@ class JobLogTestBase(unittest.TestCase):
             except ex.ETrac as e:
                 job_error = e
 
+        self._wait_for_progress_writers()
+
         return self._read_job_result(), job_error
+
+    @staticmethod
+    def _wait_for_progress_writers():
+
+        # The writer makes its final write after the job is finalized, read the snapshot once it has exited
+        for thread in threading.enumerate():
+            if thread.name == "progress":
+                thread.join(10)
 
     def _read_job_result(self) -> cfg.JobResult:
 
@@ -129,6 +166,15 @@ class JobLogTestBase(unittest.TestCase):
         result_dict = json.loads(result_path.read_text())
 
         return cfg_p.ConfigParser(cfg.JobResult).parse(result_dict)
+
+    def _read_job_progress(self, job_id: meta.TagHeader) -> tp.Optional[meta.JobProgress]:
+
+        progress_path = self.tmp_dir.joinpath("data", self.RESULT_PROGRESS_PATH.format(util.object_key(job_id)))
+
+        if not progress_path.exists():
+            return None
+
+        return cfg_p.ConfigParser(meta.JobProgress).parse(json.loads(progress_path.read_text()))
 
     def _read_job_log(self, job_result: cfg.JobResult) -> str:
 
@@ -164,6 +210,77 @@ class JobLogTestBase(unittest.TestCase):
             for name, path in captures}
 
         return meta.JobDefinition(jobType=meta.JobType.IMPORT_DATA, importData=meta.ImportDataJob(captures=sources))
+
+    def _capture_accounts(self) -> tp.Tuple[meta.TagSelector, dict, dict]:
+
+        """Capture the scenario accounts dataset, return its selector and the objects and mapping to use it"""
+
+        self.tmp_dir.joinpath("staging", "accounts.csv").write_text(
+            _SCENARIO_MODELS.joinpath("data/accounts.csv").read_text())
+
+        job_def = meta.JobDefinition(
+            jobType=meta.JobType.IMPORT_DATA,
+            importData=meta.ImportDataJob(captures={"accounts": meta.CaptureSource(
+                location=meta.ExternalLocation("staging", "accounts.csv"),
+                schemaSource=meta.CaptureSchemaSource.CAPTURE_SCHEMA_DECLARED,
+                schema=_ACCOUNTS_SCHEMA)}))
+
+        capture_result, capture_error = self._run_job(job_def)
+        self.assertIsNone(capture_error)
+
+        data_id = next(
+            oid for oid in capture_result.objectIds
+            if oid.objectId == capture_result.result.outputs["accounts"].objectId)
+
+        objects, mapping = self._result_objects(capture_result)
+
+        return util.selector_for(data_id), objects, mapping
+
+    @staticmethod
+    def _result_objects(job_result: cfg.JobResult) -> tp.Tuple[dict, dict]:
+
+        objects = dict(job_result.objects)
+        mapping = {
+            util.object_key(selector(oid)): oid
+            for oid in job_result.objectIds
+            for selector in [util.selector_for, util.selector_for_latest]}
+
+        return objects, mapping
+
+    @staticmethod
+    def _scenario_model(model_class: str) -> tp.Tuple[meta.TagHeader, meta.ObjectDefinition]:
+
+        """A flow scenario model from the local repo, which the runtime loads through the shim"""
+
+        entry_point = f"tracdap_test.flow_scenarios.models.{model_class}"
+        interfaces = yaml.safe_load(_SCENARIO_MODELS.joinpath("models.yaml").read_text())
+        interface = cfg_p.ConfigParser(meta.ModelDefinition).parse(interfaces[entry_point])
+
+        commit_hash = sp.run(["git", "rev-parse", "HEAD"], stdout=sp.PIPE, cwd=_REPO_ROOT).stdout.decode().strip()
+
+        model_def = dc.replace(
+            interface, language="python", repository=JobLogTestBase.SCENARIO_REPO_KEY,
+            path="tracdap-runtime/python/test", entryPoint=entry_point, version=commit_hash)
+
+        model_id = util.new_object_id(meta.ObjectType.MODEL)
+
+        return model_id, meta.ObjectDefinition(meta.ObjectType.MODEL, model=model_def)
+
+    def _run_model_job(
+            self, model_class: str, inputs: tp.Dict[str, meta.TagSelector] = None,
+            parameters: tp.Dict[str, meta.Value] = None) \
+            -> tp.Tuple[meta.JobDefinition, dict]:
+
+        model_id, model_obj = self._scenario_model(model_class)
+
+        job_def = meta.JobDefinition(
+            jobType=meta.JobType.RUN_MODEL,
+            runModel=meta.RunModelJob(
+                model=util.selector_for(model_id),
+                parameters=parameters or {},
+                inputs=inputs or {}))
+
+        return job_def, {util.object_key(model_id): model_obj}
 
 
 class JobLogTest(JobLogTestBase):

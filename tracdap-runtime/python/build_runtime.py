@@ -343,7 +343,7 @@ def cli_args():
     return parser.parse_args()
 
 
-def run_tests(test_path, pattern=None, ext=False):
+def run_tests(test_path, pattern=None, ext=False, progress=False):
 
     # Default test pattern for unit tests
     if pattern is None:
@@ -375,7 +375,12 @@ def run_tests(test_path, pattern=None, ext=False):
                 top_level_dir=str(RUNTIME_DIR.joinpath("test")),
                 pattern=pattern)
 
-        result = runner.run(suite)
+        if progress:
+            import tracdap_test.rt.progress_switch as progress_switch  # noqa
+            with progress_switch.progress_enabled():
+                result = runner.run(suite)
+        else:
+            result = runner.run(suite)
 
         if not result.wasSuccessful():
             exit(-1)
@@ -469,8 +474,10 @@ def main():
         for plugin_name in plugins:
             build_plugin(plugin_name)
 
+    # Runtime jobs run with job progress off (as in dev mode) and on (as on the platform)
     if "test" in args.target:
         run_tests("test/tracdap_test")
+        run_tests("test/tracdap_test", progress=True)
 
     if "test_ext" in args.target:
         run_tests("test/tracdap_ext_test", ext=True)
@@ -485,6 +492,7 @@ def main():
 
     if "examples" in args.target:
         run_tests("test/tracdap_examples")
+        run_tests("test/tracdap_examples", progress=True)
 
 
 main()

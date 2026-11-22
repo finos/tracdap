@@ -23,6 +23,7 @@ import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.internal.InternalMetadataApiGrpc;
 import org.finos.tracdap.api.internal.RuntimeJobStatus;
+import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.config.ConfigManager;
 import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
@@ -400,6 +401,23 @@ public class JobProcessorHelpersTest {
         Assertions.assertEquals(jobState.definition, newState.jobConfig.getJob());
         Assertions.assertEquals(jobState.metadata.getObjects(), newState.jobConfig.getObjectsMap());
         Assertions.assertEquals(jobState.metadata.getObjectMapping(), newState.jobConfig.getObjectMappingMap());
+    }
+
+    @Test
+    void buildJobConfig_progressPathBesideResult() {
+
+        var jobState = configJobState(null);
+        var newState = helpers.buildJobConfig(jobState);
+
+        var properties = newState.jobConfig.getPropertiesMap();
+        var jobTimestamp = MetadataCodec.decodeDatetime(jobState.jobId.getObjectTimestamp());
+        var jobFolder = String.format("%d/%s/%s/",
+                jobTimestamp.getYear(),
+                MetadataCodec.ISO_DATE_FORMAT.format(jobTimestamp.toLocalDate()),
+                jobState.jobKey);
+
+        Assertions.assertEquals(jobFolder + "trac_job_result.json", properties.get(ConfigKeys.RESULT_STORAGE_PATH));
+        Assertions.assertEquals(jobFolder + "trac_job_progress.json", properties.get(ConfigKeys.RESULT_PROGRESS_PATH));
     }
 
     @Test
