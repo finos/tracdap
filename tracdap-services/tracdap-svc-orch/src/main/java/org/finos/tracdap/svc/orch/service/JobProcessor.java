@@ -40,12 +40,14 @@ import org.finos.tracdap.common.service.TenantConfigManager;
 import org.finos.tracdap.common.validation.Validator;
 import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
+import org.finos.tracdap.metadata.JobProgress;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
 import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.TagUpdate;
 
 import io.grpc.Context;
+import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 
@@ -53,14 +55,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
 
 
 public class JobProcessor {
+
+    static final Duration PROGRESS_READ_DEADLINE = Duration.ofSeconds(2);
+    static final Duration PROGRESS_REUSE_TIME = Duration.ofSeconds(3);
+    static final Duration PROGRESS_RETENTION_TIME = Duration.ofSeconds(30);
+
+    private static final Set<JobStatusCode> PROGRESS_STATUS = Set.of(
+            JobStatusCode.SUBMITTED, JobStatusCode.RUNNING, JobStatusCode.FINISHING);
 
     private final Logger log = LoggerFactory.getLogger(getClass());
 
@@ -76,6 +91,10 @@ public class JobProcessor {
 
     // TODO: Refactor into this class
     private final JobProcessorHelpers lifecycle;
+
+    // checkJob runs on any orch-svc thread, entries are replaced whole and never changed in place
+    private final ConcurrentHashMap<String, ProgressRead> progressReads = new ConcurrentHashMap<>();
+    private Clock clock = Clock.systemUTC();
 
 
     public JobProcessor(
@@ -141,9 +160,22 @@ public class JobProcessor {
 
     public JobStatus checkJob(JobStatusRequest request, TagSelector jobSelector, Optional<JobState> cachedJob) {
 
+        // Jobs are not removed when they finish, an instance may never see the job it polled finish
+        var now = clock.instant();
+        progressReads.entrySet().removeIf(entry -> entry.getValue().retainUntil.isBefore(now));
+
         // A cached job is only reported to callers in its own tenant
-        if (cachedJob.isPresent() && cachedJob.get().tenant.equals(request.getTenant()))
-            return getStatus(cachedJob.get());
+        if (cachedJob.isPresent() && cachedJob.get().tenant.equals(request.getTenant())) {
+
+            var status = getStatus(cachedJob.get());
+
+            if (!PROGRESS_STATUS.contains(status.getStatusCode()))
+                return status;
+
+            return readProgress(cachedJob.get())
+                    .map(progress -> status.toBuilder().setProgress(progress).build())
+                    .orElse(status);
+        }
 
         var clientState = commonConcerns.prepareClientCall(Context.current());
 
@@ -378,6 +410,107 @@ public class JobProcessor {
                 newState.statusMessage = "Job status could not be determined";
 
                 return newState;
+        }
+    }
+
+    void setClock(Clock clock) {
+        this.clock = clock;
+    }
+
+    Set<String> progressReadsHeld() {
+        return Set.copyOf(progressReads.keySet());
+    }
+
+    private Optional<JobProgress> readProgress(JobState jobState) {
+
+        var now = clock.instant();
+
+        if (jobState.jobConfig == null)
+            return Optional.empty();
+
+        var properties = jobState.jobConfig.getPropertiesMap();
+        var storageKey = properties.get(ConfigKeys.RESULT_STORAGE_LOCATION);
+        var progressPath = properties.get(ConfigKeys.RESULT_PROGRESS_PATH);
+
+        // Jobs submitted before progress existed have no progress path
+        if (storageKey == null || progressPath == null)
+            return Optional.empty();
+
+        // Polls inside the reuse time get the last outcome, whatever the number of callers
+        var priorRead = progressReads.get(jobState.jobKey);
+
+        if (priorRead != null && priorRead.reuseUntil.isAfter(now))
+            return Optional.ofNullable(priorRead.progress);
+
+        var snapshotSeen = priorRead != null && priorRead.snapshotSeen;
+        var read = readSnapshot(jobState, storageKey, progressPath, snapshotSeen, now);
+
+        progressReads.put(jobState.jobKey, read);
+
+        return Optional.ofNullable(read.progress);
+    }
+
+    private ProgressRead readSnapshot(
+            JobState jobState, String storageKey, String progressPath,
+            boolean snapshotSeen, Instant now) {
+
+        // One deadline covers the whole read, a deadline is absolute so it is applied per call
+        var deadline = Deadline.after(PROGRESS_READ_DEADLINE.toMillis(), TimeUnit.MILLISECONDS);
+
+        try {
+
+            var clientState = commonConcerns.prepareClientCall(Context.ROOT);
+            var client = clientState.configureClient(storageClient);
+
+            // Reading a file that does not exist yet logs an error in the data service, so check first
+            if (!snapshotSeen) {
+
+                var existsRequest = StorageRequest.newBuilder()
+                        .setTenant(jobState.tenant)
+                        .setStorageKey(storageKey)
+                        .setStoragePath(progressPath)
+                        .build();
+
+                if (!client.withDeadline(deadline).exists(existsRequest).getExists())
+                    return new ProgressRead(now, null, false);
+            }
+
+            var readRequest = StorageReadRequest.newBuilder()
+                    .setTenant(jobState.tenant)
+                    .setStorageKey(storageKey)
+                    .setStoragePath(progressPath)
+                    .build();
+
+            var snapshot = client.withDeadline(deadline).readSmallFile(readRequest);
+
+            // A newer runtime may write fields this version does not know
+            var progress = configParser.parseConfig(
+                    snapshot.getContent().toByteArray(), ConfigFormat.JSON,
+                    JobProgress.class, /* leniency = */ true);
+
+            return new ProgressRead(now, progress, true);
+        }
+        catch (ETrac | StatusRuntimeException e) {
+
+            // A missing or partly written snapshot is normal while a job starts, report the status without it
+            log.debug("Job progress not available for [{}]: {}", jobState.jobKey, e.getMessage());
+
+            return new ProgressRead(now, null, snapshotSeen);
+        }
+    }
+
+    private static final class ProgressRead {
+
+        final Instant reuseUntil;
+        final Instant retainUntil;
+        final JobProgress progress;
+        final boolean snapshotSeen;
+
+        ProgressRead(Instant readTime, JobProgress progress, boolean snapshotSeen) {
+            this.reuseUntil = readTime.plus(PROGRESS_REUSE_TIME);
+            this.retainUntil = readTime.plus(PROGRESS_RETENTION_TIME);
+            this.progress = progress;
+            this.snapshotSeen = snapshotSeen;
         }
     }
 

@@ -17,8 +17,10 @@
 
 package org.finos.tracdap.svc.orch.jobs;
 
+import org.finos.tracdap.api.JobRequest;
 import org.finos.tracdap.api.JobStatus;
 import org.finos.tracdap.api.JobStatusRequest;
+import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.svc.admin.TracAdminService;
@@ -35,6 +37,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -44,7 +49,7 @@ import java.util.concurrent.locks.LockSupport;
 
 /**
  * Job status from {@code checkJob} for the selector forms clients send, for jobs in other tenants and for
- * jobs that don't exist.
+ * jobs that don't exist, and the progress of a running job.
  */
 @Tag("integration")
 @Tag("int-e2e")
@@ -136,6 +141,117 @@ public class CheckJobTest {
         var error = Assertions.assertThrows(StatusRuntimeException.class, () -> checkJob(TEST_TENANT, selector));
 
         Assertions.assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+    }
+
+    @Test
+    void checkJob_runningJobProgress() throws Exception {
+
+        var releaseFile = Files.createTempDirectory("check_job_progress").resolve("release");
+        var jobId = startWaitingJob(releaseFile);
+
+        try {
+
+            var running = waitForProgress(jobId, "Waiting for release");
+
+            Assertions.assertEquals(JobStatusCode.RUNNING, running.getStatusCode());
+
+            var modelStep = running.getProgress().getStepsList().stream()
+                    .filter(step -> step.getStepType() == JobStepType.STEP_MODEL)
+                    .findFirst().orElseThrow();
+
+            Assertions.assertEquals(JobStepStatusCode.STEP_RUNNING, modelStep.getStatusCode());
+            Assertions.assertTrue(modelStep.hasStartTime());
+
+            var modelLine = running.getProgress().getLogEntriesList().stream()
+                    .filter(entry -> entry.getMessage().equals("Waiting for release"))
+                    .findFirst().orElseThrow();
+
+            Assertions.assertEquals(JobLogSource.LOG_SOURCE_MODEL, modelLine.getSource());
+            Assertions.assertEquals(JobStepType.STEP_MODEL, modelLine.getStepType());
+        }
+        finally {
+            Files.createFile(releaseFile);
+        }
+
+        // A finished job has no progress section
+        var finished = waitForCompletion(MetadataUtil.selectorFor(jobId));
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, finished.getStatusCode());
+        Assertions.assertFalse(finished.hasProgress());
+    }
+
+    @Test
+    void checkJob_pollBeforeSnapshotLogsNoError() throws Exception {
+
+        var releaseFile = Files.createTempDirectory("check_job_progress").resolve("release");
+
+        try (var errorLog = ErrorLogCapture.attach()) {
+
+            // Polling starts as soon as the job is submitted, before the runtime writes its first snapshot
+            var jobId = startWaitingJob(releaseFile);
+
+            try {
+                waitForProgress(jobId, "Waiting for release");
+            }
+            finally {
+                Files.createFile(releaseFile);
+            }
+
+            waitForCompletion(MetadataUtil.selectorFor(jobId));
+
+            Assertions.assertEquals(List.of(), errorLog.errorsMentioning("trac_job_progress"));
+        }
+    }
+
+    private static TagHeader startWaitingJob(Path releaseFile) throws Exception {
+
+        var modelStub = ModelDefinition.newBuilder()
+                .setLanguage("python")
+                .setRepository("TRAC_LOCAL_REPO")
+                .setPath("tracdap-services/tracdap-svc-orch/src/test/resources")
+                .setEntryPoint("wait_for_release.WaitForRelease")
+                .setVersion(GitHelpers.getCurrentCommit())
+                .build();
+
+        var modelTag = Helpers.doModelImport(platform, TEST_TENANT, modelStub, List.of(), List.of());
+
+        var jobRequest = JobRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setJob(JobDefinition.newBuilder()
+                        .setJobType(JobType.RUN_MODEL)
+                        .setRunModel(org.finos.tracdap.metadata.RunModelJob.newBuilder()
+                                .setModel(MetadataUtil.selectorFor(modelTag.getHeader()))
+                                .putParameters("release_file", MetadataCodec.encodeValue(releaseFile.toString()))))
+                .build();
+
+        return Helpers.startJob(platform.orchClientBlocking(), jobRequest).getJobId();
+    }
+
+    private static JobStatus waitForProgress(TagHeader jobId, String logMessage) {
+
+        var selector = MetadataUtil.selectorFor(jobId);
+        var deadline = System.nanoTime() + TimeUnit.MINUTES.toNanos(2);
+        var seen = new ArrayList<JobStatusCode>();
+
+        // The first snapshot appears a little after the job starts running
+        while (System.nanoTime() < deadline) {
+
+            var status = checkJob(TEST_TENANT, selector);
+            seen.add(status.getStatusCode());
+
+            if (COMPLETED_STATES.contains(status.getStatusCode()))
+                Assertions.fail("The job finished before its progress was seen: " + status.getStatusMessage());
+
+            var logged = status.getProgress().getLogEntriesList().stream()
+                    .anyMatch(entry -> entry.getMessage().equals(logMessage));
+
+            if (logged)
+                return status;
+
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(250));
+        }
+
+        return Assertions.fail("No progress was seen for the running job, statuses seen: " + seen);
     }
 
     private static TagHeader startModelImport() throws Exception {
