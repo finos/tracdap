@@ -28,6 +28,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
+import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
@@ -907,6 +908,41 @@ public class JobProcessorHelpers {
         var client = configureClient(metaClient, jobState);
 
         return client.readObject(readRequest).getHeader();
+    }
+
+    JobStatus getStatusFromMetadata(String tenant, TagSelector jobSelector, GrpcClientState clientState) {
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(jobSelector)
+                .build();
+
+        var client = clientState.configureClient(metaClient);
+        var jobTag = client.readObject(readRequest);
+
+        var status = JobStatus.newBuilder()
+                .setJobId(jobTag.getHeader());
+
+        var statusAttr = jobTag.getAttrsMap().get(TRAC_JOB_STATUS_ATTR);
+
+        if (statusAttr != null) {
+
+            var statusName = MetadataCodec.decodeStringValue(statusAttr);
+
+            try {
+                status.setStatusCode(JobStatusCode.valueOf(statusName));
+            }
+            catch (IllegalArgumentException e) {
+                log.warn("Job [{}] has an unrecognised status [{}]", MetadataUtil.objectKey(jobTag.getHeader()), statusName);
+            }
+        }
+
+        var errorAttr = jobTag.getAttrsMap().get(TRAC_JOB_ERROR_MESSAGE_ATTR);
+
+        if (errorAttr != null)
+            status.setStatusMessage(MetadataCodec.decodeStringValue(errorAttr));
+
+        return status.build();
     }
 
     private List<TagUpdate> jobAttrs(ResultDefinition result) {

@@ -42,6 +42,7 @@ import org.finos.tracdap.config.JobResult;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.metadata.JobStatusCode;
 import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.metadata.TagUpdate;
 
 import io.grpc.Context;
@@ -54,6 +55,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static org.finos.tracdap.common.metadata.MetadataConstants.TRAC_JOB_STATUS_ATTR;
 
@@ -135,6 +137,17 @@ public class JobProcessor {
         }
 
         return status.build();
+    }
+
+    public JobStatus checkJob(JobStatusRequest request, TagSelector jobSelector, Optional<JobState> cachedJob) {
+
+        // A cached job is only reported to callers in its own tenant
+        if (cachedJob.isPresent() && cachedJob.get().tenant.equals(request.getTenant()))
+            return getStatus(cachedJob.get());
+
+        var clientState = commonConcerns.prepareClientCall(Context.current());
+
+        return lifecycle.getStatusFromMetadata(request.getTenant(), jobSelector, clientState);
     }
 
     public JobState assembleAndValidate(JobState jobState) {

@@ -20,17 +20,21 @@ package org.finos.tracdap.svc.orch.api;
 
 import io.grpc.Context;
 import org.finos.tracdap.api.*;
-import org.finos.tracdap.common.exception.ECacheNotFound;
-import org.finos.tracdap.common.exception.EUnexpected;
+import org.finos.tracdap.common.exception.ECacheCorruption;
+import org.finos.tracdap.common.exception.EMetadataNotFound;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
+import org.finos.tracdap.metadata.TagSelector;
 import org.finos.tracdap.svc.orch.service.JobManager;
 import org.finos.tracdap.svc.orch.service.JobProcessor;
+import org.finos.tracdap.svc.orch.service.JobState;
 
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
 
 
 public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestratorApiImplBase {
@@ -119,19 +123,38 @@ public class TracOrchestratorApi extends TracOrchestratorApiGrpc.TracOrchestrato
 
     private JobStatus checkJobImpl(JobStatusRequest request) {
 
-        // TODO: Keys for other selector types
-        if (!request.getSelector().hasObjectVersion())
-            throw new EUnexpected();
+        var selector = request.getSelector();
 
-        var jobKey = MetadataUtil.objectKey(request.getSelector());
-        var jobState = jobManager.queryJob(jobKey);
+        // A JOB is only ever tagged, so object version 1 is the only version that exists
+        if (selector.hasObjectVersion() && selector.getObjectVersion() != 1) {
 
-        if (jobState.isEmpty()) {
-            var message = String.format("Job not found (it may have completed): [%s]", jobKey);
-            log.error(message);
-            throw new ECacheNotFound(message);
+            var message = String.format(
+                    "Metadata not found for %s [%s] (version = %d)",
+                    selector.getObjectType(), selector.getObjectId(), selector.getObjectVersion());
+
+            throw new EMetadataNotFound(message);
         }
 
-        return jobProcessor.getStatus(jobState.get());
+        var jobSelector = TagSelector.newBuilder()
+                .setObjectType(selector.getObjectType())
+                .setObjectId(selector.getObjectId())
+                .setObjectVersion(1)
+                .setLatestTag(true)
+                .build();
+
+        var jobKey = MetadataUtil.objectKey(jobSelector);
+
+        return jobProcessor.checkJob(request, jobSelector, queryCachedJob(jobKey));
+    }
+
+    private Optional<JobState> queryCachedJob(String jobKey) {
+
+        try {
+            return jobManager.queryJob(jobKey);
+        }
+        catch (ECacheCorruption e) {
+            log.warn("Cache entry for [{}] is not readable, status will be read from metadata: {}", jobKey, e.getMessage());
+            return Optional.empty();
+        }
     }
 }

@@ -17,6 +17,8 @@
 
 package org.finos.tracdap.svc.orch.service;
 
+import org.finos.tracdap.api.JobStatusRequest;
+import org.finos.tracdap.api.MetadataReadRequest;
 import org.finos.tracdap.api.MetadataWriteBatchRequest;
 import org.finos.tracdap.api.MetadataWriteBatchResponse;
 import org.finos.tracdap.api.MetadataWriteRequest;
@@ -32,6 +34,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.middleware.GrpcClientConfig;
+import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.config.JobConfig;
@@ -57,12 +60,14 @@ import org.mockito.ArgumentMatchers;
 import org.mockito.Mockito;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 
 
 public class JobProcessorTest {
 
     private InternalMetadataApiGrpc.InternalMetadataApiBlockingStub metaClient;
     private TracStorageApiGrpc.TracStorageApiBlockingStub storageClient;
+    private GrpcConcern commonConcerns;
     private JobProcessor processor;
 
     private TagHeader jobId;
@@ -84,7 +89,7 @@ public class JobProcessorTest {
         registry.addSingleton(JobExecutor.class, Mockito.mock(JobExecutor.class));
         registry.addSingleton(ConfigManager.class, configManager);
 
-        var commonConcerns = Mockito.mock(GrpcConcern.class, Answers.CALLS_REAL_METHODS);
+        commonConcerns = Mockito.mock(GrpcConcern.class, Answers.CALLS_REAL_METHODS);
 
         processor = new JobProcessor(null, commonConcerns, registry);
 
@@ -268,6 +273,167 @@ public class JobProcessorTest {
         var batch = ArgumentCaptor.forClass(MetadataWriteBatchRequest.class);
         Mockito.verify(metaClient, Mockito.times(2)).writeBatch(batch.capture());
         Assertions.assertEquals(MetadataUtil.selectorFor(latestJobId), batch.getAllValues().get(1).getUpdateTags(0).getPriorVersion());
+    }
+
+    @Test
+    void checkJob_cachedJobSameTenant() {
+
+        var jobState = jobState(JobStatusCode.SUCCEEDED, null);
+        jobState.tracStatus = JobStatusCode.RUNNING;
+        jobState.cacheStatus = CacheStatus.RUNNING_IN_EXECUTOR;
+
+        var status = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.of(jobState));
+
+        Assertions.assertEquals(jobId, status.getJobId());
+        Assertions.assertEquals(JobStatusCode.RUNNING, status.getStatusCode());
+        Mockito.verify(metaClient, Mockito.never()).readObject(ArgumentMatchers.any());
+    }
+
+    @Test
+    void checkJob_cachedJobOtherTenant() {
+
+        var jobState = jobState(JobStatusCode.SUCCEEDED, null);
+        jobState.tracStatus = JobStatusCode.RUNNING;
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any()))
+                .thenThrow(Status.NOT_FOUND.withDescription("Metadata not found for JOB [x]").asRuntimeException());
+
+        var request = statusRequest("OTHER_TENANT");
+        var error = Assertions.assertThrows(StatusRuntimeException.class,
+                () -> processor.checkJob(request, jobSelector(), Optional.of(jobState)));
+
+        Assertions.assertEquals(Status.Code.NOT_FOUND, error.getStatus().getCode());
+
+        var read = ArgumentCaptor.forClass(MetadataReadRequest.class);
+        Mockito.verify(metaClient).readObject(read.capture());
+        Assertions.assertEquals("OTHER_TENANT", read.getValue().getTenant());
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = JobStatusCode.class, names = {"SUCCEEDED", "FAILED", "CANCELLED"})
+    void checkJob_notCachedReadsMetadata(JobStatusCode statusCode) {
+
+        var errorMessage = statusCode == JobStatusCode.SUCCEEDED ? null : "Model failed";
+        var latestJobId = nextTagVersion(jobId);
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any()))
+                .thenReturn(jobTag(latestJobId, statusCode.name(), errorMessage));
+
+        var status = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.empty());
+
+        Assertions.assertEquals(latestJobId, status.getJobId());
+        Assertions.assertEquals(statusCode, status.getStatusCode());
+        Assertions.assertEquals(errorMessage == null ? "" : errorMessage, status.getStatusMessage());
+
+        var read = ArgumentCaptor.forClass(MetadataReadRequest.class);
+        Mockito.verify(metaClient).readObject(read.capture());
+        Assertions.assertEquals(SampleMetadata.TEST_TENANT, read.getValue().getTenant());
+        Assertions.assertEquals(jobSelector(), read.getValue().getSelector());
+    }
+
+    @Test
+    void checkJob_notCachedRunningJob() {
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any()))
+                .thenReturn(jobTag(jobId, JobStatusCode.RUNNING.name(), null));
+
+        var status = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.empty());
+
+        Assertions.assertEquals(jobId, status.getJobId());
+        Assertions.assertEquals(JobStatusCode.RUNNING, status.getStatusCode());
+        Assertions.assertEquals("", status.getStatusMessage());
+    }
+
+    @Test
+    void checkJob_notCachedUnrecognisedStatus() {
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any()))
+                .thenReturn(jobTag(jobId, "NOT_A_STATUS", null));
+
+        var status = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.empty());
+
+        Assertions.assertEquals(jobId, status.getJobId());
+        Assertions.assertEquals(JobStatusCode.JOB_STATUS_CODE_NOT_SET, status.getStatusCode());
+    }
+
+    @Test
+    void checkJob_notFoundPassesThrough() {
+
+        var notFound = Status.NOT_FOUND.withDescription("Metadata not found for JOB [x]").asRuntimeException();
+
+        Mockito.when(metaClient.readObject(ArgumentMatchers.any())).thenThrow(notFound);
+
+        var request = statusRequest(SampleMetadata.TEST_TENANT);
+        var error = Assertions.assertThrows(StatusRuntimeException.class,
+                () -> processor.checkJob(request, jobSelector(), Optional.empty()));
+
+        Assertions.assertSame(notFound, error);
+    }
+
+    @Test
+    void checkJob_metadataReadUsesCallerContext() {
+
+        var callerClient = Mockito.mock(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub.class);
+
+        Mockito.when(callerClient.readObject(ArgumentMatchers.any()))
+                .thenReturn(jobTag(jobId, JobStatusCode.SUCCEEDED.name(), null));
+
+        Mockito.doReturn(clientStateFor(callerClient))
+                .when(commonConcerns).prepareClientCall(ArgumentMatchers.any());
+
+        var status = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.empty());
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, status.getStatusCode());
+        Mockito.verify(commonConcerns).prepareClientCall(io.grpc.Context.current());
+        Mockito.verify(callerClient).readObject(ArgumentMatchers.any());
+        Mockito.verify(metaClient, Mockito.never()).readObject(ArgumentMatchers.any());
+    }
+
+    private JobStatusRequest statusRequest(String tenant) {
+
+        return JobStatusRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(MetadataUtil.selectorFor(jobId))
+                .build();
+    }
+
+    private TagSelector jobSelector() {
+
+        return TagSelector.newBuilder()
+                .setObjectType(ObjectType.JOB)
+                .setObjectId(jobId.getObjectId())
+                .setObjectVersion(1)
+                .setLatestTag(true)
+                .build();
+    }
+
+    private static Tag jobTag(TagHeader header, String statusName, String errorMessage) {
+
+        var tag = Tag.newBuilder()
+                .setHeader(header)
+                .putAttrs(MetadataConstants.TRAC_JOB_STATUS_ATTR, MetadataCodec.encodeValue(statusName));
+
+        if (errorMessage != null)
+            tag.putAttrs(MetadataConstants.TRAC_JOB_ERROR_MESSAGE_ATTR, MetadataCodec.encodeValue(errorMessage));
+
+        return tag.build();
+    }
+
+    private static GrpcClientState clientStateFor(InternalMetadataApiGrpc.InternalMetadataApiBlockingStub callerClient) {
+
+        return new GrpcClientState() {
+
+            @Override
+            @SuppressWarnings("unchecked")
+            public <TStub extends AbstractStub<TStub>> TStub configureClient(TStub clientStub) {
+                return (TStub) callerClient;
+            }
+
+            @Override
+            public GrpcClientState restore(GrpcConcern grpcConcern) {
+                return this;
+            }
+        };
     }
 
     private static GrpcClientConfig passThroughClient() {
