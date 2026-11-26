@@ -38,7 +38,7 @@ import org.finos.tracdap.svc.admin.api.MessageProcessor;
 import org.finos.tracdap.svc.admin.api.TracAdminApi;
 
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.netty.NettyServerBuilder;
 
 import org.finos.tracdap.svc.admin.services.ConfigService;
 import org.finos.tracdap.svc.admin.services.NotifierService;
@@ -83,7 +83,6 @@ public class TracAdminService extends TracServiceBase {
         try {
             var platformConfig = configManager.loadRootConfigObject(PlatformConfig.class);
             var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.ADMIN_SERVICE_KEY);
-            var servicePort = serviceConfig.getPort();
 
             // Common framework for cross-cutting concerns
             var commonConcerns = buildCommonConcerns();
@@ -110,8 +109,8 @@ public class TracAdminService extends TracServiceBase {
 
             var adminApi = new TracAdminApi(configService, platformConfigService, tenantService);
 
-            var serverBuilder = ServerBuilder
-                    .forPort(servicePort)
+            var serverBuilder = NettyServerBuilder
+                    .forAddress(RoutingUtils.serviceBindAddress(serviceConfig))
                     .executor(executor)
                     .addService(adminApi)
                     .addService(new MessageProcessor())

@@ -22,7 +22,9 @@ import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RoutingTarget;
+import org.finos.tracdap.config.ServiceConfig;
 
+import java.net.InetSocketAddress;
 import java.util.Map;
 
 public class RoutingUtils {
@@ -35,6 +37,17 @@ public class RoutingUtils {
             Map.entry(ConfigKeys.DATA_SERVICE_KEY, "tracdap-svc-data"),
             Map.entry(ConfigKeys.ORCHESTRATOR_SERVICE_KEY, "tracdap-svc-orch"),
             Map.entry(ConfigKeys.GATEWAY_SERVICE_KEY, "tracdap-gateway"));
+
+    public static InetSocketAddress serviceBindAddress(ServiceConfig serviceConfig) {
+
+        // Listen on all interfaces unless network.bindAddress is set
+
+        var bindAddress = serviceConfig.getPropertiesOrDefault(ConfigKeys.NETWORK_BIND_ADDRESS, "");
+
+        return bindAddress.isEmpty()
+                ? new InetSocketAddress(serviceConfig.getPort())
+                : new InetSocketAddress(bindAddress, serviceConfig.getPort());
+    }
 
     public static RoutingTarget serviceTarget(PlatformConfig platformConfig, String serviceKey) {
 
