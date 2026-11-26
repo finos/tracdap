@@ -75,6 +75,7 @@ class MetadataWriteHookTest {
         assertEquals(ObjectWrite.Operation.CREATE, write.operation());
         assertFalse(write.inBatch());
         assertNull(write.priorDefinition());
+        assertNull(write.priorTag());
         assertEquals(schemaType, write.definition().getCustom().getCustomSchemaType());
         assertNotNull(write.userMetadata());
     }
@@ -105,6 +106,31 @@ class MetadataWriteHookTest {
         assertFalse(update.inBatch());
         assertEquals(1, update.priorDefinition().getCustom().getCustomSchemaVersion());
         assertEquals(2, update.definition().getCustom().getCustomSchemaVersion());
+        assertSameTag(v1, update.priorTag().getHeader());
+        assertFalse(update.priorTag().hasDefinition());
+    }
+
+    @Test
+    void updateObject_priorTagIsTheLatestTagOfThePriorVersion() {
+
+        var schemaType = uniqueSchemaType();
+        var v1 = publicApi.createObject(createRequest(schemaType));
+
+        var t2 = publicApi.updateTag(MetadataWriteRequest.newBuilder()
+                .setTenant(TEST_TENANT)
+                .setObjectType(ObjectType.CUSTOM)
+                .setPriorVersion(MetadataUtil.selectorFor(v1))
+                .addTagUpdates(TagUpdate.newBuilder()
+                        .setAttrName("hook_test_attr")
+                        .setValue(MetadataCodec.encodeValue("tag 2")))
+                .build());
+
+        // The update names the first tag, the hook sees the latest
+        publicApi.updateObject(updateRequest(v1, schemaType, 2));
+
+        var update = writesFor(schemaType).get(1);
+        assertSameTag(t2, update.priorTag().getHeader());
+        assertEquals("tag 2", update.priorTag().getAttrsOrThrow("hook_test_attr").getStringValue());
     }
 
     @Test
@@ -263,6 +289,13 @@ class MetadataWriteHookTest {
                                         .setOperator(SearchOperator.EQ)
                                         .setSearchValue(MetadataCodec.encodeValue(schemaType)))))
                 .build());
+    }
+
+    private static void assertSameTag(TagHeader expected, TagHeader actual) {
+
+        assertEquals(expected.getObjectId(), actual.getObjectId());
+        assertEquals(expected.getObjectVersion(), actual.getObjectVersion());
+        assertEquals(expected.getTagVersion(), actual.getTagVersion());
     }
 
     private static MetadataWriteRequest refused(MetadataWriteRequest request) {
