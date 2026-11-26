@@ -135,16 +135,16 @@ public class RunFlowScenarioTest {
         var models = importModels(scenario);
         var inputs = loadInputs(scenario);
 
-        // The scenario runs as it does without a context, its job and outputs record the context
-        var jobId = runFlow(scenario, flowId, models, inputs, Map.of(), MetadataUtil.selectorFor(contextId));
+        // The scenario runs as it does without a context, its job and outputs record the context and its part
+        var jobId = runFlow(scenario, flowId, models, inputs, Map.of(), MetadataUtil.selectorFor(contextId), "part_a");
         var result = checkResult(scenario, jobId, 1);
 
-        checkContext(MetadataUtil.selectorForLatest(jobId), contextId);
+        checkContext(MetadataUtil.selectorForLatest(jobId), contextId, "part_a");
 
         for (var output : result.getOutputsMap().values())
-            checkContext(output, contextId);
+            checkContext(output, contextId, "part_a");
 
-        checkContext(result.getLogFileId(), contextId);
+        checkContext(result.getLogFileId(), contextId, "part_a");
     }
 
     private TagHeader createFlow(FlowScenario scenario) {
@@ -235,6 +235,14 @@ public class RunFlowScenarioTest {
             Map<String, TagHeader> models, Map<String, TagHeader> inputs,
             Map<String, TagSelector> priorOutputs, TagSelector context) {
 
+        return runFlow(scenario, flowId, models, inputs, priorOutputs, context, null);
+    }
+
+    private TagHeader runFlow(
+            FlowScenario scenario, TagHeader flowId,
+            Map<String, TagHeader> models, Map<String, TagHeader> inputs,
+            Map<String, TagSelector> priorOutputs, TagSelector context, String contextPart) {
+
         var runFlow = RunFlowJob.newBuilder()
                 .setFlow(MetadataUtil.selectorFor(flowId))
                 .putAllParameters(scenario.parameters())
@@ -249,6 +257,9 @@ public class RunFlowScenarioTest {
 
         if (context != null)
             job.setContext(context);
+
+        if (contextPart != null)
+            job.setContextPart(contextPart);
 
         var jobRequest = JobRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -313,7 +324,7 @@ public class RunFlowScenarioTest {
         return result;
     }
 
-    private void checkContext(TagSelector selector, TagHeader contextId) {
+    private void checkContext(TagSelector selector, TagHeader contextId, String contextPart) {
 
         var tag = platform.metaClientBlocking().readObject(MetadataReadRequest.newBuilder()
                 .setTenant(TEST_TENANT)
@@ -330,6 +341,11 @@ public class RunFlowScenarioTest {
         Assertions.assertEquals(
                 contextId.getObjectVersion(),
                 MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)),
+                objectKey);
+
+        Assertions.assertEquals(
+                contextPart,
+                MetadataCodec.decodeStringValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR)),
                 objectKey);
     }
 

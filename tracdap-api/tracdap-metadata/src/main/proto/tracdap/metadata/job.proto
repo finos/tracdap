@@ -111,6 +111,10 @@ message JobDefinition {
   /// A CUSTOM object the job runs under, at an explicit version
   /// Recorded on the job and its outputs, it is not used to run the job
   optional TagSelector context = 9;
+
+  /// Names a part of the context the job runs under, an identifier, only with a context
+  /// Recorded on the job and its outputs, it is not used to run the job
+  optional string contextPart = 10;
 }
 
 /**

@@ -48,6 +48,7 @@ public class JobValidator {
     private static final Descriptors.OneofDescriptor JD_JOB_DETAILS;
     private static final Descriptors.FieldDescriptor JD_RESULT_ID;
     private static final Descriptors.FieldDescriptor JD_CONTEXT;
+    private static final Descriptors.FieldDescriptor JD_CONTEXT_PART;
 
     private static final Descriptors.Descriptor IMPORT_MODEL_JOB;
     private static final Descriptors.FieldDescriptor IMJ_LANGUAGE;
@@ -107,6 +108,7 @@ public class JobValidator {
         JD_JOB_DETAILS = field(JOB_DEFINITION, JobDefinition.RUNMODEL_FIELD_NUMBER).getContainingOneof();
         JD_RESULT_ID = field(JOB_DEFINITION, JobDefinition.RESULTID_FIELD_NUMBER);
         JD_CONTEXT = field(JOB_DEFINITION, JobDefinition.CONTEXT_FIELD_NUMBER);
+        JD_CONTEXT_PART = field(JOB_DEFINITION, JobDefinition.CONTEXTPART_FIELD_NUMBER);
 
         IMPORT_MODEL_JOB = ImportModelJob.getDescriptor();
         IMJ_LANGUAGE = field(IMPORT_MODEL_JOB, ImportModelJob.LANGUAGE_FIELD_NUMBER);
@@ -205,6 +207,12 @@ public class JobValidator {
                 .apply(ObjectIdValidator::tagSelector, TagSelector.class)
                 .apply(ObjectIdValidator::selectorType, TagSelector.class, ObjectType.CUSTOM)
                 .apply(ObjectIdValidator::explicitObjectVersion, TagSelector.class)
+                .pop();
+
+        ctx = ctx.push(JD_CONTEXT_PART)
+                .apply(CommonValidators.onlyIf(msg.hasContext(), "a context is given"))
+                .apply(CommonValidators::identifier)
+                .apply(CommonValidators::notTracReserved)
                 .pop();
 
         return ctx;
