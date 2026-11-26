@@ -43,12 +43,13 @@ public class TagWrite {
     private final boolean inBatch;
     private final UserMetadata userMetadata;
     private final IConfigReader reader;
+    private final IObjectReader objectReader;
 
     public TagWrite(
             String tenant, ObjectType objectType, Tag priorTag,
             TagControl control, VersionScope versionScope, List<TagUpdate> tagUpdates,
             int latestObjectVersion, boolean inBatch,
-            UserMetadata userMetadata, IConfigReader reader) {
+            UserMetadata userMetadata, IConfigReader reader, IObjectReader objectReader) {
 
         this.tenant = tenant;
         this.objectType = objectType;
@@ -60,6 +61,7 @@ public class TagWrite {
         this.inBatch = inBatch;
         this.userMetadata = userMetadata;
         this.reader = reader;
+        this.objectReader = objectReader;
     }
 
     public String tenant() {
@@ -107,5 +109,9 @@ public class TagWrite {
 
     public IConfigReader reader() {
         return reader;
+    }
+
+    public IObjectReader objectReader() {
+        return objectReader;
     }
 }

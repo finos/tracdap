@@ -41,6 +41,7 @@ import org.finos.tracdap.metadata.TenantInfo;
 import org.finos.tracdap.svc.meta.api.MessageProcessor;
 import org.finos.tracdap.svc.meta.services.ConfigService;
 import org.finos.tracdap.svc.meta.services.MetadataConfigReader;
+import org.finos.tracdap.svc.meta.services.MetadataObjectReader;
 import org.finos.tracdap.svc.meta.services.MetadataReadService;
 import org.finos.tracdap.svc.meta.services.MetadataSearchService;
 import org.finos.tracdap.svc.meta.services.MetadataWriteService;
@@ -142,7 +143,8 @@ public class TracMetadataService extends TracServiceBase {
             // Set up services and APIs
             var readService = new MetadataReadService(metadataStore, platformConfig, tenantConfigMap);
             var configReader = new MetadataConfigReader(metadataStore);
-            var writeService = new MetadataWriteService(metadataStore, registry, configReader);
+            var objectReader = new MetadataObjectReader(metadataStore);
+            var writeService = new MetadataWriteService(metadataStore, registry, configReader, objectReader);
             var searchService = new MetadataSearchService(metadataStore);
             var configService = new ConfigService(metadataStore, registry, configReader, tenantTemplate);
             configService.checkTenantTemplate();

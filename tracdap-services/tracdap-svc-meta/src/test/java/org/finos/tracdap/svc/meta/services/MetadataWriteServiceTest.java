@@ -25,6 +25,7 @@ import org.finos.tracdap.common.metadata.store.IMetadataStore;
 import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.IConfigReader;
+import org.finos.tracdap.common.service.IObjectReader;
 import org.finos.tracdap.metadata.*;
 import org.finos.tracdap.test.meta.SampleMetadata;
 
@@ -57,7 +58,7 @@ class MetadataWriteServiceTest {
     void setup() {
 
         store = Mockito.mock(IMetadataStore.class);
-        writeService = new MetadataWriteService(store, new PluginRegistry(), Mockito.mock(IConfigReader.class));
+        writeService = new MetadataWriteService(store, new PluginRegistry(), Mockito.mock(IConfigReader.class), Mockito.mock(IObjectReader.class));
     }
 
     @Test
