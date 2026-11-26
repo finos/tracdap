@@ -376,7 +376,7 @@ public class JobProcessorHelpers {
             objects.remove(contextKey);
             tags.remove(contextKey);
 
-            definition = definition.toBuilder().clearContext().build();
+            definition = definition.toBuilder().clearContext().clearContextPart().build();
         }
 
         // The job's tag is sent without the context, or the status it had when the job was created
@@ -386,6 +386,7 @@ public class JobProcessorHelpers {
             var jobTag = tags.get(jobState.jobKey).toBuilder()
                     .removeAttrs(TRAC_JOB_CONTEXT_ATTR)
                     .removeAttrs(TRAC_JOB_CONTEXT_VERSION_ATTR)
+                    .removeAttrs(TRAC_JOB_CONTEXT_PART_ATTR)
                     .removeAttrs(TRAC_JOB_STATUS_ATTR)
                     .build();
 
@@ -707,6 +708,12 @@ public class JobProcessorHelpers {
                 attrs.addAttrs(TagUpdate.newBuilder()
                         .setAttrName(TRAC_JOB_CONTEXT_VERSION_ATTR)
                         .setValue(MetadataCodec.encodeValue(context.getObjectVersion())));
+
+                if (jobState.definition.hasContextPart()) {
+                    attrs.addAttrs(TagUpdate.newBuilder()
+                            .setAttrName(TRAC_JOB_CONTEXT_PART_ATTR)
+                            .setValue(MetadataCodec.encodeValue(jobState.definition.getContextPart())));
+                }
             }
 
             if (objectId.getObjectVersion() == MetadataConstants.OBJECT_FIRST_VERSION) {
