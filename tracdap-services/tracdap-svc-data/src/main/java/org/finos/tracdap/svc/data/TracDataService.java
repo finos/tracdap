@@ -213,7 +213,7 @@ public class TracDataService extends TracServiceBase {
             var messageProcessor = new MessageProcessor(storageManager, offloadExecutor, registry);
 
             var serverBuilder = NettyServerBuilder
-                    .forPort(serviceConfig.getPort())
+                    .forAddress(RoutingUtils.serviceBindAddress(serviceConfig))
 
                     // Netty setup
                     .channelType(channelType)

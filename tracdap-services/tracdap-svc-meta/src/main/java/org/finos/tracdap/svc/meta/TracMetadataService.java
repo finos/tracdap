@@ -50,7 +50,7 @@ import org.finos.tracdap.svc.meta.services.PlatformConfigService;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.netty.NettyServerBuilder;
 
 import org.finos.tracdap.svc.meta.api.TracMetadataApi;
 import org.finos.tracdap.svc.meta.api.InternalMetadataApi;
@@ -175,10 +175,9 @@ public class TracMetadataService extends TracServiceBase {
             // Underlying Netty pools / ELs are managed automatically by gRPC for now
 
             var serviceConfig = platformConfig.getServicesOrThrow(ConfigKeys.METADATA_SERVICE_KEY);
-            var servicePort = serviceConfig.getPort();
 
-            var serverBuilder = ServerBuilder
-                    .forPort(servicePort)
+            var serverBuilder = NettyServerBuilder
+                    .forAddress(RoutingUtils.serviceBindAddress(serviceConfig))
                     .executor(executor)
                     .addService(publicApi)
                     .addService(internalApi)
