@@ -20,6 +20,7 @@ package org.finos.tracdap.common.service;
 import org.finos.tracdap.common.grpc.UserMetadata;
 import org.finos.tracdap.metadata.ObjectDefinition;
 import org.finos.tracdap.metadata.ObjectType;
+import org.finos.tracdap.metadata.Tag;
 
 /**
  * A single metadata object write, as seen by an {@link IMetadataWriteHook}.
@@ -37,12 +38,13 @@ public class ObjectWrite {
     private final Operation operation;
     private final boolean inBatch;
     private final ObjectDefinition priorDefinition;
+    private final Tag priorTag;
     private final ObjectDefinition definition;
     private final UserMetadata userMetadata;
 
     public ObjectWrite(
             String tenant, ObjectType objectType, Operation operation, boolean inBatch,
-            ObjectDefinition priorDefinition, ObjectDefinition definition,
+            ObjectDefinition priorDefinition, Tag priorTag, ObjectDefinition definition,
             UserMetadata userMetadata) {
 
         this.tenant = tenant;
@@ -50,6 +52,7 @@ public class ObjectWrite {
         this.operation = operation;
         this.inBatch = inBatch;
         this.priorDefinition = priorDefinition;
+        this.priorTag = priorTag;
         this.definition = definition;
         this.userMetadata = userMetadata;
     }
@@ -74,6 +77,11 @@ public class ObjectWrite {
     /** The prior definition, for updates */
     public ObjectDefinition priorDefinition() {
         return priorDefinition;
+    }
+
+    /** The latest tag of the prior version, without its definition, for updates */
+    public Tag priorTag() {
+        return priorTag;
     }
 
     public ObjectDefinition definition() {

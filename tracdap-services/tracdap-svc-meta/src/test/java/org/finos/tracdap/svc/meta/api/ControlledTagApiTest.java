@@ -853,12 +853,46 @@ abstract class ControlledTagApiTest {
         assertEquals(0, writes[0].latestObjectVersion());
         assertFalse(writes[0].inBatch());
         assertNotNull(writes[0].reader());
+        assertNotNull(writes[0].objectReader());
         assertNotNull(writes[0].userMetadata());
 
         // One call for a write to all versions, with the latest version number
         assertEquals(VersionScope.VERSION_SCOPE_ALL_VERSIONS, writes[1].versionScope());
         assertEquals(2, writes[1].latestObjectVersion());
         assertEquals(t2, writes[1].priorTag().getHeader());
+    }
+
+    @Test
+    void hook_readsObjectsThroughItsObjectReader() {
+
+        var other = createObject();
+        var target = createObject();
+        var seen = new java.util.concurrent.atomic.AtomicReference<org.finos.tracdap.metadata.Tag>();
+
+        onTagWrite(write -> seen.set(write.objectReader().readObject(write.tenant(), MetadataUtil.selectorFor(other))));
+
+        var t2 = publicApi.updateTag(ordinary(target, set("description", "read another object")));
+
+        assertEquals(other.getObjectId(), seen.get().getHeader().getObjectId());
+        assertEquals(other.getTagVersion(), seen.get().getHeader().getTagVersion());
+        assertTrue(seen.get().hasDefinition());
+
+        // A missing object is reported to the hook as not found
+        var missing = MetadataUtil.selectorFor(other).toBuilder().setObjectId(java.util.UUID.randomUUID().toString()).build();
+        var notFound = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        onTagWrite(write -> {
+            try {
+                write.objectReader().readObject(write.tenant(), missing);
+            }
+            catch (org.finos.tracdap.common.exception.EMetadataNotFound e) {
+                notFound.set(true);
+            }
+        });
+
+        publicApi.updateTag(ordinary(t2, set("description", "read a missing object")));
+
+        assertTrue(notFound.get());
     }
 
     @Test

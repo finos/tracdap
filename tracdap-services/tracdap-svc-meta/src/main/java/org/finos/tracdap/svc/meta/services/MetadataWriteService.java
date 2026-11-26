@@ -33,6 +33,7 @@ import org.finos.tracdap.common.metadata.tag.ObjectUpdateLogic;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.IConfigReader;
 import org.finos.tracdap.common.service.IMetadataWriteHook;
+import org.finos.tracdap.common.service.IObjectReader;
 import org.finos.tracdap.common.service.ObjectWrite;
 import org.finos.tracdap.common.service.TagWrite;
 import org.finos.tracdap.common.exception.EInputValidation;
@@ -58,13 +59,17 @@ public class MetadataWriteService {
     private final IMetadataStore metadataStore;
     private final PluginRegistry registry;
     private final IConfigReader configReader;
+    private final IObjectReader objectReader;
     private final BundleLoader bundleLoader;
     private final UuidFactory objectIdFactory;
 
-    public MetadataWriteService(IMetadataStore metadataStore, PluginRegistry registry, IConfigReader configReader) {
+    public MetadataWriteService(
+            IMetadataStore metadataStore, PluginRegistry registry,
+            IConfigReader configReader, IObjectReader objectReader) {
         this.metadataStore = metadataStore;
         this.registry = registry;
         this.configReader = configReader;
+        this.objectReader = objectReader;
         this.bundleLoader = new BundleLoader(metadataStore);
         this.objectIdFactory = new UuidFactory();
     }
@@ -209,7 +214,7 @@ public class MetadataWriteService {
             if (hook != null)
                 hook.validateObject(objectWrite(
                         tenant, ObjectWrite.Operation.CREATE_PREALLOCATED, inBatch,
-                        request, null, userMetadata));
+                        request, null, null, userMetadata));
 
             var objectId = UUID.fromString(request.getPriorVersion().getObjectId());
 
@@ -235,7 +240,7 @@ public class MetadataWriteService {
             if (hook != null)
                 hook.validateObject(objectWrite(
                         tenant, ObjectWrite.Operation.CREATE, inBatch,
-                        request, null, userMetadata));
+                        request, null, null, userMetadata));
 
             var objectId = objectIdFactory.allocate();
 
@@ -286,12 +291,14 @@ public class MetadataWriteService {
                     request.getDefinition(),
                     priorVersion.getDefinition());
 
+            var latestPriorTag = latestPriorTags.get(i);
+
             if (hook != null)
                 hook.validateObject(objectWrite(
                         tenant, ObjectWrite.Operation.UPDATE, inBatch,
-                        request, priorVersion.getDefinition(), userMetadata));
-
-            var latestPriorTag = latestPriorTags.get(i);
+                        request, priorVersion.getDefinition(),
+                        latestPriorTag != null ? latestPriorTag : priorVersion,
+                        userMetadata));
 
             var newObject = ObjectUpdateLogic.buildNewVersion(
                     priorVersion, latestPriorTag, request.getDefinition(), request.getTagUpdatesList(),
@@ -336,12 +343,14 @@ public class MetadataWriteService {
 
     private ObjectWrite objectWrite(
             String tenant, ObjectWrite.Operation operation, boolean inBatch,
-            MetadataWriteRequest request, ObjectDefinition priorDefinition,
+            MetadataWriteRequest request, ObjectDefinition priorDefinition, Tag priorTag,
             UserMetadata userMetadata) {
+
+        var priorTagOnly = priorTag != null ? priorTag.toBuilder().clearDefinition().build() : null;
 
         return new ObjectWrite(
                 tenant, request.getObjectType(), operation, inBatch,
-                priorDefinition, request.getDefinition(), userMetadata);
+                priorDefinition, priorTagOnly, request.getDefinition(), userMetadata);
     }
 
     private List<Tag> processNewTags(
@@ -475,6 +484,6 @@ public class MetadataWriteService {
         return new TagWrite(
                 tenant, request.getObjectType(), priorTag,
                 request.getControl(), request.getVersionScope(), request.getTagUpdatesList(),
-                latestObjectVersion, inBatch, userMetadata, configReader);
+                latestObjectVersion, inBatch, userMetadata, configReader, objectReader);
     }
 }
