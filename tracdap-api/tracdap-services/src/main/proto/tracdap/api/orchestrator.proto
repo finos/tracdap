@@ -125,6 +125,6 @@ message JobStatus {
   metadata.JobStatusCode statusCode = 2;
   string statusMessage = 3;
 
-  /// Progress of a running job, filled only by checkJob() and followJob()
+  /// Progress of a running job, filled only by checkJob()
   optional metadata.JobProgress progress = 4;
 }

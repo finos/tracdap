@@ -852,7 +852,8 @@ class FlowScenarioProgressTest(flow_scenarios.FlowScenarioDevModeTest):
         job_result, job_progress, _ = self._run_progress_scenario("branch_failure")
         self._check_branch_failure(job_result, job_progress)
 
-    def test_independent_branch_after_failure(self):
+    @staticmethod
+    def _bad_branch_first():
 
         is_viable_node = engine.GraphProcessor._is_viable_node.__func__  # noqa
 
@@ -864,8 +865,11 @@ class FlowScenarioProgressTest(flow_scenarios.FlowScenarioDevModeTest):
                     return False
             return is_viable_node(cls, node, graph)
 
-        with recording_handler() as recording, \
-                mock.patch.object(engine.GraphProcessor, "_is_viable_node", classmethod(bad_branch_first)):
+        return mock.patch.object(engine.GraphProcessor, "_is_viable_node", classmethod(bad_branch_first))
+
+    def test_independent_branch_after_failure(self):
+
+        with recording_handler() as recording, self._bad_branch_first():
 
             job_result, job_progress, _ = self._run_progress_scenario("branch_failure")
 
@@ -907,8 +911,10 @@ class FlowScenarioProgressTest(flow_scenarios.FlowScenarioDevModeTest):
         for scenario_name in ["chain", "branch_failure"]:
             with self.subTest(scenario_name):
 
-                without_progress = self._saved_log(scenario_name, progress_enabled=False)
-                with_progress = self._saved_log(scenario_name, progress_enabled=True)
+                # How far an independent branch gets before a failure depends on scheduling, so the order is fixed
+                with self._bad_branch_first():
+                    without_progress = self._saved_log(scenario_name, progress_enabled=False)
+                    with_progress = self._saved_log(scenario_name, progress_enabled=True)
 
                 # Independent nodes start in no fixed order, so the lines are compared without their order
                 self.assertEqual(sorted(without_progress), sorted(with_progress))

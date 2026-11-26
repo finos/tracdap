@@ -442,8 +442,7 @@ public class JobProcessor {
         if (priorRead != null && priorRead.reuseUntil.isAfter(now))
             return Optional.ofNullable(priorRead.progress);
 
-        var snapshotSeen = priorRead != null && priorRead.snapshotSeen;
-        var read = readSnapshot(jobState, storageKey, progressPath, snapshotSeen, now);
+        var read = readSnapshot(jobState, storageKey, progressPath, priorRead, now);
 
         progressReads.put(jobState.jobKey, read);
 
@@ -452,7 +451,10 @@ public class JobProcessor {
 
     private ProgressRead readSnapshot(
             JobState jobState, String storageKey, String progressPath,
-            boolean snapshotSeen, Instant now) {
+            ProgressRead priorRead, Instant now) {
+
+        var snapshotSeen = priorRead != null && priorRead.snapshotSeen;
+        var priorProgress = priorRead != null ? priorRead.progress : null;
 
         // One deadline covers the whole read, a deadline is absolute so it is applied per call
         var deadline = Deadline.after(PROGRESS_READ_DEADLINE.toMillis(), TimeUnit.MILLISECONDS);
@@ -492,10 +494,10 @@ public class JobProcessor {
         }
         catch (ETrac | StatusRuntimeException e) {
 
-            // A missing or partly written snapshot is normal while a job starts, report the status without it
+            // A missing or partly written snapshot is normal while a job runs, the last snapshot read is kept
             log.debug("Job progress not available for [{}]: {}", jobState.jobKey, e.getMessage());
 
-            return new ProgressRead(now, null, snapshotSeen);
+            return new ProgressRead(now, priorProgress, snapshotSeen);
         }
     }
 

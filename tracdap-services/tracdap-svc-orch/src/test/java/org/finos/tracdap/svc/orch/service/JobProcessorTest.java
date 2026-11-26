@@ -483,6 +483,29 @@ public class JobProcessorTest {
     }
 
     @Test
+    void checkJob_progressKeptWhenLaterReadFails() throws Exception {
+
+        snapshotExists(true);
+        snapshotReturns(progressJson());
+
+        var jobState = runningJob(true);
+        processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.of(jobState));
+
+        snapshotReturns("{ \"steps\": [ { \"stepType\": ");
+        clock.advance(PROGRESS_REUSE);
+        var partial = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.of(jobState));
+
+        Mockito.when(storageClient.readSmallFile(ArgumentMatchers.any(StorageReadRequest.class)))
+                .thenThrow(Status.UNAVAILABLE.asRuntimeException());
+        clock.advance(PROGRESS_REUSE);
+        var unavailable = processor.checkJob(statusRequest(SampleMetadata.TEST_TENANT), jobSelector(), Optional.of(jobState));
+
+        Assertions.assertEquals(sampleProgress(), partial.getProgress());
+        Assertions.assertEquals(sampleProgress(), unavailable.getProgress());
+        Mockito.verify(storageClient, Mockito.times(3)).readSmallFile(ArgumentMatchers.any());
+    }
+
+    @Test
     void checkJob_progressUnknownField() throws Exception {
 
         snapshotExists(true);

@@ -28,7 +28,7 @@ class BlobJobExitTest(job_exit.JobExitTestSuite, unittest.TestCase):
     def _job_store(self) -> meta.ResourceDefinition:
         return meta.ResourceDefinition(
             resourceType=meta.ResourceType.INTERNAL_STORAGE, protocol="BLOB",
-            properties=int_storage_azure.BlobArrowStorageTest._properties_from_env())  # noqa
+            properties=int_storage_azure.BlobFsspecStorageTest._properties_from_env())  # noqa
 
 
 if __name__ == "__main__":
