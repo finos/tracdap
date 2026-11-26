@@ -131,6 +131,28 @@ class ObjectUpdateLogicTest {
         assertEquals("RUN_MODEL", MetadataCodec.decodeStringValue(attrs.get(MetadataConstants.TRAC_JOB_TYPE_ATTR)));
         assertEquals(contextId, MetadataCodec.decodeStringValue(attrs.get(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)));
         assertEquals(3, MetadataCodec.decodeIntegerValue(attrs.get(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)));
+        assertFalse(attrs.containsKey(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR));
+    }
+
+    @Test
+    void structuredJobAttrs_contextPart() {
+
+        var contextId = UUID.randomUUID().toString();
+
+        var jobDef = JobDefinition.newBuilder()
+                .setJobType(JobType.RUN_MODEL)
+                .setContext(TagSelector.newBuilder()
+                        .setObjectType(ObjectType.CUSTOM)
+                        .setObjectId(contextId)
+                        .setObjectVersion(3)
+                        .setLatestTag(true))
+                .setContextPart("part_a")
+                .build();
+
+        var attrs = attrsByName(ObjectUpdateLogic.structuredJobAttrs(jobDef));
+
+        assertEquals(contextId, MetadataCodec.decodeStringValue(attrs.get(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)));
+        assertEquals("part_a", MetadataCodec.decodeStringValue(attrs.get(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR)));
     }
 
     @Test
@@ -151,6 +173,7 @@ class ObjectUpdateLogicTest {
         var priorTag = ObjectUpdateLogic.buildNewObject(
                 UUID.randomUUID(), customDef("acme_widget"),
                 List.of(attr("trac_job_context", "context_id"), intAttr("trac_job_context_version", 1),
+                        attr("trac_job_context_part", "part_a"),
                         attr("TRAC_JOB_CONTEXT", "context_id_upper"), attr("trac_job_type", "RUN_MODEL"),
                         attr("trac_job_context_other", "kept"), attr("business_key", "kept")),
                 null, requestMetadata(), userMetadata());
@@ -161,6 +184,7 @@ class ObjectUpdateLogicTest {
 
         assertFalse(newTag.containsAttrs("trac_job_context"));
         assertFalse(newTag.containsAttrs("trac_job_context_version"));
+        assertFalse(newTag.containsAttrs("trac_job_context_part"));
         assertFalse(newTag.containsAttrs("TRAC_JOB_CONTEXT"));
 
         assertTrue(newTag.containsAttrs("trac_job_type"));
@@ -190,7 +214,8 @@ class ObjectUpdateLogicTest {
 
         var priorTag = ObjectUpdateLogic.buildNewObject(
                 UUID.randomUUID(), customDef("acme_widget"),
-                List.of(attr("trac_job_context", "context_id"), intAttr("trac_job_context_version", 1)),
+                List.of(attr("trac_job_context", "context_id"), intAttr("trac_job_context_version", 1),
+                        attr("trac_job_context_part", "part_a")),
                 null, requestMetadata(), userMetadata());
 
         var newTag = ObjectUpdateLogic.buildNewTag(
@@ -199,6 +224,7 @@ class ObjectUpdateLogicTest {
 
         assertEquals("context_id", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("trac_job_context")));
         assertEquals(1, MetadataCodec.decodeIntegerValue(newTag.getAttrsOrThrow("trac_job_context_version")));
+        assertEquals("part_a", MetadataCodec.decodeStringValue(newTag.getAttrsOrThrow("trac_job_context_part")));
     }
 
     @Test

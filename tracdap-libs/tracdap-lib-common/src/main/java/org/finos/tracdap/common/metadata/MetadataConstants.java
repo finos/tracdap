@@ -80,7 +80,7 @@ public class MetadataConstants {
     // Attributes that belong to one object version, they are not carried over to a new version
     // Tag-only updates keep them, a new version only has them if the write that creates it sets them again
     public static final Pattern VERSION_SCOPED_ATTRS = Pattern.compile(
-            "\\A(trac_job_context|trac_job_context_version|ctl_this_.*)\\Z", Pattern.CASE_INSENSITIVE);
+            "\\A(trac_job_context|trac_job_context_version|trac_job_context_part|ctl_this_.*)\\Z", Pattern.CASE_INSENSITIVE);
 
     public static final String TRAC_CREATE_TIME = "trac_create_time";
     public static final String TRAC_CREATE_USER_ID = "trac_create_user_id";
@@ -97,6 +97,7 @@ public class MetadataConstants {
     public static final String TRAC_JOB_ERROR_MESSAGE_ATTR = "trac_job_error_message";
     public static final String TRAC_JOB_CONTEXT_ATTR = "trac_job_context";
     public static final String TRAC_JOB_CONTEXT_VERSION_ATTR = "trac_job_context_version";
+    public static final String TRAC_JOB_CONTEXT_PART_ATTR = "trac_job_context_part";
 
     public static final String TRAC_SCHEMA_TYPE_ATTR = "trac_schema_type";
     public static final String TRAC_SCHEMA_FIELD_COUNT_ATTR = "trac_schema_field_count";

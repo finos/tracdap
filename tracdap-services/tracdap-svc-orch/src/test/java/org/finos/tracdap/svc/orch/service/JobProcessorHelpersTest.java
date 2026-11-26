@@ -155,6 +155,7 @@ public class JobProcessorHelpersTest {
         jobState.definition = JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
                 .setContext(MetadataUtil.selectorFor(contextId))
+                .setContextPart("part_a")
                 .build();
 
         helpers.processJobResult(jobState);
@@ -172,6 +173,10 @@ public class JobProcessorHelpersTest {
             Assertions.assertTrue(attrs.stream().anyMatch(attr ->
                     attr.getAttrName().equals(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR) &&
                     MetadataCodec.decodeIntegerValue(attr.getValue()) == contextId.getObjectVersion()));
+
+            Assertions.assertTrue(attrs.stream().anyMatch(attr ->
+                    attr.getAttrName().equals(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR) &&
+                    MetadataCodec.decodeStringValue(attr.getValue()).equals("part_a")));
         }
     }
 
@@ -392,6 +397,16 @@ public class JobProcessorHelpersTest {
     }
 
     @Test
+    void buildJobConfig_contextPartNotSentToRuntime() {
+
+        var jobState = configJobState(CONTEXT_SELECTOR, "part_a");
+        var newState = helpers.buildJobConfig(jobState);
+
+        Assertions.assertFalse(newState.jobConfig.getJob().hasContextPart());
+        Assertions.assertEquals("part_a", newState.definition.getContextPart());
+    }
+
+    @Test
     void buildJobConfig_noContextUnchanged() {
 
         var jobState = configJobState(null);
@@ -482,6 +497,7 @@ public class JobProcessorHelpersTest {
         Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_STATUS_ATTR));
         Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_CONTEXT_ATTR));
         Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR));
+        Assertions.assertFalse(sentTag.containsAttrs(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR));
 
         // The job is not an object the job definition refers to
         Assertions.assertFalse(jobConfig.containsObjectMapping(jobState.jobKey));
@@ -673,6 +689,7 @@ public class JobProcessorHelpersTest {
                 .putAttrs(MetadataConstants.TRAC_JOB_STATUS_ATTR, MetadataCodec.encodeValue("QUEUED"))
                 .putAttrs(MetadataConstants.TRAC_JOB_CONTEXT_ATTR, MetadataCodec.encodeValue(CONTEXT_ID.getObjectId()))
                 .putAttrs(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR, MetadataCodec.encodeValue(CONTEXT_ID.getObjectVersion()))
+                .putAttrs(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR, MetadataCodec.encodeValue("part_a"))
                 .putAttrs(MetadataConstants.TRAC_CREATE_USER_NAME, MetadataCodec.encodeValue("Test User"));
 
         userAttrs.forEach((name, value) -> tag.putAttrs(name, MetadataCodec.encodeValue(value)));
@@ -777,12 +794,20 @@ public class JobProcessorHelpersTest {
 
     private JobState configJobState(TagSelector context) {
 
+        return configJobState(context, null);
+    }
+
+    private JobState configJobState(TagSelector context, String contextPart) {
+
         var definition = JobDefinition.newBuilder()
                 .setJobType(JobType.RUN_MODEL)
                 .setRunModel(RunModelJob.newBuilder().setModel(MODEL_SELECTOR));
 
         if (context != null)
             definition.setContext(context);
+
+        if (contextPart != null)
+            definition.setContextPart(contextPart);
 
         var objects = new HashMap<String, ObjectDefinition>();
         var tags = new HashMap<String, Tag>();

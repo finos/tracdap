@@ -434,22 +434,34 @@ public class ObjectUpdateLogic {
                 .build());
 
         if (tracJob.hasContext())
-            jobAttrs.addAll(jobContextAttrs(tracJob.getContext()));
+            jobAttrs.addAll(jobContextAttrs(tracJob));
 
         return jobAttrs;
     }
 
-    private static List<TagUpdate> jobContextAttrs(TagSelector context) {
+    private static List<TagUpdate> jobContextAttrs(JobDefinition tracJob) {
 
-        return List.of(
-                TagUpdate.newBuilder()
-                        .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)
-                        .setValue(MetadataCodec.encodeValue(context.getObjectId()))
-                        .build(),
-                TagUpdate.newBuilder()
-                        .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)
-                        .setValue(MetadataCodec.encodeValue(context.getObjectVersion()))
-                        .build());
+        var context = tracJob.getContext();
+        var attrs = new ArrayList<TagUpdate>();
+
+        attrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_ATTR)
+                .setValue(MetadataCodec.encodeValue(context.getObjectId()))
+                .build());
+
+        attrs.add(TagUpdate.newBuilder()
+                .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)
+                .setValue(MetadataCodec.encodeValue(context.getObjectVersion()))
+                .build());
+
+        if (tracJob.hasContextPart()) {
+            attrs.add(TagUpdate.newBuilder()
+                    .setAttrName(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR)
+                    .setValue(MetadataCodec.encodeValue(tracJob.getContextPart()))
+                    .build());
+        }
+
+        return attrs;
     }
 
     public static List<TagUpdate> structuredCustomAttrs(CustomDefinition tracCustom) {
