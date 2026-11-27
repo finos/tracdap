@@ -29,6 +29,7 @@ import unittest
 import yaml
 
 import tracdap.rt.config as cfg
+import tracdap.rt.exceptions as ex
 import tracdap.rt.metadata as meta
 import tracdap.rt._impl.core.logging as log  # noqa
 import tracdap.rt._impl.core.plugins as plugins  # noqa
@@ -196,7 +197,7 @@ class JobExitTestSuite:
                 snapshot = self._read_store(driver.PROGRESS_FILE_NAME)
                 if snapshot and _MODEL_LINE in [entry["message"] for entry in json.loads(snapshot)["logEntries"]]:
                     return
-            except (ValueError, KeyError):
+            except (ValueError, KeyError, ex.EStorage):
                 pass  # A snapshot read while it is being written
 
             time.sleep(0.2)
