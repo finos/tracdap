@@ -82,3 +82,67 @@ class PythonGuardRailsTest(unittest.TestCase):
         test_model.run_model(None)  # noqa
 
         self.assertEqual([True, True], results)
+
+    def test_exec_outside_model_uses_caller_locals(self):
+
+        class StorageError(Exception):
+            pass
+
+        def raise_storage_error():
+            error = StorageError("not found")
+            exec("raise error from None")
+
+        self.assertRaises(StorageError, raise_storage_error)
+
+    def test_eval_outside_model_uses_caller_locals(self):
+
+        a, b = 2, 3
+
+        self.assertEqual(5, eval("a + b"))
+
+    def test_exec_outside_model_locals_are_a_snapshot(self):
+
+        x = 1
+        exec("x = 2")
+
+        self.assertEqual(1, x)
+
+    def test_exec_outside_model_module_level(self):
+
+        module_globals = {"__name__": "guard_rails_test_module"}
+        exec("exec('y = 1')\nz = y + 1", module_globals)
+
+        self.assertEqual(1, module_globals["y"])
+        self.assertEqual(2, module_globals["z"])
+
+    def test_exec_outside_model_explicit_namespace(self):
+
+        error = ValueError("caller")
+        namespace = {"error": KeyError("explicit")}
+
+        self.assertRaises(KeyError, lambda: exec("raise error", namespace))
+        self.assertEqual(4, eval("n * 2", {}, {"n": 2}))
+        self.assertIsInstance(error, ValueError)
+
+    def test_exec_outside_model_globals_none(self):
+
+        c = 7
+        result = {}
+
+        exec("result['c'] = c", None, {"result": result, "c": c})
+        self.assertEqual(7, result["c"])
+        self.assertEqual(7, eval("c", None))
+
+    def test_eval_from_model(self):
+
+        test_model_class = create_model(lambda: eval("1 + 1"))
+        test_model = test_model_class()
+
+        self.assertRaises(ex.EModelValidation, lambda: test_model.run_model(None))  # noqa
+
+    def test_exec_with_namespace_from_model(self):
+
+        test_model_class = create_model(lambda: exec("x = 1", {}, {}))
+        test_model = test_model_class()
+
+        self.assertRaises(ex.EModelValidation, lambda: test_model.run_model(None))  # noqa
