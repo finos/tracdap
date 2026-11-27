@@ -28,6 +28,7 @@ import org.finos.tracdap.common.netty.ProtocolHandler;
 import org.finos.tracdap.common.plugin.PluginManager;
 import org.finos.tracdap.common.service.TracGatewayConfig;
 import org.finos.tracdap.common.service.TracServiceBase;
+import org.finos.tracdap.common.util.RoutingUtils;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.ServiceConfig;
 import org.finos.tracdap.gateway.builders.RedirectBuilder;
@@ -157,7 +158,8 @@ public class TracPlatformGateway extends TracServiceBase {
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
 
             // Bind and start to accept incoming connections.
-            var startupFuture = bootstrap.bind(proxyPort);
+            var bindAddress = RoutingUtils.serviceBindAddress(serviceConfig);
+            var startupFuture = bootstrap.bind(bindAddress);
 
             // Block until the server channel is ready - it's just easier this way!
             // The sync call will rethrow any errors, so they can be handled before leaving the start() method
