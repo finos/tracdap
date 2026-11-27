@@ -180,6 +180,27 @@ public class JobContextTest {
         checkLogFileContext(jobTag, contextV1);
     }
 
+    @Test @Order(203)
+    void runModel_contextPartOnJobAndOutputs() {
+
+        var jobId = startJob(runModel("pandas").setContext(contextSelector(contextV1)).setContextPart("part_a"));
+        var jobStatus = Helpers.waitForJob(platform.orchClientBlocking(), TEST_TENANT, jobId);
+
+        Assertions.assertEquals(JobStatusCode.SUCCEEDED, jobStatus.getStatusCode());
+
+        var jobTag = readLatest(jobId);
+        Assertions.assertEquals("part_a", jobTag.getDefinition().getJob().getContextPart());
+        checkContextPart(jobTag, "part_a");
+
+        var outputs = searchJobObjects(ObjectType.DATA, jobId);
+        Assertions.assertEquals(1, outputs.size());
+        checkContextPart(readLatest(outputs.get(0).getHeader()), "part_a");
+
+        var resultTag = readObject(jobTag.getDefinition().getJob().getResultId());
+        var logFileTag = readObject(resultTag.getDefinition().getResult().getLogFileId());
+        checkContextPart(logFileTag, "part_a");
+    }
+
     @Test @Order(301)
     void runModel_oneOffPriorOutputsHasNoContext() {
 
@@ -281,6 +302,14 @@ public class JobContextTest {
         Assertions.assertEquals(
                 context.getObjectVersion(),
                 MetadataCodec.decodeIntegerValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_VERSION_ATTR)),
+                MetadataUtil.objectKey(tag.getHeader()));
+    }
+
+    private static void checkContextPart(org.finos.tracdap.metadata.Tag tag, String contextPart) {
+
+        Assertions.assertEquals(
+                contextPart,
+                MetadataCodec.decodeStringValue(tag.getAttrsOrThrow(MetadataConstants.TRAC_JOB_CONTEXT_PART_ATTR)),
                 MetadataUtil.objectKey(tag.getHeader()));
     }
 

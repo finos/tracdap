@@ -2491,6 +2491,57 @@ public class JobValidationTest {
     }
 
     @Test
+    public void contextPart_ok() {
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+        var job = contextRunModelJob("context_part_ok").setContext(contextSelector(contextId)).setContextPart("part_a");
+
+        var jobStatus = orchClient.validateJob(contextRequest(job));
+
+        Assertions.assertEquals(JobStatusCode.VALIDATED, jobStatus.getStatusCode());
+
+        // The hook sees the part with the context
+        var validation = TestJobHooks.VALIDATIONS.stream()
+                .filter(v -> v.definition().getContext().getObjectId().equals(contextId.getObjectId()))
+                .findFirst()
+                .orElseThrow();
+
+        Assertions.assertEquals("part_a", validation.definition().getContextPart());
+    }
+
+    @Test
+    public void contextPart_withoutContext() {
+
+        var job = contextRunModelJob("context_part_without_context").setContextPart("part_a");
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.INVALID_ARGUMENT, "A value cannot be given for [contextPart] unless a context is given");
+    }
+
+    @Test
+    public void contextPart_notAnIdentifier() {
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+        var job = contextRunModelJob("context_part_not_identifier").setContext(contextSelector(contextId)).setContextPart("part a");
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.INVALID_ARGUMENT, "[contextPart] is not a valid identifier: [part a]");
+    }
+
+    @Test
+    public void contextPart_reserved() {
+
+        var contextId = createContextObject(ByteString.copyFromUtf8("{}"));
+        var job = contextRunModelJob("context_part_reserved").setContext(contextSelector(contextId)).setContextPart("trac_part");
+
+        expectInvalid(
+                () -> orchClient.validateJob(contextRequest(job)),
+                Status.Code.INVALID_ARGUMENT, "[contextPart] is a TRAC reserved identifier: [trac_part]");
+    }
+
+    @Test
     public void context_notCustom() {
 
         var job = contextRunModelJob("context_not_custom").setContext(basicDataSelector);
