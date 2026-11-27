@@ -17,12 +17,17 @@
 
 package org.finos.tracdap.common.util;
 
+import org.finos.tracdap.common.config.ConfigHelpers;
 import org.finos.tracdap.common.config.ConfigKeys;
 import org.finos.tracdap.common.exception.EConfig;
 import org.finos.tracdap.common.exception.EUnexpected;
 import org.finos.tracdap.config.PlatformConfig;
 import org.finos.tracdap.config.RoutingTarget;
+import org.finos.tracdap.config.ServiceConfig;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
 import java.util.Map;
 
 public class RoutingUtils {
@@ -85,5 +90,45 @@ public class RoutingUtils {
                 throw new EUnexpected();
         }
 
+    }
+
+    /**
+     * Resolve the optional local bind host configured for a service via {@link ConfigKeys#NETWORK_BIND_ADDRESS}.
+     *
+     * @return trimmed bind host/IP, or {@code null} when unset/blank (meaning wildcard bind)
+     */
+    public static String serviceBindHost(ServiceConfig serviceConfig) {
+
+        var bindHost = ConfigHelpers.readString(
+                "service",
+                serviceConfig.getPropertiesMap(),
+                ConfigKeys.NETWORK_BIND_ADDRESS,
+                false);
+
+        if (bindHost == null || bindHost.isBlank())
+            return null;
+
+        return bindHost;
+    }
+
+    /**
+     * Resolve the local {@link InetSocketAddress} a service should bind to.
+     * Falls back to a wildcard bind on the configured port when {@link ConfigKeys#NETWORK_BIND_ADDRESS} is not set.
+     */
+    public static InetSocketAddress serviceBindAddress(ServiceConfig serviceConfig) {
+
+        var bindHost = serviceBindHost(serviceConfig);
+        var port = serviceConfig.getPort();
+
+        if (bindHost != null) {
+            try {
+                return new InetSocketAddress(InetAddress.getByName(bindHost), port);
+            }
+            catch (UnknownHostException e) {
+                throw new EConfig(String.format("Invalid bind address [%s]: %s", bindHost, e.getMessage()), e);
+            }
+        }
+
+        return new InetSocketAddress(port);
     }
 }

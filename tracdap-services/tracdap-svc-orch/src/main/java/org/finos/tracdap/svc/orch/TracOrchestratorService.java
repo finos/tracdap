@@ -199,7 +199,7 @@ public class TracOrchestratorService extends TracServiceBase {
 
             // Build the main server
             var serverBuilder = NettyServerBuilder
-                    .forPort(serviceConfig.getPort())
+                    .forAddress(RoutingUtils.serviceBindAddress(serviceConfig))
 
                     // Netty config
                     .channelType(channelType)
