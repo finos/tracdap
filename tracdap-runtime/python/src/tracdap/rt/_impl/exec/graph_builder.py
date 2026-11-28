@@ -315,7 +315,7 @@ class GraphBuilder:
         file_spec = _dc.replace(file_spec, definition=file_def)
 
         file_save_id = NodeId.of(f"{file_output_name}:SAVE", self._job_namespace, _data.DataSpec)
-        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec, step_name=file_output_name)
 
         decode_id = NodeId(f"{capture_name}:DECODE", self._job_namespace, _data.DataItem)
         nodes[decode_id] = DecodeTableNode(
@@ -787,7 +787,8 @@ class GraphBuilder:
         # Physical load of data items from disk
         # Currently one item per input, since inputs are single part/delta
         data_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
-        nodes[data_load_id] = LoadDataNode(data_load_id, spec=data_spec, explicit_deps=explicit_deps)
+        nodes[data_load_id] = LoadDataNode(
+            data_load_id, spec=data_spec, step_name=input_name, explicit_deps=explicit_deps)
 
         # Input views assembled by mapping one root part to each view
         data_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
@@ -827,7 +828,7 @@ class GraphBuilder:
                 explicit_deps=explicit_deps)
 
             # Save operation uses the dynamically produced schema info
-            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id)
+            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec_id=data_spec_id, step_name=output_name)
 
         else:
 
@@ -840,7 +841,7 @@ class GraphBuilder:
                 schema_id=schema_id)
 
             # Save operation uses the statically produced schema info
-            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec)
+            nodes[data_save_id] = SaveDataNode(data_save_id, data_item_id, spec=data_spec, step_name=output_name)
 
     def _build_data_spec(self, data_selector):
 
@@ -870,7 +871,8 @@ class GraphBuilder:
         file_spec = self._attach_metadata(file_spec, input_selector)
 
         file_load_id = NodeId.of(f"{input_name}:LOAD", self._job_namespace, _data.DataItem)
-        nodes[file_load_id] = LoadDataNode(file_load_id, spec=file_spec, explicit_deps=explicit_deps)
+        nodes[file_load_id] = LoadDataNode(
+            file_load_id, spec=file_spec, step_name=input_name, explicit_deps=explicit_deps)
 
         # Input views assembled by mapping one root part to each view
         file_view_id = NodeId.of(input_name, self._job_namespace, _data.DataView)
@@ -894,7 +896,7 @@ class GraphBuilder:
 
         # Graph node for the save operation
         file_save_id = NodeId.of(f"{output_name}:SAVE", self._job_namespace, _data.DataSpec)
-        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec)
+        nodes[file_save_id] = SaveDataNode(file_save_id, file_item_id, spec=file_spec, step_name=output_name)
 
     def _allocate_file_output_ids(self, prior_selector):
 
@@ -944,7 +946,8 @@ class GraphBuilder:
 
         exec_section = self.build_model_or_flow(
             sub_namespace, job_def, model_or_flow,
-            explicit_deps=push_section.must_run)
+            explicit_deps=push_section.must_run,
+            step_name=model_or_flow_name)
 
         pop_section = self.build_context_pop(
             sub_namespace, output_mapping,
@@ -956,11 +959,12 @@ class GraphBuilder:
             self, namespace: NodeNamespace,
             job_def: _meta.JobDefinition,
             model_or_flow: _meta.ObjectDefinition,
-            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None,
+            step_name: str = "") \
             -> GraphSection:
 
         if model_or_flow.objectType == _meta.ObjectType.MODEL:
-            return self.build_model(namespace, job_def, model_or_flow.model, explicit_deps)
+            return self.build_model(namespace, job_def, model_or_flow.model, explicit_deps, step_name)
 
         elif model_or_flow.objectType == _meta.ObjectType.FLOW:
             return self.build_flow(namespace, job_def, model_or_flow.flow, explicit_deps)
@@ -976,7 +980,8 @@ class GraphBuilder:
             self, namespace: NodeNamespace,
             job_def: _meta.JobDefinition,
             model_def: _meta.ModelDefinition,
-            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None) \
+            explicit_deps: _tp.Optional[_tp.List[NodeId]] = None,
+            step_name: str = "") \
             -> GraphSection:
 
         # Models in a flow are checked against the model type of their flow node
@@ -1030,7 +1035,8 @@ class GraphBuilder:
             frozenset(resource_ids), frozenset(parameter_ids), frozenset(input_ids),
             explicit_deps=explicit_deps, bundle=model_id.namespace,
             storage_access=storage_access,
-            graph_context=context)
+            graph_context=context,
+            step_name=step_name)
 
         nodes = {model_id: model_node}
 

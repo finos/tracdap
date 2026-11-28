@@ -28,6 +28,7 @@ import org.finos.tracdap.common.metadata.MetadataCodec;
 import org.finos.tracdap.common.metadata.MetadataConstants;
 import org.finos.tracdap.common.metadata.MetadataUtil;
 import org.finos.tracdap.common.metadata.ResourceBundle;
+import org.finos.tracdap.common.middleware.GrpcClientState;
 import org.finos.tracdap.common.middleware.GrpcConcern;
 import org.finos.tracdap.common.plugin.PluginRegistry;
 import org.finos.tracdap.common.service.TenantConfigManager;
@@ -55,6 +56,7 @@ import static org.finos.tracdap.common.metadata.MetadataConstants.*;
 public class JobProcessorHelpers {
 
     public static final String RESULT_PATH_TEMPLATE = "%d/%s/%s/trac_job_result.json";
+    public static final String PROGRESS_PATH_TEMPLATE = "%d/%s/%s/trac_job_progress.json";
     public static final String CAPTURE_MAX_SIZE_CONFIG_KEY = "captureMaxSize";
 
     static final int ERROR_MESSAGE_MAX_BYTES = 4000;
@@ -407,13 +409,15 @@ public class JobProcessorHelpers {
                 ConfigKeys.RESULT_STORAGE_LOCATION,
                 ConfigDefaults.RESULT_STORAGE_LOCATION);
 
-        var resultPath = buildResultPath(jobState);
+        var resultPath = buildResultPath(jobState, RESULT_PATH_TEMPLATE);
+        var progressPath = buildResultPath(jobState, PROGRESS_PATH_TEMPLATE);
 
         jobConfig.putProperties(ConfigKeys.RESULT_ENABLED, Boolean.TRUE.toString());
         jobConfig.putProperties(ConfigKeys.RESULT_LOGS_ENABLED, Boolean.TRUE.toString());
         jobConfig.putProperties(ConfigKeys.RESULT_STORAGE_LOCATION, resultLocation);
         jobConfig.putProperties(ConfigKeys.RESULT_STORAGE_PATH, resultPath);
         jobConfig.putProperties(ConfigKeys.RESULT_FORMAT, ConfigFormat.JSON.toString());
+        jobConfig.putProperties(ConfigKeys.RESULT_PROGRESS_PATH, progressPath);
 
         var sysConfig = RuntimeConfig.newBuilder();
         sysConfig.putAllProperties(tenantConfig.getPropertiesMap());
@@ -430,12 +434,12 @@ public class JobProcessorHelpers {
         return newState;
     }
 
-    private String buildResultPath(JobState jobState) {
+    private String buildResultPath(JobState jobState, String pathTemplate) {
 
         var jobTimestamp = MetadataCodec.decodeDatetime(jobState.jobId.getObjectTimestamp());
 
         return String.format(
-                RESULT_PATH_TEMPLATE,
+                pathTemplate,
                 jobTimestamp.getYear(),
                 MetadataCodec.ISO_DATE_FORMAT.format(jobTimestamp.toLocalDate()),
                 jobState.jobKey);
@@ -914,6 +918,41 @@ public class JobProcessorHelpers {
         var client = configureClient(metaClient, jobState);
 
         return client.readObject(readRequest).getHeader();
+    }
+
+    JobStatus getStatusFromMetadata(String tenant, TagSelector jobSelector, GrpcClientState clientState) {
+
+        var readRequest = MetadataReadRequest.newBuilder()
+                .setTenant(tenant)
+                .setSelector(jobSelector)
+                .build();
+
+        var client = clientState.configureClient(metaClient);
+        var jobTag = client.readObject(readRequest);
+
+        var status = JobStatus.newBuilder()
+                .setJobId(jobTag.getHeader());
+
+        var statusAttr = jobTag.getAttrsMap().get(TRAC_JOB_STATUS_ATTR);
+
+        if (statusAttr != null) {
+
+            var statusName = MetadataCodec.decodeStringValue(statusAttr);
+
+            try {
+                status.setStatusCode(JobStatusCode.valueOf(statusName));
+            }
+            catch (IllegalArgumentException e) {
+                log.warn("Job [{}] has an unrecognised status [{}]", MetadataUtil.objectKey(jobTag.getHeader()), statusName);
+            }
+        }
+
+        var errorAttr = jobTag.getAttrsMap().get(TRAC_JOB_ERROR_MESSAGE_ATTR);
+
+        if (errorAttr != null)
+            status.setStatusMessage(MetadataCodec.decodeStringValue(errorAttr));
+
+        return status.build();
     }
 
     private List<TagUpdate> jobAttrs(ResultDefinition result) {

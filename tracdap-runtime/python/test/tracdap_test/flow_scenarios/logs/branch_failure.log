@@ -1,0 +1,73 @@
+2026-11-22 15:56:42,532 [engine] INFO tracdap.rt._impl.exec.engine.JobProcessor - New job created for [JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1]
+2026-11-22 15:56:42,532 [engine] INFO tracdap.rt._impl.exec.engine.JobProcessor - Starting job [JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1]
+2026-11-22 15:56:42,533 [engine] INFO tracdap.rt._impl.exec.engine.GraphBuilder - Building execution graph
+2026-11-22 15:56:42,534 [engine] INFO tracdap.rt._impl.exec.engine.FunctionResolver - Resolving graph nodes to executable code
+2026-11-22 15:56:42,541 [engine] INFO tracdap.rt._impl.exec.engine.GraphProcessor - Begin processing graph
+2026-11-22 15:56:42,541 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START ContextPush [trac_job_push] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,541 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE ContextPush [trac_job_push] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,542 [data-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START LoadData [accounts:LOAD] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [data-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE LoadData [accounts:LOAD] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START DataView [accounts] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE DataView [accounts] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - EVICT LoadData [accounts:LOAD] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START ContextPush [trac_ctx_push] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - PUSH DataView [accounts] -> [accounts] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE ContextPush [trac_ctx_push] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START ContextPush [trac_ctx_push] / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - PUSH DataView [accounts] -> [accounts] / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE ContextPush [trac_ctx_push] / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,544 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - EVICT DataView [accounts] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,545 [model-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START RunModel [FailingModel] / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,545 [model-0] INFO tracdap.shim._0.tracdap_test.flow_scenarios.models.FailingModel - Scenario model [FailingModel] ran
+2026-11-22 15:56:42,545 [model-0] ERROR tracdap.rt._impl.exec.engine.NodeProcessor - FAILED RunModel [FailingModel] / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,548 [model-0] ERROR tracdap.rt._impl.exec.engine.NodeProcessor - There was an unhandled error in the model: Scenario model failure (models.py line 237, raise RuntimeError("Scenario model failure"))
+Traceback (most recent call last):
+  File "/opt/trac/venv/lib/python3.12/site-packages/tracdap/rt/_impl/exec/functions.py", line 706, in _execute
+    model.run_model(trac_ctx)
+  File "/opt/trac/repo/tracdap-runtime/python/test/tracdap_test/flow_scenarios/models.py", line 237, in run_model
+    raise RuntimeError("Scenario model failure")
+RuntimeError: Scenario model failure
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/opt/trac/venv/lib/python3.12/site-packages/tracdap/rt/_impl/exec/engine.py", line 1099, in evaluate_node
+    result = self.node.function(ctx, callback)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/trac/venv/lib/python3.12/site-packages/tracdap/rt/_impl/exec/functions.py", line 113, in __call__
+    return self._execute(ctx)
+           ^^^^^^^^^^^^^^^^^^
+  File "/opt/trac/venv/lib/python3.12/site-packages/tracdap/rt/_impl/exec/functions.py", line 712, in _execute
+    raise _ex.EModelExec(msg) from e
+tracdap.rt.exceptions.EModelExec: There was an unhandled error in the model: Scenario model failure (models.py line 237, raise RuntimeError("Scenario model failure"))
+2026-11-22 15:56:42,548 [model-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START RunModel [SumByRegion] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,548 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP failed_accounts / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,548 [model-0] INFO tracdap.shim._0.tracdap_test.flow_scenarios.models.SumByRegion - Scenario model [SumByRegion] ran
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP trac_job_result / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP trac_job_pop / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP trac_ctx_pop / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - EVICT ContextPush [trac_ctx_push] / MODEL = bad, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 / ROOT (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP bad.failed_accounts / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP trac_ctx_push / MODEL = count, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - EVICT ContextPush [trac_job_push] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP trac_ctx_pop / MODEL = count, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP accounts / MODEL = count, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP CountAccounts / MODEL = count, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP count.account_count / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP account_count / MODEL = count, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP account_count / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP account_count:ITEM / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,549 [engine] WARNING tracdap.rt._impl.exec.engine.GraphProcessor - SKIP account_count:SAVE / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1 (upstream failure)
+2026-11-22 15:56:42,564 [model-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - RESULT DataView [region_totals] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [model-0] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE RunModel [SumByRegion] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START ContextPop [trac_ctx_pop] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - POP DataView [good.region_totals] <- [region_totals] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE ContextPop [trac_ctx_pop] / MODEL = good, JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - MAP DataView [good.region_totals] -> [region_totals] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START DataItem [region_totals:ITEM] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [engine] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE DataItem [region_totals:ITEM] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,564 [data-1] INFO tracdap.rt._impl.exec.engine.NodeProcessor - START SaveData [region_totals:SAVE] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,565 [data-1] INFO tracdap.rt._impl.exec.engine.NodeProcessor - DONE SaveData [region_totals:SAVE] / JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1
+2026-11-22 15:56:42,566 [engine] ERROR tracdap.rt._impl.exec.engine.JobProcessor - Job failed [JOB-01a203f9-55bd-77a7-8e1d-54a73b14b91e-v1]
+2026-11-22 15:56:42,566 [engine] INFO tracdap.rt._impl.exec.engine.JobProcessor - Saving job log [FILE-01a203f9-55c1-70ce-aeb5-fffb8f10360d-v1]

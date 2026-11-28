@@ -25,6 +25,7 @@ import tracdap.rt.exceptions as _ex
 import tracdap.rt._impl.exec.actors as _actors
 import tracdap.rt._impl.exec.graph_builder as _graph
 import tracdap.rt._impl.exec.functions as _func
+import tracdap.rt._impl.exec.progress as _progress
 import tracdap.rt._impl.core.config_parser as _cfg_p
 import tracdap.rt._impl.core.data as _data
 import tracdap.rt._impl.core.logging as _logging
@@ -89,17 +90,23 @@ class _JobLog:
 
     log_file_needed: bool = True
 
+    progress_handler: tp.Optional[_progress.ProgressHandler] = None
+
     log_buffer: io.BytesIO = None
     log_provider: _logging.LogProvider = None
 
     def __post_init__(self, log_init):
+
+        extra_handlers = [self.progress_handler] if self.progress_handler is not None else []
 
         if log_init is not None:
             self.log_provider = log_init.log_provider
             self.log_file_needed = False
         elif self.log_file_needed:
             self.log_buffer = io.BytesIO()
-            self.log_provider = _logging.job_log_provider(self.log_buffer)
+            self.log_provider = _logging.job_log_provider(self.log_buffer, extra_handlers)
+        elif any(extra_handlers):
+            self.log_provider = _logging.JobLogProvider(*extra_handlers)
         else:
             self.log_provider = _logging.LogProvider()
 
@@ -114,6 +121,7 @@ class _JobState:
     actor_id: _actors.ActorId = None
     monitors: tp.List[_actors.ActorId] = dc.field(default_factory=list)
     job_log: _JobLog = None
+    progress_writer: tp.Optional[_progress.ProgressWriter] = None
 
     job_result: _cfg.JobResult = None
     job_error: Exception = None
@@ -197,7 +205,10 @@ class TracEngine(_actors.Actor):
             _cfg_p.ConfigKeys.RESULT_LOGS_ENABLED,
             False, bool)
 
-        job_log = _JobLog(log_file_needed=job_logs_enabled)
+        progress_writer = self._start_job_progress(job_key, job_config)
+        progress_handler = progress_writer.handler if progress_writer is not None else None
+
+        job_log = _JobLog(log_file_needed=job_logs_enabled, progress_handler=progress_handler)
 
         job_processor = JobProcessor(
             self._sys_config, self._resources,
@@ -213,6 +224,7 @@ class TracEngine(_actors.Actor):
         job_state.actor_id = job_actor_id
         job_state.monitors.append(job_monitor_id)
         job_state.job_log = job_log
+        job_state.progress_writer = progress_writer
 
         self._jobs[job_key] = job_state
 
@@ -327,8 +339,12 @@ class TracEngine(_actors.Actor):
             False, bool)
 
         # Record output metadata if required
-        if result_enabled and job_state.parent_key is None:
-            self._save_job_result(job_key, job_state)
+        try:
+            if result_enabled and job_state.parent_key is None:
+                self._save_job_result(job_key, job_state)
+        finally:
+            if job_state.parent_key is None:
+                self._stop_job_progress(job_key, job_state)
 
         # Stop any monitors that were created directly by the engine
         # (Other actors are responsible for stopping their own monitors)
@@ -341,6 +357,41 @@ class TracEngine(_actors.Actor):
         if job_state.actor_id is not None:
             self.actors().stop(job_state.actor_id)
             job_state.actor_id = None
+
+    def _start_job_progress(self, job_key: str, job_config: _cfg.JobConfig) -> tp.Optional[_progress.ProgressWriter]:
+
+        # Progress is never required to run a job, a job with no progress runs as normal
+        try:
+
+            progress_path = _util.read_property(
+                job_config.properties,
+                _cfg_p.ConfigKeys.RESULT_PROGRESS_PATH,
+                optional=True)
+
+            if progress_path is None:
+                return None
+
+            storage_key = _util.read_property(job_config.properties, _cfg_p.ConfigKeys.RESULT_STORAGE_LOCATION)
+            storage = self._resources.get_storage().get_file_storage(storage_key)
+
+            progress_writer = _progress.ProgressWriter(_progress.ProgressHandler(), storage, progress_path)
+            progress_writer.start()
+
+            return progress_writer
+
+        except Exception as e:
+            self._log.exception(f"Job progress is not available for [{job_key}]: {str(e)}")
+            return None
+
+    def _stop_job_progress(self, job_key: str, job_state: _JobState):
+
+        if job_state.progress_writer is None:
+            return
+
+        try:
+            job_state.progress_writer.stop()
+        except Exception as e:
+            self._log.exception(f"Job progress could not be stopped for [{job_key}]: {str(e)}")
 
     def _save_job_result(self, job_key: str, job_state: _JobState):
 
@@ -734,7 +785,9 @@ class GraphProcessor(_actors.Actor):
 
                 if self._upstream_failure(node, graph):
 
-                    self._log.warning(f"SKIP {str(node_id)} (upstream failure)")
+                    self._log.warning(
+                        f"SKIP {str(node_id)} (upstream failure)",
+                        extra=_progress.step_extra(node.node, _progress.STEP_SKIP))
 
                     pending_nodes.discard(node_id)
                     failed_nodes.add(node_id)
@@ -867,6 +920,10 @@ class GraphProcessor(_actors.Actor):
 
     @_actors.Message
     def node_succeeded(self, node_id: NodeId, result):
+
+        # A node can report success after an error was set on it, it is then recorded as failed
+        if self.graph.nodes[node_id].error:
+            self._node_logger.log_node_failed(self.graph.nodes[node_id])
 
         # Child node is no longer needed, it can be stopped to release resources
         processor = self.processors.pop(node_id)
@@ -1226,7 +1283,9 @@ class NodeLogger:
             self._log.info(f"USE {self._func_type(node)} [{node_name}] / {namespace}")
 
         else:
-            self._log.info(f"START {self._func_type(node)} [{node_name}] / {namespace}")
+            self._log.info(
+                f"START {self._func_type(node)} [{node_name}] / {namespace}",
+                extra=_progress.step_extra(node.node, _progress.STEP_START))
 
     def log_node_succeeded(self, node: _EngineNode):
 
@@ -1243,15 +1302,20 @@ class NodeLogger:
         if logging_type == self.LoggingType.MODEL:
             self._log_model_node_details(node.node)  # noqa
 
-        self._log.info(f"DONE {self._func_type(node)} [{node_name}] / {namespace}")
+        self._log.info(
+            f"DONE {self._func_type(node)} [{node_name}] / {namespace}",
+            extra=_progress.step_extra(node.node, _progress.STEP_DONE))
 
-    def log_node_failed(self, node: _EngineNode, e: Exception):
+    def log_node_failed(self, node: _EngineNode, e: tp.Optional[Exception] = None):
 
         node_name = node.node.id.name
         namespace = node.node.id.namespace
+        step_extra = _progress.step_extra(node.node, _progress.STEP_FAILED)
 
-        self._log.error(f"FAILED {self._func_type(node)} [{node_name}] / {namespace}")
-        self._log.exception(e)
+        self._log.error(f"FAILED {self._func_type(node)} [{node_name}] / {namespace}", extra=step_extra)
+
+        if e is not None:
+            self._log.exception(e, extra=step_extra)
 
     def log_node_evict(self, node: _EngineNode):
 

@@ -64,6 +64,7 @@ public class ConfigKeys {
     public static final String RESULT_STORAGE_LOCATION = "result.storage.location";
     public static final String RESULT_STORAGE_PATH = "result.storage.path";
     public static final String RESULT_FORMAT = "result.format";
+    public static final String RESULT_PROGRESS_PATH = "result.progress.path";
 
     // Well-known config classes
     public static final String TRAC_CONFIG = "trac_config";

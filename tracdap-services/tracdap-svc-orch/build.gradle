@@ -72,6 +72,12 @@ dependencies {
         exclude group: 'junit', module: 'junit'
     }
 
+    // Log capture, for tests that check what the services log
+    testImplementation group: 'org.apache.logging.log4j', name: 'log4j-core', version: "$log4j_version"
+
+    // In-process gRPC server, for tests that depend on call deadlines
+    testImplementation group: 'io.grpc', name: 'grpc-inprocess', version: "$grpc_version"
+
     // gRPC testing requires Jackson annotations
     testImplementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: "$jackson_annotations_version"
 }

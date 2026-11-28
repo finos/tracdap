@@ -91,6 +91,8 @@ class PythonGuardRails:
 
     REQUIRED_DEBUG_FUNCTIONS = ["exec", "eval", "compile"]
 
+    CALLER_NAMESPACE_FUNCTIONS = ["exec", "eval"]
+
     REQUIRED_IMPORT_FUNCTIONS = {
         "exec": exec,
         "eval": eval,
@@ -152,12 +154,12 @@ class PythonGuardRails:
             # Allow libraries and platform code to call the dangerous functions
             # Trying to restrict libraries or even Python itself causes too many errors to be practical
             if model_code_details is None:
-                return func(*args, **kwargs)
+                return cls.call_allowed_function(func_name, func, sys._getframe(1), args, kwargs)  # noqa
 
             # Some dangerous functions are required by the debugger, e.g. exec, eval, compile
             # We definitely want the debugger to work for model code, so these have to be allowed
             if cls.is_debug() and func_name in cls.REQUIRED_DEBUG_FUNCTIONS:
-                return func(*args, **kwargs)
+                return cls.call_allowed_function(func_name, func, sys._getframe(1), args, kwargs)  # noqa
 
             # ----------------------------------------------------------------------------------------------------------
             # Do not guard model code imports for now
@@ -172,6 +174,28 @@ class PythonGuardRails:
         setattr(protected_function,  "__trac_protection__", True)
 
         return protected_function
+
+    @classmethod
+    def call_allowed_function(cls, func_name, func, caller_frame, args, kwargs):
+
+        # With no namespace, exec() and eval() use the namespace of their caller
+        # The caller of the real function is the protected wrapper, so the original caller's namespace is passed on
+        if func_name not in cls.CALLER_NAMESPACE_FUNCTIONS:
+            return func(*args, **kwargs)
+
+        source, *namespaces = args
+        globals_ = namespaces[0] if len(namespaces) > 0 else kwargs.pop("globals", None)
+        locals_ = namespaces[1] if len(namespaces) > 1 else kwargs.pop("locals", None)
+
+        if globals_ is None:
+            globals_ = caller_frame.f_globals
+            if locals_ is None:
+                # Function locals are a snapshot, as for the real function, module locals are the module globals
+                locals_ = caller_frame.f_locals
+                if locals_ is not globals_:
+                    locals_ = dict(locals_)
+
+        return func(source, globals_, locals_, **kwargs)
 
     @classmethod
     def check_for_model_code(cls, func_name):
